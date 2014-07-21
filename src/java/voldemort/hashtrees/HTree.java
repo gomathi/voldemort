@@ -1,5 +1,6 @@
 package voldemort.hashtrees;
 
+import java.util.Collection;
 import java.util.List;
 
 /**
@@ -20,9 +21,15 @@ public interface HTree {
      * Given an another HTree object, this method updates its HTree, based on
      * the difference in the keys.
      * 
+     * This function should be running on primary to synch with other replicas,
+     * and not the other way.
+     * 
      * @param htree
+     * @param synchRemoteOrLocal, true indicates update remote with the
+     *        differences from local and false indicates get the updates from
+     *        remote.
      */
-    void synchWith(HTree htree);
+    void synch(HTree htree, boolean synchRemoteOrLocal);
 
     /**
      * Hash tree internal nodes store the hash of their leaf nodes. Given a set
@@ -32,7 +39,7 @@ public interface HTree {
      * @param nodeIds, internal tree node ids.
      * @return
      */
-    List<SegmentHash> getSegmentHashes(List<Integer> nodeIds);
+    List<SegmentHash> getSegmentHashes(Collection<Integer> nodeIds);
 
     /**
      * Hash tree data is stored on the leaf blocks. Given a segment id this

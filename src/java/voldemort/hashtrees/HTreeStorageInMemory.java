@@ -65,7 +65,7 @@ public class HTreeStorageInMemory implements HTreeStorage {
     }
 
     @Override
-    public void unsetDirtySegmentBlock(Collection<Integer> dirtySegIds) {
+    public void unsetDirtySegmentBlocks(Collection<Integer> dirtySegIds) {
         for(int dirtySegId: dirtySegIds) {
             dirtySegments.clear(dirtySegId);
         }

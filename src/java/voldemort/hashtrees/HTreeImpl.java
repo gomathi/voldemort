@@ -9,8 +9,11 @@ import java.util.Set;
 import java.util.TreeSet;
 
 /**
+ * Uses a binary tree to store the segment hashes.
  * 
- *
+ * 1) Segment hashes and (Key, Hash) pairs are stored on the same storage
+ * {@link HTreeStorage}
+ * 
  */
 public class HTreeImpl implements HTree {
 
@@ -32,10 +35,37 @@ public class HTreeImpl implements HTree {
     }
 
     @Override
-    public void synchWith(HTree htree) {}
+    public void synch(HTree htree, boolean synchRemoteOrLocal) {
+        if(synchRemoteOrLocal)
+            synch(this, htree);
+        else
+            synch(htree, this);
+    }
+
+    /**
+     * 
+     * @param src
+     * @param dest
+     */
+    private void synch(HTree src, HTree dest) {
+        List<Integer> blocksToCheck = new ArrayList<Integer>();
+        List<Integer> missingBlocks = new ArrayList<Integer>();
+        SegmentHashIterator fItr, sItr;
+
+        Queue<Integer> pQueue = new ArrayDeque<Integer>();
+        pQueue.add(0); // 0 is the root node.
+        while(!pQueue.isEmpty()) {
+
+            fItr = new SegmentHashIterator(src.getSegmentHashes(pQueue));
+            sItr = new SegmentHashIterator(dest.getSegmentHashes(pQueue));
+            while(fItr.hasNext() && sItr.hasNext()) {
+
+            }
+        }
+    }
 
     @Override
-    public List<SegmentHash> getSegmentHashes(List<Integer> nodeIds) {
+    public List<SegmentHash> getSegmentHashes(Collection<Integer> nodeIds) {
         return hTStorage.getSegmentHashes(nodeIds);
     }
 
@@ -48,7 +78,7 @@ public class HTreeImpl implements HTree {
     public void rebuildHTree() {
         List<Integer> dirtyNodeIds = rebuildLeaves();
         rebuildInternalNodes(dirtyNodeIds);
-        hTStorage.unsetDirtySegmentBlock(dirtyNodeIds);
+        hTStorage.unsetDirtySegmentBlocks(dirtyNodeIds);
     }
 
     private List<Integer> rebuildLeaves() {
@@ -91,6 +121,12 @@ public class HTreeImpl implements HTree {
         }
     }
 
+    /**
+     * For each parent id, gets all the child hashes, and updates the parent
+     * hash.
+     * 
+     * @param parentIds
+     */
     private void updateInternalNodes(final Set<Integer> parentIds) {
         List<SegmentHash> segmentHashes;
         StringBuilder sb = new StringBuilder();
@@ -138,6 +174,11 @@ public class HTreeImpl implements HTree {
         return height;
     }
 
+    /**
+     * 
+     * @param childId
+     * @return
+     */
     private static int getParent(final int childId) {
         if(childId <= 2)
             return 0;
@@ -159,7 +200,7 @@ public class HTreeImpl implements HTree {
     }
 
     /**
-     * Given a parent id, finds all the leaves that can be reached extended the
+     * Given a parent id, finds all the leaves that can be reached from the
      * parent.
      * 
      * @param parentId
@@ -177,8 +218,4 @@ public class HTreeImpl implements HTree {
         return pQueue;
     }
 
-    public static void main(String[] args) {
-        Collection<Integer> result = getAllLeafNodeIds(4, 14);
-        System.out.println(result);
-    }
 }

@@ -64,6 +64,6 @@ public interface HTreeStorage {
      * 
      * @param dirtySegIds
      */
-    void unsetDirtySegmentBlock(Collection<Integer> dirtySegIds);
+    void unsetDirtySegmentBlocks(Collection<Integer> dirtySegIds);
 
 }
