@@ -4,6 +4,7 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
 import java.util.TreeSet;
@@ -21,10 +22,12 @@ public class HTreeImpl implements HTree {
     private final int maxInternalNodeId;
     private final int noOfSegments;
     private final HTreeStorage hTStorage;
+    private final Storage storage;
 
-    public HTreeImpl(final int noOfSegments, final HTreeStorage hTStroage) {
+    public HTreeImpl(final int noOfSegments, final HTreeStorage hTStroage, final Storage storage) {
         this.noOfSegments = noOfSegments;
         this.hTStorage = hTStroage;
+        this.storage = storage;
         maxInternalNodeId = getNoOfInternalNodeIds(noOfSegments) - 2;
     }
 
@@ -33,6 +36,14 @@ public class HTreeImpl implements HTree {
         int segId = getSegmentId(key);
         String digest = digest(value);
         hTStorage.putSegmentData(segId, key, digest);
+        hTStorage.setDirtySegmentBlock(segId);
+    }
+
+    @Override
+    public void remove(String key) {
+        int segId = getSegmentId(key);
+        hTStorage.deleteSegmentData(segId, key);
+        hTStorage.setDirtySegmentBlock(segId);
     }
 
     @Override
@@ -42,6 +53,7 @@ public class HTreeImpl implements HTree {
         List<Integer> missingBlocksInLocal = new ArrayList<Integer>();
         PeekingIteratorImpl<SegmentHash> localItr = null, remoteItr = null;
         SegmentHash local, remote;
+        BatchUpdater batchUpdater = new BatchUpdater(1000, remoteTree);
 
         Queue<Integer> pQueue = new ArrayDeque<Integer>();
         pQueue.add(ROOT_NODE);
@@ -49,7 +61,7 @@ public class HTreeImpl implements HTree {
 
             localItr = new PeekingIteratorImpl<SegmentHash>(getSegmentHashes(pQueue));
             remoteItr = new PeekingIteratorImpl<SegmentHash>(remoteTree.getSegmentHashes(pQueue));
-            pQueue.clear();
+            pQueue = new ArrayDeque<Integer>();
             while(localItr.hasNext() && remoteItr.hasNext()) {
                 local = localItr.peek();
                 remote = remoteItr.peek();
@@ -90,14 +102,43 @@ public class HTreeImpl implements HTree {
             else
                 missingBlocksInLocal.addAll(getAllLeafNodeIds(remoteItr.peek().getNodeId()));
         }
+
+        for(int blockId: blocksToCheck)
+            checkAndSynchSegmentBlock(blockId, remoteTree, batchUpdater);
     }
 
-    private void checkAndSynchSegmentBlock(int segBlockId, HTree remoteTree) {
+    private void checkAndSynchSegmentBlock(int segBlockId,
+                                           HTree remoteTree,
+                                           BatchUpdater batchUpdater) {
         PeekingIteratorImpl<SegmentData> localDataItr = new PeekingIteratorImpl<SegmentData>(getSegmentBlock(segBlockId));
         PeekingIteratorImpl<SegmentData> remoteDataItr = new PeekingIteratorImpl<SegmentData>(remoteTree.getSegmentBlock(segBlockId));
+        SegmentData local, remote;
+        List<String> keysToBeUpdated = new ArrayList<String>();
+        List<String> keysToBeRemoved = new ArrayList<String>();
         while(localDataItr.hasNext() && remoteDataItr.hasNext()) {
+            local = localDataItr.peek();
+            remote = remoteDataItr.peek();
 
+            int compRes = local.getKey().compareTo(remote.getKey());
+            if(compRes == 0) {
+                if(!local.getValue().equals(remote.getValue()))
+                    keysToBeUpdated.add(local.getKey());
+                localDataItr.next();
+                remoteDataItr.next();
+            } else if(compRes < 0) {
+                keysToBeUpdated.add(local.getKey());
+                localDataItr.next();
+            } else {
+                keysToBeRemoved.add(remote.getKey());
+                remoteDataItr.next();
+            }
         }
+        while(localDataItr.hasNext())
+            keysToBeUpdated.add(localDataItr.next().getKey());
+        while(remoteDataItr.hasNext())
+            keysToBeRemoved.add(remoteDataItr.next().getKey());
+        batchUpdater.addKeys(keysToBeUpdated);
+        batchUpdater.removeKeys(keysToBeRemoved);
     }
 
     @Override
@@ -118,8 +159,15 @@ public class HTreeImpl implements HTree {
     }
 
     @Override
-    public void addAndPut(String key, String value) {
-        put(key, value);
+    public void batchSPut(Map<String, String> keyValuePairs) {
+        for(Map.Entry<String, String> keyValuePair: keyValuePairs.entrySet())
+            storage.put(keyValuePair.getKey(), keyValuePair.getValue());
+    }
+
+    @Override
+    public void batchSRemove(List<String> keys) {
+        for(String key: keys)
+            storage.remove(key);
     }
 
     /**

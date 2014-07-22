@@ -24,8 +24,14 @@ public class HTreeStorageInMemory implements HTreeStorage {
     public void putSegmentData(int segId, String key, String digest) {
         if(!segDataBlocks.containsKey(segId))
             segDataBlocks.put(segId, new TreeMap<String, String>());
-        TreeMap<String, String> segDataBlock = segDataBlocks.get(segId);
-        segDataBlock.put(key, digest);
+        segDataBlocks.get(segId).put(key, digest);
+    }
+
+    @Override
+    public void deleteSegmentData(int segId, String key) {
+        if(segDataBlocks.containsKey(segId)) {
+            segDataBlocks.get(segId).remove(key);
+        }
     }
 
     @Override
@@ -70,4 +76,5 @@ public class HTreeStorageInMemory implements HTreeStorage {
             dirtySegments.clear(dirtySegId);
         }
     }
+
 }

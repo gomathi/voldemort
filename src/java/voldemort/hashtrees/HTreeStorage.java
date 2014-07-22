@@ -19,6 +19,14 @@ public interface HTreeStorage {
     void putSegmentData(int segId, String key, String digest);
 
     /**
+     * Deletes the given segement data from the block.
+     * 
+     * @param segId
+     * @param key
+     */
+    void deleteSegmentData(int segId, String key);
+
+    /**
      * Given a segment id, returns the list of all segment data in the
      * individual segment block.
      * 

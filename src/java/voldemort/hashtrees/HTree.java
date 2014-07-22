@@ -2,6 +2,7 @@ package voldemort.hashtrees;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Defines Hash tree methods. Hash tree provides a way for nodes to synch up
@@ -19,14 +20,27 @@ public interface HTree {
     void put(String key, String value);
 
     /**
-     * Adds the (key,value) pair to the original storage, and also puts (key,
-     * digest) pair to the merkle tree. Intended to be used while synch
-     * operation.
+     * Deletes the key from the hash tree.
+     * 
+     * @param key
+     */
+    void remove(String key);
+
+    /**
+     * Adds the (key,value) pair to the original storage. Intended to be used
+     * while synch operation.
      * 
      * @param key
      * @param value
      */
-    void addAndPut(String key, String value);
+    void batchSPut(Map<String, String> keyValuePairs);
+
+    /**
+     * Deletes the keys from the storage. While synching this function is used.
+     * 
+     * @param key
+     */
+    void batchSRemove(List<String> key);
 
     /**
      * Updates the other HTree based on the differences with local objects.
