@@ -57,12 +57,12 @@ public class HTreeStorageInMemory implements HTreeStorage {
     }
 
     @Override
-    public void setDirtySegmentBlock(int segId) {
+    public void setDirtySegmentBucket(int segId) {
         dirtySegments.set(segId);
     }
 
     @Override
-    public List<Integer> getDirtySegmentBlockIds() {
+    public List<Integer> getDirtySegmentBucketIds() {
         List<Integer> result = new ArrayList<Integer>();
         for(int itr = dirtySegments.nextSetBit(0); itr >= 0; itr = dirtySegments.nextSetBit(itr + 1)) {
             result.add(itr);
@@ -71,7 +71,7 @@ public class HTreeStorageInMemory implements HTreeStorage {
     }
 
     @Override
-    public void unsetDirtySegmentBlocks(Collection<Integer> dirtySegIds) {
+    public void unsetDirtySegmentBuckets(Collection<Integer> dirtySegIds) {
         for(int dirtySegId: dirtySegIds) {
             dirtySegments.clear(dirtySegId);
         }

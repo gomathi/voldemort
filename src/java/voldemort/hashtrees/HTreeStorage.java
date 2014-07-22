@@ -58,20 +58,20 @@ public interface HTreeStorage {
      * 
      * @param segId
      */
-    void setDirtySegmentBlock(int segId);
+    void setDirtySegmentBucket(int segId);
 
     /**
      * Returns all the ids of the dirty segments.
      * 
      * @return
      */
-    List<Integer> getDirtySegmentBlockIds();
+    List<Integer> getDirtySegmentBucketIds();
 
     /**
      * Clears the dirty bits of the dirty segments.
      * 
      * @param dirtySegIds
      */
-    void unsetDirtySegmentBlocks(Collection<Integer> dirtySegIds);
+    void unsetDirtySegmentBuckets(Collection<Integer> dirtySegIds);
 
 }
