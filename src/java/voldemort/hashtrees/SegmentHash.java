@@ -14,7 +14,7 @@ public class SegmentHash {
         return hash;
     }
 
-    public long getNodeId() {
+    public int getNodeId() {
         return nodeId;
     }
 

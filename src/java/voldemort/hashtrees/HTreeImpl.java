@@ -17,14 +17,15 @@ import java.util.TreeSet;
  */
 public class HTreeImpl implements HTree {
 
-    private final int leafNodeOffset;
+    private final static int ROOT_NODE = 0;
+    private final int maxInternalNodeId;
     private final int noOfSegments;
     private final HTreeStorage hTStorage;
 
     public HTreeImpl(final int noOfSegments, final HTreeStorage hTStroage) {
         this.noOfSegments = noOfSegments;
         this.hTStorage = hTStroage;
-        leafNodeOffset = getNoOfInternalNodeIds(noOfSegments) - 2;
+        maxInternalNodeId = getNoOfInternalNodeIds(noOfSegments) - 2;
     }
 
     @Override
@@ -35,32 +36,67 @@ public class HTreeImpl implements HTree {
     }
 
     @Override
-    public void synch(HTree htree, boolean synchRemoteOrLocal) {
-        if(synchRemoteOrLocal)
-            synch(this, htree);
-        else
-            synch(htree, this);
-    }
-
-    /**
-     * 
-     * @param src
-     * @param dest
-     */
-    private void synch(HTree src, HTree dest) {
+    public void update(HTree remoteTree) {
         List<Integer> blocksToCheck = new ArrayList<Integer>();
-        List<Integer> missingBlocks = new ArrayList<Integer>();
-        SegmentHashIterator fItr, sItr;
+        List<Integer> missingBlocksInRemote = new ArrayList<Integer>();
+        List<Integer> missingBlocksInLocal = new ArrayList<Integer>();
+        PeekingIteratorImpl<SegmentHash> localItr = null, remoteItr = null;
+        SegmentHash local, remote;
 
         Queue<Integer> pQueue = new ArrayDeque<Integer>();
-        pQueue.add(0); // 0 is the root node.
+        pQueue.add(ROOT_NODE);
         while(!pQueue.isEmpty()) {
 
-            fItr = new SegmentHashIterator(src.getSegmentHashes(pQueue));
-            sItr = new SegmentHashIterator(dest.getSegmentHashes(pQueue));
-            while(fItr.hasNext() && sItr.hasNext()) {
+            localItr = new PeekingIteratorImpl<SegmentHash>(getSegmentHashes(pQueue));
+            remoteItr = new PeekingIteratorImpl<SegmentHash>(remoteTree.getSegmentHashes(pQueue));
+            pQueue.clear();
+            while(localItr.hasNext() && remoteItr.hasNext()) {
+                local = localItr.peek();
+                remote = remoteItr.peek();
 
+                if(local.getNodeId() == remote.getNodeId()) {
+                    if(!local.getHash().equals(remote.getHash())) {
+                        if(isLeafNode(local.getNodeId()))
+                            blocksToCheck.add(getSegmentBlockId(local.getNodeId()));
+                        else
+                            pQueue.addAll(getImmediateChildren(local.getNodeId()));
+
+                    }
+                    localItr.next();
+                    remoteItr.next();
+                } else if(local.getNodeId() < remote.getNodeId()) {
+                    if(isLeafNode(local.getNodeId()))
+                        missingBlocksInRemote.add(getSegmentBlockId(local.getNodeId()));
+                    else
+                        missingBlocksInRemote.addAll(getAllLeafNodeIds(local.getNodeId()));
+                    localItr.next();
+                } else {
+                    if(isLeafNode(remote.getNodeId()))
+                        missingBlocksInLocal.add(getSegmentBlockId(remote.getNodeId()));
+                    else
+                        missingBlocksInLocal.addAll(getAllLeafNodeIds(remote.getNodeId()));
+                    remoteItr.next();
+                }
             }
+        }
+        if(localItr != null && localItr.hasNext()) {
+            if(isLeafNode(localItr.peek().getNodeId()))
+                missingBlocksInRemote.add(localItr.peek().getNodeId());
+            else
+                missingBlocksInRemote.addAll(getAllLeafNodeIds(localItr.peek().getNodeId()));
+        } else if(remoteItr != null && remoteItr.hasNext()) {
+            if(isLeafNode(remoteItr.peek().getNodeId()))
+                missingBlocksInLocal.add(remoteItr.peek().getNodeId());
+            else
+                missingBlocksInLocal.addAll(getAllLeafNodeIds(remoteItr.peek().getNodeId()));
+        }
+    }
+
+    private void checkAndSynchSegmentBlock(int segBlockId, HTree remoteTree) {
+        PeekingIteratorImpl<SegmentData> localDataItr = new PeekingIteratorImpl<SegmentData>(getSegmentBlock(segBlockId));
+        PeekingIteratorImpl<SegmentData> remoteDataItr = new PeekingIteratorImpl<SegmentData>(remoteTree.getSegmentBlock(segBlockId));
+        while(localDataItr.hasNext() && remoteDataItr.hasNext()) {
+
         }
     }
 
@@ -81,13 +117,24 @@ public class HTreeImpl implements HTree {
         hTStorage.unsetDirtySegmentBlocks(dirtyNodeIds);
     }
 
+    @Override
+    public void addAndPut(String key, String value) {
+        put(key, value);
+    }
+
+    /**
+     * Rebuilds the dirty segments, and updates the segment hashes of the
+     * leaves.
+     * 
+     * @return, the nodes ids of leaves in the tree.
+     */
     private List<Integer> rebuildLeaves() {
         List<Integer> dirtySegments = hTStorage.getDirtySegmentBlockIds();
         List<Integer> dirtyNodeIds = new ArrayList<Integer>();
         for(int dirtySegId: dirtySegments) {
             String digest = digestSegmentData(dirtySegId);
             if(!digest.isEmpty()) {
-                int nodeId = leafNodeOffset + dirtySegId;
+                int nodeId = maxInternalNodeId + dirtySegId;
                 hTStorage.putSegmentHash(nodeId, digest);
                 dirtyNodeIds.add(nodeId);
             }
@@ -144,6 +191,39 @@ public class HTreeImpl implements HTree {
         return -1;
     }
 
+    /**
+     * Segment block id starts with 0. Each leaf node corresponds to a segment
+     * block. To calculate the segment block id given a leaf node id, we need to
+     * subtract maxInternalNodeId.
+     * 
+     * @param leafNodeId
+     * @return
+     */
+    private int getSegmentBlockId(final int leafNodeId) {
+        return leafNodeId - maxInternalNodeId;
+    }
+
+    private boolean isLeafNode(int nodeId) {
+        return nodeId > maxInternalNodeId;
+    }
+
+    /**
+     * Given a parent id, finds all the leaves that can be reached from the
+     * parent.
+     * 
+     * @param parentId
+     * @return
+     */
+    private Collection<Integer> getAllLeafNodeIds(int parentId) {
+        Queue<Integer> pQueue = new ArrayDeque<Integer>();
+        pQueue.add(parentId);
+        while(pQueue.peek() <= maxInternalNodeId) {
+            int cNodeId = pQueue.remove();
+            pQueue.addAll(getImmediateChildren(cNodeId));
+        }
+        return pQueue;
+    }
+
     private static String digest(String data) {
         return null;
     }
@@ -175,6 +255,7 @@ public class HTreeImpl implements HTree {
     }
 
     /**
+     * Returns the parent node id.
      * 
      * @param childId
      * @return
@@ -197,25 +278,6 @@ public class HTreeImpl implements HTree {
             children.add((2 * parentId) + i);
         }
         return children;
-    }
-
-    /**
-     * Given a parent id, finds all the leaves that can be reached from the
-     * parent.
-     * 
-     * @param parentId
-     * @param maxLeafNodeId, needs additional parameter to figure out when to
-     *        stop.
-     * @return
-     */
-    private static Collection<Integer> getAllLeafNodeIds(int parentId, int maxLeafNodeId) {
-        Queue<Integer> pQueue = new ArrayDeque<Integer>();
-        pQueue.add(parentId);
-        while(pQueue.peek() <= maxLeafNodeId) {
-            int cNodeId = pQueue.remove();
-            pQueue.addAll(getImmediateChildren(cNodeId));
-        }
-        return pQueue;
     }
 
 }

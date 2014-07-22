@@ -11,6 +11,7 @@ import java.util.List;
 public interface HTree {
 
     /**
+     * Adds the key, and digest of value to the segment block.
      * 
      * @param key
      * @param value
@@ -18,22 +19,28 @@ public interface HTree {
     void put(String key, String value);
 
     /**
-     * Given an another HTree object, this method updates its HTree, based on
-     * the difference in the keys.
+     * Adds the (key,value) pair to the original storage, and also puts (key,
+     * digest) pair to the merkle tree. Intended to be used while synch
+     * operation.
+     * 
+     * @param key
+     * @param value
+     */
+    void addAndPut(String key, String value);
+
+    /**
+     * Updates the other HTree based on the differences with local objects.
      * 
      * This function should be running on primary to synch with other replicas,
      * and not the other way.
      * 
-     * @param htree
-     * @param synchRemoteOrLocal, true indicates update remote with the
-     *        differences from local and false indicates get the updates from
-     *        remote.
+     * @param remoteTree
      */
-    void synch(HTree htree, boolean synchRemoteOrLocal);
+    void update(HTree remoteTree);
 
     /**
-     * Hash tree internal nodes store the hash of their leaf nodes. Given a set
-     * of internal node ids, this returns the hashes that are stored on the
+     * Hash tree internal nodes store the hash of their children nodes. Given a
+     * set of internal node ids, this returns the hashes that are stored on the
      * internal node.
      * 
      * @param nodeIds, internal tree node ids.
