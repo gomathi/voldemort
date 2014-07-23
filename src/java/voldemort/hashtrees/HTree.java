@@ -69,7 +69,7 @@ public interface HTree {
      * @param segId, id of the segment block.
      * @return
      */
-    List<SegmentData> getSegmentBlock(int segId);
+    List<SegmentData> getSegment(int segId);
 
     /**
      * Hash tree implementations usually do not update the tree on every key
@@ -77,4 +77,11 @@ public interface HTree {
      * function provides an option to make a force call to update the tree.
      */
     void rebuildHTree();
+
+    /**
+     * Deletes the node ids and corresponding segments from HTree.
+     * 
+     * @param nodeIds
+     */
+    void deleteNodes(Collection<Integer> nodeIds);
 }

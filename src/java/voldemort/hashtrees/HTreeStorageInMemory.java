@@ -35,7 +35,7 @@ public class HTreeStorageInMemory implements HTreeStorage {
     }
 
     @Override
-    public List<SegmentData> getSegmentBlock(int segId) {
+    public List<SegmentData> getSegment(int segId) {
         if(!segDataBlocks.containsKey(segId))
             return Collections.emptyList();
         TreeMap<String, String> segDataBlock = segDataBlocks.get(segId);
@@ -57,12 +57,12 @@ public class HTreeStorageInMemory implements HTreeStorage {
     }
 
     @Override
-    public void setDirtySegmentBucket(int segId) {
+    public void setDirtySegment(int segId) {
         dirtySegments.set(segId);
     }
 
     @Override
-    public List<Integer> getDirtySegmentBucketIds() {
+    public List<Integer> getDirtySegments() {
         List<Integer> result = new ArrayList<Integer>();
         for(int itr = dirtySegments.nextSetBit(0); itr >= 0; itr = dirtySegments.nextSetBit(itr + 1)) {
             result.add(itr);
@@ -71,9 +71,22 @@ public class HTreeStorageInMemory implements HTreeStorage {
     }
 
     @Override
-    public void unsetDirtySegmentBuckets(Collection<Integer> dirtySegIds) {
+    public void unsetDirtySegmens(Collection<Integer> dirtySegIds) {
         for(int dirtySegId: dirtySegIds) {
             dirtySegments.clear(dirtySegId);
+        }
+    }
+
+    @Override
+    public void deleteSegments(Collection<Integer> segIds) {
+        for(int segId: segIds)
+            deleteSegment(segId);
+    }
+
+    @Override
+    public void deleteSegment(int segId) {
+        if(segDataBlocks.containsKey(segId)) {
+            segDataBlocks.remove(segId);
         }
     }
 

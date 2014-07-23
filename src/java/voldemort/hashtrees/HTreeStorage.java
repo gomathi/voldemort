@@ -27,13 +27,27 @@ public interface HTreeStorage {
     void deleteSegmentData(int segId, String key);
 
     /**
+     * Deletes list of segments.
+     * 
+     * @param segIds
+     */
+    void deleteSegments(Collection<Integer> segIds);
+
+    /**
+     * Deletes the entire segment of (key,hash) pairs.
+     * 
+     * @param segId
+     */
+    void deleteSegment(int segId);
+
+    /**
      * Given a segment id, returns the list of all segment data in the
      * individual segment block.
      * 
      * @param segId
      * @return
      */
-    List<SegmentData> getSegmentBlock(int segId);
+    List<SegmentData> getSegment(int segId);
 
     /**
      * Segment hash is the hash of all data inside a segment block. A segment
@@ -58,20 +72,20 @@ public interface HTreeStorage {
      * 
      * @param segId
      */
-    void setDirtySegmentBucket(int segId);
+    void setDirtySegment(int segId);
 
     /**
      * Returns all the ids of the dirty segments.
      * 
      * @return
      */
-    List<Integer> getDirtySegmentBucketIds();
+    List<Integer> getDirtySegments();
 
     /**
      * Clears the dirty bits of the dirty segments.
      * 
      * @param dirtySegIds
      */
-    void unsetDirtySegmentBuckets(Collection<Integer> dirtySegIds);
+    void unsetDirtySegmens(Collection<Integer> dirtySegIds);
 
 }
