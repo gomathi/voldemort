@@ -1,5 +1,8 @@
 package voldemort.hashtrees;
 
+import static voldemort.utils.ByteUtils.sha1;
+import static voldemort.utils.ByteUtils.toHexString;
+
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -22,6 +25,7 @@ import com.google.common.collect.Collections2;
 public class HTreeImpl implements HTree {
 
     private final static int ROOT_NODE = 0;
+    private final static int MAX_CAPACITY = 1 << 30;
 
     private final int maxInternalNodeId;
     private final int noOfSegments;
@@ -29,7 +33,10 @@ public class HTreeImpl implements HTree {
     private final Storage storage;
 
     public HTreeImpl(final int noOfSegments, final HTreeStorage hTStroage, final Storage storage) {
-        this.noOfSegments = noOfSegments;
+        if(noOfSegments < 0)
+            throw new IllegalArgumentException("noOfSegments can not be a negative value.");
+        this.noOfSegments = noOfSegments > MAX_CAPACITY ? MAX_CAPACITY
+                                                       : roundUpToPowerOf2(noOfSegments);
         this.hTStorage = hTStroage;
         this.storage = storage;
         maxInternalNodeId = getNoOfInternalNodes(noOfSegments) - 2;
@@ -38,7 +45,7 @@ public class HTreeImpl implements HTree {
     @Override
     public void put(String key, String value) {
         int segId = getSegmentId(key);
-        String digest = digest(value);
+        String digest = toHexString(sha1(value.getBytes()));
         hTStorage.putSegmentData(segId, key, digest);
         hTStorage.setDirtySegment(segId);
     }
@@ -213,7 +220,7 @@ public class HTreeImpl implements HTree {
         for(SegmentData sd: dirtySegmentData)
             sb.append(sd.getValue() + "\n");
 
-        String digest = digest(sb.toString());
+        String digest = toHexString(sha1(sb.toString().getBytes()));
         return digest;
     }
 
@@ -243,14 +250,15 @@ public class HTreeImpl implements HTree {
             segmentHashes = hTStorage.getSegmentHashes(getImmediateChildren(parentId));
             for(SegmentHash sh: segmentHashes)
                 sb.append(sh.getHash() + "\n");
-            String digest = digest(sb.toString());
+            String digest = toHexString(sha1(sb.toString().getBytes()));
             hTStorage.putSegmentHash(parentId, digest);
             sb.setLength(0);
         }
     }
 
     private int getSegmentId(String key) {
-        return -1;
+        int hcode = key.hashCode();
+        return hcode & noOfSegments;
     }
 
     /**
@@ -276,6 +284,11 @@ public class HTreeImpl implements HTree {
         });
     }
 
+    /**
+     * 
+     * @param nodeId, id of the internal node in the tree.
+     * @return
+     */
     private boolean isLeafNode(int nodeId) {
         return nodeId > maxInternalNodeId;
     }
@@ -297,11 +310,18 @@ public class HTreeImpl implements HTree {
         return pQueue;
     }
 
+    /**
+     * Given a collection of internal tree node ids, returns all the segment ids
+     * which can be reached from these nodes.
+     * 
+     * @param nodeIds
+     * @return, segment ids.
+     */
     private Collection<Integer> getSegmentIdsOf(Collection<Integer> nodeIds) {
         Collection<Integer> leafNodeIds = new ArrayList<Integer>();
         for(int nodeId: nodeIds) {
             if(isLeafNode(nodeId)) {
-                leafNodeIds.add(getSegmentIdFromLeafId(nodeId));
+                leafNodeIds.add(nodeId);
             } else {
                 leafNodeIds.addAll(getAllLeafNodeIds(nodeId));
             }
@@ -310,8 +330,9 @@ public class HTreeImpl implements HTree {
         return getSegmentIdsFromLeafIds(leafNodeIds);
     }
 
-    private static String digest(final String data) {
-        return null;
+    private static int roundUpToPowerOf2(int number) {
+        return number >= MAX_CAPACITY ? MAX_CAPACITY
+                                     : (number > 1) ? Integer.highestOneBit((number - 1) << 1) : 1;
     }
 
     /**

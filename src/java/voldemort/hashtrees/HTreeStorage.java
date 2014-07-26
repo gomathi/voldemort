@@ -3,6 +3,8 @@ package voldemort.hashtrees;
 import java.util.Collection;
 import java.util.List;
 
+import voldemort.utils.Pair;
+
 /**
  * Defines storage interface to be used the higher level HTree.
  * 
@@ -57,6 +59,13 @@ public interface HTreeStorage {
      * @param digest
      */
     void putSegmentHash(int nodeId, String digest);
+
+    /**
+     * Updates a list of segment hash values on the tree.
+     * 
+     * @param segmentHashPairs
+     */
+    void putSegmentHashes(List<Pair<Integer, String>> segmentHashPairs);
 
     /**
      * Returns the data inside the nodes of the hash tree. If the node id is not

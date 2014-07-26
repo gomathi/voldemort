@@ -9,6 +9,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 
+import voldemort.utils.Pair;
+
 public class HTreeStorageInMemory implements HTreeStorage {
 
     private final Map<Integer, String> segmentHashes = new TreeMap<Integer, String>();
@@ -88,6 +90,11 @@ public class HTreeStorageInMemory implements HTreeStorage {
         if(segDataBlocks.containsKey(segId)) {
             segDataBlocks.remove(segId);
         }
+    }
+
+    @Override
+    public void putSegmentHashes(List<Pair<Integer, String>> segmentHashPairs) {
+
     }
 
 }
