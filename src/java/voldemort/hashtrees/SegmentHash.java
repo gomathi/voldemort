@@ -1,16 +1,18 @@
 package voldemort.hashtrees;
 
+import voldemort.utils.ByteArray;
+
 public class SegmentHash {
 
-    private final String hash;
+    private final ByteArray hash;
     private final int nodeId;
 
-    public SegmentHash(final int nodeId, final String hash) {
+    public SegmentHash(final int nodeId, final ByteArray hash) {
         this.hash = hash;
         this.nodeId = nodeId;
     }
 
-    public String getHash() {
+    public ByteArray getHash() {
         return hash;
     }
 

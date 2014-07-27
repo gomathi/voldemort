@@ -7,7 +7,7 @@ import voldemort.utils.ByteArray;
 import voldemort.utils.Pair;
 
 /**
- * Defines storage interface to be used the higher level HTree.
+ * Defines storage interface to be used by higher level HTree.
  * 
  */
 public interface HTreeStorage {
@@ -59,7 +59,7 @@ public interface HTreeStorage {
      * @param nodeId, identifier of the node in the hash tree.
      * @param digest
      */
-    void putSegmentHash(int nodeId, String digest);
+    void putSegmentHash(int nodeId, ByteArray digest);
 
     /**
      * Updates a list of segment hash values on the tree.

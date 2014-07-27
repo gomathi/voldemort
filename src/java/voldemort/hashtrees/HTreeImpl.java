@@ -1,7 +1,6 @@
 package voldemort.hashtrees;
 
 import static voldemort.utils.ByteUtils.sha1;
-import static voldemort.utils.ByteUtils.toHexString;
 import static voldemort.utils.TreeUtils.getImmediateChildren;
 import static voldemort.utils.TreeUtils.getNoOfNodes;
 import static voldemort.utils.TreeUtils.getParent;
@@ -15,6 +14,7 @@ import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.concurrent.ExecutorService;
 
 import org.apache.log4j.Logger;
 
@@ -24,8 +24,22 @@ import com.google.common.base.Function;
 import com.google.common.collect.Collections2;
 
 /**
- * 1) Segment hashes and (Key, Hash) pairs are stored on the same storage
- * {@link HTreeStorage}
+ * HashTree has the following components
+ * 
+ * 1) Segments, where the (key, hash of value) pairs are stored. All the pairs
+ * sorted. Whenever a key,value is added or key is removed from a node, HashTree
+ * segment is updated. Keys are distributed using uniform hash distribution.
+ * 
+ * 2) A complete tree where the segments' hashes are updated and maintained.
+ * Tree is not updated on every update on a segment. Tree can be binary or 4-ary
+ * tree.
+ * 
+ * Uses {@link HTreeStorage} for storing tree and segments.
+ * {@link HTreeStorageInMemory} provides in memory implementation of storing
+ * entire tree and segments.
+ * 
+ * {@link #put(ByteArray, ByteArray)} and {@link #remove(ByteArray)} can be non
+ * blocking calls. This will try to avoid any latency issue to storage layer.
  * 
  */
 public class HTreeImpl implements HTree {
@@ -33,7 +47,7 @@ public class HTreeImpl implements HTree {
     private final static Logger logger = Logger.getLogger(HTreeImpl.class);
 
     private final static int ROOT_NODE = 0;
-    private final static int MAX_CAPACITY = 1 << 30;
+    private final static int MAX_NO_OF_BUCKETS = 1 << 30;
     private final static int FOUR_ARY_TREE = 4;
 
     private final int noOfChildrenPerParent;
@@ -41,27 +55,68 @@ public class HTreeImpl implements HTree {
     private final int noOfSegments;
     private final HTreeStorage hTStorage;
     private final Storage storage;
+    private final ExecutorService executors;
 
-    public HTreeImpl(int noOfSegments, final HTreeStorage hTStroage, final Storage storage) {
-        this.noOfSegments = (noOfSegments > MAX_CAPACITY) || (noOfSegments < 0) ? MAX_CAPACITY
-                                                                               : roundUpToPowerOf2(noOfSegments);
+    private volatile boolean enableNonBlockingPutsAndRemoves = false;
+
+    public HTreeImpl(int noOfSegments,
+                     final HTreeStorage hTStroage,
+                     final Storage storage,
+                     final ExecutorService executors) {
+        this.noOfSegments = (noOfSegments > MAX_NO_OF_BUCKETS) || (noOfSegments < 0) ? MAX_NO_OF_BUCKETS
+                                                                                    : roundUpToPowerOf2(noOfSegments);
         this.hTStorage = hTStroage;
         this.storage = storage;
-        this.noOfChildrenPerParent = FOUR_ARY_TREE;
+        this.executors = executors;
+        noOfChildrenPerParent = FOUR_ARY_TREE;
         maxInternalNodeId = getNoOfNodes(height(this.noOfSegments, this.noOfChildrenPerParent) - 1,
                                          this.noOfChildrenPerParent);
     }
 
+    /**
+     * Enables non blocking calls for {@link #put(ByteArray, ByteArray)} and
+     * {@link #remove(ByteArray)} operations.
+     */
+    public void enableNonBlockingCalls() {
+        this.enableNonBlockingPutsAndRemoves = true;
+    }
+
     @Override
     public void put(final ByteArray key, final ByteArray value) {
+        if(enableNonBlockingPutsAndRemoves) {
+            executors.submit(new Runnable() {
+
+                @Override
+                public void run() {
+                    putInternal(key, value);
+                }
+            });
+        } else
+            putInternal(key, value);
+    }
+
+    @Override
+    public void remove(final ByteArray key) {
+        if(enableNonBlockingPutsAndRemoves) {
+            executors.submit(new Runnable() {
+
+                @Override
+                public void run() {
+                    removeInternal(key);
+                }
+            });
+        } else
+            removeInternal(key);
+    }
+
+    private void putInternal(final ByteArray key, final ByteArray value) {
         int segId = getSegmentId(key);
         ByteArray digest = new ByteArray(sha1(value.get()));
         hTStorage.putSegmentData(segId, key, digest);
         hTStorage.setDirtySegment(segId);
     }
 
-    @Override
-    public void remove(final ByteArray key) {
+    private void removeInternal(final ByteArray key) {
         int segId = getSegmentId(key);
         hTStorage.deleteSegmentData(segId, key);
         hTStorage.setDirtySegment(segId);
@@ -88,15 +143,15 @@ public class HTreeImpl implements HTree {
                                  Collection<Integer> nodesToCheck,
                                  Collection<Integer> missingNodes,
                                  Collection<Integer> nodesToDelete) {
-        PeekingIteratorImpl<SegmentHash> localItr = null, remoteItr = null;
+        CollectionPeekingIterator<SegmentHash> localItr = null, remoteItr = null;
         SegmentHash local, remote;
 
         Queue<Integer> pQueue = new ArrayDeque<Integer>();
         pQueue.add(ROOT_NODE);
         while(!pQueue.isEmpty()) {
 
-            localItr = new PeekingIteratorImpl<SegmentHash>(getSegmentHashes(pQueue));
-            remoteItr = new PeekingIteratorImpl<SegmentHash>(remoteTree.getSegmentHashes(pQueue));
+            localItr = new CollectionPeekingIterator<SegmentHash>(getSegmentHashes(pQueue));
+            remoteItr = new CollectionPeekingIterator<SegmentHash>(remoteTree.getSegmentHashes(pQueue));
             pQueue = new ArrayDeque<Integer>();
             while(localItr.hasNext() && remoteItr.hasNext()) {
                 local = localItr.peek();
@@ -137,8 +192,8 @@ public class HTreeImpl implements HTree {
     }
 
     private void syncSegment(int segId, HTree remoteTree, BatchUpdater batchUpdater) {
-        PeekingIteratorImpl<SegmentData> localDataItr = new PeekingIteratorImpl<SegmentData>(getSegment(segId));
-        PeekingIteratorImpl<SegmentData> remoteDataItr = new PeekingIteratorImpl<SegmentData>(remoteTree.getSegment(segId));
+        CollectionPeekingIterator<SegmentData> localDataItr = new CollectionPeekingIterator<SegmentData>(getSegment(segId));
+        CollectionPeekingIterator<SegmentData> remoteDataItr = new CollectionPeekingIterator<SegmentData>(remoteTree.getSegment(segId));
         SegmentData local, remote;
         List<ByteArray> keysToBeUpdated = new ArrayList<ByteArray>();
         List<ByteArray> keysToBeRemoved = new ArrayList<ByteArray>();
@@ -212,27 +267,22 @@ public class HTreeImpl implements HTree {
     private List<Integer> rebuildLeaves(final List<Integer> dirtySegments) {
         List<Integer> dirtyNodeIds = new ArrayList<Integer>();
         for(int dirtySegId: dirtySegments) {
-            String digest = digestSegmentData(dirtySegId);
-            if(!digest.isEmpty()) {
-                int nodeId = getSegmentIdFromLeafId(dirtySegId);
-                hTStorage.putSegmentHash(nodeId, digest);
-                dirtyNodeIds.add(nodeId);
-            }
+            ByteArray digest = digestSegmentData(dirtySegId);
+            int nodeId = getSegmentIdFromLeafId(dirtySegId);
+            hTStorage.putSegmentHash(nodeId, digest);
+            dirtyNodeIds.add(nodeId);
         }
         return dirtyNodeIds;
     }
 
-    private String digestSegmentData(int segId) {
+    private ByteArray digestSegmentData(int segId) {
         List<SegmentData> dirtySegmentData = hTStorage.getSegment(segId);
-        if(dirtySegmentData.size() == 0)
-            return "";
 
         StringBuilder sb = new StringBuilder();
         for(SegmentData sd: dirtySegmentData)
             sb.append(sd.getValue() + "\n");
 
-        String digest = toHexString(sha1(sb.toString().getBytes()));
-        return digest;
+        return new ByteArray(sha1(sb.toString().getBytes()));
     }
 
     private void rebuildInternalNodes(final List<Integer> nodeIds) {
@@ -262,7 +312,7 @@ public class HTreeImpl implements HTree {
                                                                             this.noOfChildrenPerParent));
             for(SegmentHash sh: segmentHashes)
                 sb.append(sh.getHash() + "\n");
-            String digest = toHexString(sha1(sb.toString().getBytes()));
+            ByteArray digest = new ByteArray(sha1(sb.toString().getBytes()));
             hTStorage.putSegmentHash(parentId, digest);
             sb.setLength(0);
         }
@@ -343,8 +393,9 @@ public class HTreeImpl implements HTree {
     }
 
     private static int roundUpToPowerOf2(int number) {
-        return number >= MAX_CAPACITY ? MAX_CAPACITY
-                                     : (number > 1) ? Integer.highestOneBit((number - 1) << 1) : 1;
+        return number >= MAX_NO_OF_BUCKETS ? MAX_NO_OF_BUCKETS
+                                          : (number > 1) ? Integer.highestOneBit((number - 1) << 1)
+                                                        : 1;
     }
 
 }

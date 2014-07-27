@@ -14,12 +14,12 @@ import voldemort.utils.Pair;
 
 public class HTreeStorageInMemory implements HTreeStorage {
 
-    private final Map<Integer, String> segmentHashes = new TreeMap<Integer, String>();
+    private final Map<Integer, ByteArray> segmentHashes = new TreeMap<Integer, ByteArray>();
     private final Map<Integer, TreeMap<ByteArray, ByteArray>> segDataBlocks = new HashMap<Integer, TreeMap<ByteArray, ByteArray>>();
     private final BitSet dirtySegments = new BitSet();
 
     @Override
-    public void putSegmentHash(int segNodeId, String digest) {
+    public void putSegmentHash(int segNodeId, ByteArray digest) {
         segmentHashes.put(segNodeId, digest);
     }
 

@@ -8,14 +8,14 @@ import java.util.Queue;
 
 import com.google.common.collect.PeekingIterator;
 
-public class PeekingIteratorImpl<T> implements PeekingIterator<T> {
+public class CollectionPeekingIterator<T> implements PeekingIterator<T> {
 
     private final Queue<T> pQueue;
     private final Iterator<T> iItr;
 
-    public PeekingIteratorImpl(Collection<T> shList) {
+    public CollectionPeekingIterator(Collection<T> collection) {
         pQueue = new ArrayDeque<T>();
-        iItr = shList.iterator();
+        iItr = collection.iterator();
     }
 
     private void addElement() {
