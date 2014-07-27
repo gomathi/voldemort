@@ -9,16 +9,23 @@ import static voldemort.utils.TreeUtils.height;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.log4j.Logger;
+import org.mortbay.log.Log;
 
+import voldemort.annotations.concurrency.Threadsafe;
 import voldemort.utils.ByteArray;
+import voldemort.utils.Pair;
 
 import com.google.common.base.Function;
 import com.google.common.collect.Collections2;
@@ -27,24 +34,27 @@ import com.google.common.collect.Collections2;
  * HashTree has the following components
  * 
  * 1) Segments, where the (key, hash of value) pairs are stored. All the pairs
- * sorted. Whenever a key,value is added or key is removed from a node, HashTree
- * segment is updated. Keys are distributed using uniform hash distribution.
+ * sorted. Whenever a key addition/removal happens on the node, HashTree segment
+ * is updated. Keys are distributed using uniform hash distribution. Max no of
+ * segments is {@link #MAX_NO_OF_BUCKETS}.
  * 
  * 2) A complete tree where the segments' hashes are updated and maintained.
- * Tree is not updated on every update on a segment. Tree can be binary or 4-ary
- * tree.
+ * Tree is not updated on every update on a segment. Rather, tree update is
+ * happening at regular intervals.Tree can be binary or 4-ary tree.
  * 
- * Uses {@link HTreeStorage} for storing tree and segments.
- * {@link HTreeStorageInMemory} provides in memory implementation of storing
+ * Uses {@link HashTreeStorage} for storing tree and segments.
+ * {@link HashTreeStorageInMemory} provides in memory implementation of storing
  * entire tree and segments.
  * 
- * {@link #put(ByteArray, ByteArray)} and {@link #remove(ByteArray)} can be non
- * blocking calls. This will try to avoid any latency issue to storage layer.
+ * {@link #put(ByteArray, ByteArray)} and {@link #remove(ByteArray)} are non
+ * blocking calls in order to avoid any latency issue to storage layer on every
+ * update.
  * 
  */
-public class HTreeImpl implements HTree {
+@Threadsafe
+public class HashTreeImpl implements HashTree {
 
-    private final static Logger logger = Logger.getLogger(HTreeImpl.class);
+    private final static Logger logger = Logger.getLogger(HashTreeImpl.class);
 
     private final static int ROOT_NODE = 0;
     private final static int MAX_NO_OF_BUCKETS = 1 << 30;
@@ -53,60 +63,50 @@ public class HTreeImpl implements HTree {
     private final int noOfChildrenPerParent;
     private final int maxInternalNodeId;
     private final int noOfSegments;
-    private final HTreeStorage hTStorage;
+    private final HashTreeStorage hTStorage;
     private final Storage storage;
     private final ExecutorService executors;
+    private final BackgroundSegmentDataUpdater segDataUpdater;
 
-    private volatile boolean enableNonBlockingPutsAndRemoves = false;
+    private static enum HTOperation {
+        PUT,
+        REMOVE,
+        // Indicates the thread to stop processing when it receives this value.
+        // Used for safe shutdown operation.
+        STOP;
+    }
 
-    public HTreeImpl(int noOfSegments,
-                     final HTreeStorage hTStroage,
-                     final Storage storage,
-                     final ExecutorService executors) {
+    public HashTreeImpl(int noOfSegments,
+                        final HashTreeStorage hTStroage,
+                        final Storage storage,
+                        final ExecutorService executors) {
         this.noOfSegments = (noOfSegments > MAX_NO_OF_BUCKETS) || (noOfSegments < 0) ? MAX_NO_OF_BUCKETS
                                                                                     : roundUpToPowerOf2(noOfSegments);
         this.hTStorage = hTStroage;
         this.storage = storage;
         this.executors = executors;
         noOfChildrenPerParent = FOUR_ARY_TREE;
+        segDataUpdater = new BackgroundSegmentDataUpdater();
         maxInternalNodeId = getNoOfNodes(height(this.noOfSegments, this.noOfChildrenPerParent) - 1,
                                          this.noOfChildrenPerParent);
-    }
-
-    /**
-     * Enables non blocking calls for {@link #put(ByteArray, ByteArray)} and
-     * {@link #remove(ByteArray)} operations.
-     */
-    public void enableNonBlockingCalls() {
-        this.enableNonBlockingPutsAndRemoves = true;
+        new Thread(segDataUpdater).start();
     }
 
     @Override
     public void put(final ByteArray key, final ByteArray value) {
-        if(enableNonBlockingPutsAndRemoves) {
-            executors.submit(new Runnable() {
-
-                @Override
-                public void run() {
-                    putInternal(key, value);
-                }
-            });
-        } else
-            putInternal(key, value);
+        List<ByteArray> second = new ArrayList<ByteArray>();
+        second.add(key);
+        second.add(value);
+        segDataUpdater.enque(new Pair<HashTreeImpl.HTOperation, List<ByteArray>>(HTOperation.PUT,
+                                                                                 second));
     }
 
     @Override
     public void remove(final ByteArray key) {
-        if(enableNonBlockingPutsAndRemoves) {
-            executors.submit(new Runnable() {
-
-                @Override
-                public void run() {
-                    removeInternal(key);
-                }
-            });
-        } else
-            removeInternal(key);
+        List<ByteArray> second = new ArrayList<ByteArray>();
+        second.add(key);
+        segDataUpdater.enque(new Pair<HashTreeImpl.HTOperation, List<ByteArray>>(HTOperation.REMOVE,
+                                                                                 second));
     }
 
     private void putInternal(final ByteArray key, final ByteArray value) {
@@ -123,26 +123,22 @@ public class HTreeImpl implements HTree {
     }
 
     @Override
-    public void update(final HTree remoteTree) {
+    public void update(final HashTree remoteTree) {
         Collection<Integer> leafNodesToCheck = new ArrayList<Integer>();
         Collection<Integer> missingNodes = new ArrayList<Integer>();
-        Collection<Integer> nodesToDelete = new ArrayList<Integer>();
 
-        findDifferences(remoteTree, leafNodesToCheck, missingNodes, nodesToDelete);
+        findDifferences(remoteTree, leafNodesToCheck, missingNodes);
 
         BatchUpdater batchUpdater = new BatchUpdater(1000, remoteTree);
 
         Collection<Integer> segsToCheck = getSegmentIdsFromLeafIds(leafNodesToCheck);
         syncSegments(segsToCheck, remoteTree, batchUpdater);
 
-        remoteTree.deleteNodes(nodesToDelete);
-
     }
 
-    private void findDifferences(HTree remoteTree,
+    private void findDifferences(HashTree remoteTree,
                                  Collection<Integer> nodesToCheck,
-                                 Collection<Integer> missingNodes,
-                                 Collection<Integer> nodesToDelete) {
+                                 Collection<Integer> missingNodes) {
         CollectionPeekingIterator<SegmentHash> localItr = null, remoteItr = null;
         SegmentHash local, remote;
 
@@ -171,27 +167,22 @@ public class HTreeImpl implements HTree {
                 } else if(local.getNodeId() < remote.getNodeId()) {
                     missingNodes.add(local.getNodeId());
                     localItr.next();
-                } else {
-                    nodesToDelete.add(remote.getNodeId());
-                    remoteItr.next();
                 }
             }
         }
         if(localItr != null && localItr.hasNext()) {
             missingNodes.add(localItr.peek().getNodeId());
-        } else if(remoteItr != null && remoteItr.hasNext()) {
-            nodesToDelete.add(remoteItr.peek().getNodeId());
         }
     }
 
     private void syncSegments(Collection<Integer> segIds,
-                              HTree remoteTree,
+                              HashTree remoteTree,
                               BatchUpdater batchUpdater) {
         for(int segId: segIds)
             syncSegment(segId, remoteTree, batchUpdater);
     }
 
-    private void syncSegment(int segId, HTree remoteTree, BatchUpdater batchUpdater) {
+    private void syncSegment(int segId, HashTree remoteTree, BatchUpdater batchUpdater) {
         CollectionPeekingIterator<SegmentData> localDataItr = new CollectionPeekingIterator<SegmentData>(getSegment(segId));
         CollectionPeekingIterator<SegmentData> remoteDataItr = new CollectionPeekingIterator<SegmentData>(remoteTree.getSegment(segId));
         SegmentData local, remote;
@@ -234,7 +225,7 @@ public class HTreeImpl implements HTree {
     }
 
     @Override
-    public void rebuildHTree() {
+    public void updateSegmentHashes() {
         List<Integer> dirtySegmentBuckets = hTStorage.getDirtySegments();
         List<Integer> dirtyLeafNodes = rebuildLeaves(dirtySegmentBuckets);
         rebuildInternalNodes(dirtyLeafNodes);
@@ -251,11 +242,6 @@ public class HTreeImpl implements HTree {
     public void batchSRemove(final List<ByteArray> keys) {
         for(ByteArray key: keys)
             storage.remove(key);
-    }
-
-    @Override
-    public void deleteNodes(final Collection<Integer> nodeIds) {
-        hTStorage.deleteSegments(getSegmentIdsOf(nodeIds));
     }
 
     /**
@@ -355,47 +341,119 @@ public class HTreeImpl implements HTree {
         return nodeId > maxInternalNodeId;
     }
 
-    /**
-     * Given a parent id, finds all the leaves that can be reached from the
-     * parent.
-     * 
-     * @param pId, parent id
-     * @return
-     */
-    private Collection<Integer> getAllLeafNodeIds(int pId) {
-        Queue<Integer> pQueue = new ArrayDeque<Integer>();
-        pQueue.add(pId);
-        while(pQueue.peek() <= maxInternalNodeId) {
-            int cNodeId = pQueue.remove();
-            pQueue.addAll(getImmediateChildren(cNodeId, this.noOfChildrenPerParent));
-        }
-        return pQueue;
-    }
-
-    /**
-     * Given a collection of internal tree node ids, returns all the segment ids
-     * which can be reached from these nodes.
-     * 
-     * @param nodeIds
-     * @return, segment ids.
-     */
-    private Collection<Integer> getSegmentIdsOf(final Collection<Integer> nodeIds) {
-        Collection<Integer> leafNodeIds = new ArrayList<Integer>();
-        for(int nodeId: nodeIds) {
-            if(isLeafNode(nodeId)) {
-                leafNodeIds.add(nodeId);
-            } else {
-                leafNodeIds.addAll(getAllLeafNodeIds(nodeId));
-            }
-        }
-
-        return getSegmentIdsFromLeafIds(leafNodeIds);
-    }
-
     private static int roundUpToPowerOf2(int number) {
         return number >= MAX_NO_OF_BUCKETS ? MAX_NO_OF_BUCKETS
                                           : (number > 1) ? Integer.highestOneBit((number - 1) << 1)
                                                         : 1;
+    }
+
+    /**
+     * A task to enable non blocking calls on all
+     * {@link HashTreeImpl#put(ByteArray, ByteArray)} and
+     * {@link HashTreeImpl#remove(ByteArray)} operation.
+     * 
+     */
+    private class BackgroundSegmentDataUpdater implements Runnable {
+
+        private BlockingQueue<Pair<HTOperation, List<ByteArray>>> que = new ArrayBlockingQueue<Pair<HTOperation, List<ByteArray>>>(Integer.MAX_VALUE);
+
+        public void enque(Pair<HTOperation, List<ByteArray>> data) {
+            que.add(data);
+        }
+
+        @Override
+        public void run() {
+            for(;;) {
+                try {
+                    Pair<HTOperation, List<ByteArray>> pair = que.take();
+                    switch(pair.getFirst()) {
+                        case PUT:
+                            putInternal(pair.getSecond().get(0), pair.getSecond().get(1));
+                            break;
+                        case REMOVE:
+                            removeInternal(pair.getSecond().get(0));
+                            break;
+                        case STOP:
+                            logger.info("Stopping current thread as stop request received.");
+                            return;
+                    }
+                } catch(InterruptedException e) {
+                    // TODO Auto-generated catch block
+                    logger.error("Interrupted while waiting for removing an element from the queue. Exiting");
+                    return;
+                }
+            }
+        }
+    }
+
+    /**
+     * This reads all the keys from storage, and rebuilds the complete HTree.
+     * This task can be scheduled through the executor service.
+     * 
+     */
+    @Threadsafe
+    private class RebuildHTreeTask implements Runnable {
+
+        private final AtomicBoolean isRunning = new AtomicBoolean(false);
+
+        @Override
+        public void run() {
+            if(!isRunning.get()) {
+                boolean statusUpdated = isRunning.compareAndSet(false, true);
+                if(statusUpdated) {
+                    executors.submit(new Runnable() {
+
+                        @Override
+                        public void run() {
+                            rebuildHTree();
+                        }
+                    });
+                    return;
+                }
+            }
+            logger.info("A task for rebuilding hash tree is already running. Skipping the current task.");
+        }
+
+        private void rebuildHTree() {
+            logger.info("Rebuilding HTree");
+            long startTime = System.currentTimeMillis();
+
+            long endTime = System.currentTimeMillis();
+            logger.info("Total time took for rebuilding htree (in ms) : " + (endTime - startTime));
+            logger.info("Rebuilding HTree - Done");
+        }
+    }
+
+    /**
+     * This task resynchs given set of remote htree objects. This task can be
+     * scheduled through the executor service.
+     * 
+     */
+    @Threadsafe
+    private class BackgroundSynchTask implements Runnable {
+
+        private Map<String, HashTree> hostNameAndRemoteHTrees = new HashMap<String, HashTree>();
+
+        public synchronized void add(String hostName, HashTree remoteHTree) {
+            if(!hostNameAndRemoteHTrees.containsKey(hostName)) {
+                hostNameAndRemoteHTrees.put(hostName, remoteHTree);
+                logger.debug(hostName + " is already present on the synch list. Skipping the host.");
+            }
+            logger.info(hostName + " is added to the synch list.");
+        }
+
+        public synchronized void remove(String hostName) {
+            if(hostNameAndRemoteHTrees.containsKey(hostName)) {
+                Log.info(hostName + " is removed from synch list.");
+                return;
+            }
+        }
+
+        @Override
+        public void run() {
+
+        }
+
     }
 
 }

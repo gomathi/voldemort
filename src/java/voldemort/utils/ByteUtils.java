@@ -490,4 +490,5 @@ public class ByteUtils {
         return newBuffer;
     }
 
+    public static void main(String[] args) {}
 }

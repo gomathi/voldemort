@@ -11,7 +11,7 @@ import voldemort.utils.ByteArray;
  * quickly by exchanging very little information.
  * 
  */
-public interface HTree {
+public interface HashTree {
 
     /**
      * Adds the key, and digest of value to the segment block.
@@ -52,7 +52,7 @@ public interface HTree {
      * 
      * @param remoteTree
      */
-    void update(HTree remoteTree);
+    void update(HashTree remoteTree);
 
     /**
      * Hash tree internal nodes store the hash of their children nodes. Given a
@@ -74,16 +74,10 @@ public interface HTree {
     List<SegmentData> getSegment(int segId);
 
     /**
-     * Hash tree implementations usually do not update the tree on every key
-     * change. Rather, hash tree is rebuilt at every regular intervals. This
-     * function provides an option to make a force call to update the tree.
+     * Hash tree implementations usually do not update the segment hashes tree
+     * on every key change. Rather tree is rebuilt at every regular intervals.
+     * This function provides an option to make a force call to update the
+     * segment hashes.
      */
-    void rebuildHTree();
-
-    /**
-     * Deletes the node ids and corresponding segments from HTree.
-     * 
-     * @param nodeIds
-     */
-    void deleteNodes(Collection<Integer> nodeIds);
+    void updateSegmentHashes();
 }

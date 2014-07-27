@@ -2,6 +2,10 @@ package voldemort.hashtrees;
 
 import voldemort.utils.ByteArray;
 
+/**
+ * Usually stored in memory.
+ * 
+ */
 public class SegmentHash {
 
     private final ByteArray hash;

@@ -4,36 +4,40 @@ import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.TreeMap;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.ConcurrentSkipListMap;
 
+import voldemort.annotations.concurrency.Threadsafe;
 import voldemort.utils.ByteArray;
 import voldemort.utils.Pair;
 
-public class HTreeStorageInMemory implements HTreeStorage {
+@Threadsafe
+public class HashTreeStorageInMemory implements HashTreeStorage {
 
-    private final Map<Integer, ByteArray> segmentHashes = new TreeMap<Integer, ByteArray>();
-    private final Map<Integer, TreeMap<ByteArray, ByteArray>> segDataBlocks = new HashMap<Integer, TreeMap<ByteArray, ByteArray>>();
+    private final ConcurrentMap<Integer, ByteArray> segmentHashes = new ConcurrentSkipListMap<Integer, ByteArray>();
+    private final ConcurrentMap<Integer, ConcurrentSkipListMap<ByteArray, ByteArray>> segDataBlocks = new ConcurrentHashMap<Integer, ConcurrentSkipListMap<ByteArray, ByteArray>>();
     private final BitSet dirtySegments = new BitSet();
 
     @Override
-    public void putSegmentHash(int segNodeId, ByteArray digest) {
-        segmentHashes.put(segNodeId, digest);
+    public void putSegmentHash(int nodeId, ByteArray digest) {
+        segmentHashes.put(nodeId, digest);
     }
 
     @Override
     public void putSegmentData(int segId, ByteArray key, ByteArray digest) {
-        if(!segDataBlocks.containsKey(segId))
-            segDataBlocks.put(segId, new TreeMap<ByteArray, ByteArray>());
+        segDataBlocks.putIfAbsent(segId, new ConcurrentSkipListMap<ByteArray, ByteArray>());
         segDataBlocks.get(segId).put(key, digest);
     }
 
     @Override
     public void deleteSegmentData(int segId, ByteArray key) {
-        if(segDataBlocks.containsKey(segId) && segDataBlocks.get(segId).containsKey(key)) {
-            segDataBlocks.get(segId).remove(key);
+        if(segDataBlocks.containsKey(segId)) {
+            Map<ByteArray, ByteArray> segDataBlock = segDataBlocks.get(segId);
+            if(segDataBlock != null)
+                segDataBlock.remove(key);
         }
     }
 
@@ -41,7 +45,8 @@ public class HTreeStorageInMemory implements HTreeStorage {
     public List<SegmentData> getSegment(int segId) {
         if(!segDataBlocks.containsKey(segId))
             return Collections.emptyList();
-        TreeMap<ByteArray, ByteArray> segDataBlock = segDataBlocks.get(segId);
+        ConcurrentMap<ByteArray, ByteArray> segDataBlock = segDataBlocks.get(segId);
+
         List<SegmentData> result = new ArrayList<SegmentData>();
         for(Map.Entry<ByteArray, ByteArray> entry: segDataBlock.entrySet()) {
             result.add(new SegmentData(entry.getKey(), entry.getValue()));
@@ -53,8 +58,9 @@ public class HTreeStorageInMemory implements HTreeStorage {
     public List<SegmentHash> getSegmentHashes(Collection<Integer> nodeIds) {
         List<SegmentHash> result = new ArrayList<SegmentHash>();
         for(int nodeId: nodeIds) {
-            if(segmentHashes.containsKey(nodeId))
-                result.add(new SegmentHash(nodeId, segmentHashes.get(nodeId)));
+            ByteArray hash = segmentHashes.get(nodeId);
+            if(hash != null)
+                result.add(new SegmentHash(nodeId, hash));
         }
         return result;
     }
@@ -77,19 +83,6 @@ public class HTreeStorageInMemory implements HTreeStorage {
     public void unsetDirtySegmens(Collection<Integer> dirtySegIds) {
         for(int dirtySegId: dirtySegIds) {
             dirtySegments.clear(dirtySegId);
-        }
-    }
-
-    @Override
-    public void deleteSegments(Collection<Integer> segIds) {
-        for(int segId: segIds)
-            deleteSegment(segId);
-    }
-
-    @Override
-    public void deleteSegment(int segId) {
-        if(segDataBlocks.containsKey(segId)) {
-            segDataBlocks.remove(segId);
         }
     }
 

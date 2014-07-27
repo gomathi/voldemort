@@ -10,11 +10,11 @@ import voldemort.utils.ByteArray;
 public class BatchUpdater {
 
     private final int batchSize;
-    private final HTree remoteHTree;
+    private final HashTree remoteHTree;
     private final Map<ByteArray, ByteArray> keyValuePairsToAdd = new HashMap<ByteArray, ByteArray>();
     private final List<ByteArray> keysToBeRemoved = new ArrayList<ByteArray>();
 
-    public BatchUpdater(final int batchSize, final HTree remoteHTree) {
+    public BatchUpdater(final int batchSize, final HashTree remoteHTree) {
         this.batchSize = batchSize;
         this.remoteHTree = remoteHTree;
     }

@@ -11,9 +11,9 @@ import voldemort.utils.ByteArray;
  * hash tree.
  * 
  */
-public class RemoteHTreeImpl implements HTree {
+public class RemoteHashTree implements HashTree {
 
-    public RemoteHTreeImpl() {
+    public RemoteHashTree() {
 
     }
 
@@ -30,7 +30,7 @@ public class RemoteHTreeImpl implements HTree {
     public void batchSRemove(List<ByteArray> key) {}
 
     @Override
-    public void update(HTree remoteTree) {}
+    public void update(HashTree remoteTree) {}
 
     @Override
     public List<SegmentHash> getSegmentHashes(Collection<Integer> nodeIds) {
@@ -43,9 +43,6 @@ public class RemoteHTreeImpl implements HTree {
     }
 
     @Override
-    public void rebuildHTree() {}
-
-    @Override
-    public void deleteNodes(Collection<Integer> nodeIds) {}
+    public void updateSegmentHashes() {}
 
 }

@@ -10,7 +10,7 @@ import voldemort.utils.Pair;
  * Defines storage interface to be used by higher level HTree.
  * 
  */
-public interface HTreeStorage {
+public interface HashTreeStorage {
 
     /**
      * A segment data is the value inside a segment block.
@@ -28,20 +28,6 @@ public interface HTreeStorage {
      * @param key
      */
     void deleteSegmentData(int segId, ByteArray key);
-
-    /**
-     * Deletes list of segments.
-     * 
-     * @param segIds
-     */
-    void deleteSegments(Collection<Integer> segIds);
-
-    /**
-     * Deletes the entire segment of (key,hash) pairs.
-     * 
-     * @param segId
-     */
-    void deleteSegment(int segId);
 
     /**
      * Given a segment id, returns the list of all segment data in the
