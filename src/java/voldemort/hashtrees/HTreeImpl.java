@@ -18,6 +18,8 @@ import java.util.TreeSet;
 
 import org.apache.log4j.Logger;
 
+import voldemort.utils.ByteArray;
+
 import com.google.common.base.Function;
 import com.google.common.collect.Collections2;
 
@@ -41,10 +43,8 @@ public class HTreeImpl implements HTree {
     private final Storage storage;
 
     public HTreeImpl(int noOfSegments, final HTreeStorage hTStroage, final Storage storage) {
-        if(noOfSegments < 0)
-            throw new IllegalArgumentException("noOfSegments can not be a negative value.");
-        this.noOfSegments = noOfSegments > MAX_CAPACITY ? MAX_CAPACITY
-                                                       : roundUpToPowerOf2(noOfSegments);
+        this.noOfSegments = (noOfSegments > MAX_CAPACITY) || (noOfSegments < 0) ? MAX_CAPACITY
+                                                                               : roundUpToPowerOf2(noOfSegments);
         this.hTStorage = hTStroage;
         this.storage = storage;
         this.noOfChildrenPerParent = FOUR_ARY_TREE;
@@ -53,15 +53,15 @@ public class HTreeImpl implements HTree {
     }
 
     @Override
-    public void put(final String key, final String value) {
+    public void put(final ByteArray key, final ByteArray value) {
         int segId = getSegmentId(key);
-        String digest = toHexString(sha1(value.getBytes()));
+        ByteArray digest = new ByteArray(sha1(value.get()));
         hTStorage.putSegmentData(segId, key, digest);
         hTStorage.setDirtySegment(segId);
     }
 
     @Override
-    public void remove(String key) {
+    public void remove(final ByteArray key) {
         int segId = getSegmentId(key);
         hTStorage.deleteSegmentData(segId, key);
         hTStorage.setDirtySegment(segId);
@@ -140,8 +140,8 @@ public class HTreeImpl implements HTree {
         PeekingIteratorImpl<SegmentData> localDataItr = new PeekingIteratorImpl<SegmentData>(getSegment(segId));
         PeekingIteratorImpl<SegmentData> remoteDataItr = new PeekingIteratorImpl<SegmentData>(remoteTree.getSegment(segId));
         SegmentData local, remote;
-        List<String> keysToBeUpdated = new ArrayList<String>();
-        List<String> keysToBeRemoved = new ArrayList<String>();
+        List<ByteArray> keysToBeUpdated = new ArrayList<ByteArray>();
+        List<ByteArray> keysToBeRemoved = new ArrayList<ByteArray>();
         while(localDataItr.hasNext() && remoteDataItr.hasNext()) {
             local = localDataItr.peek();
             remote = remoteDataItr.peek();
@@ -187,14 +187,14 @@ public class HTreeImpl implements HTree {
     }
 
     @Override
-    public void batchSPut(Map<String, String> keyValuePairs) {
-        for(Map.Entry<String, String> keyValuePair: keyValuePairs.entrySet())
+    public void batchSPut(Map<ByteArray, ByteArray> keyValuePairs) {
+        for(Map.Entry<ByteArray, ByteArray> keyValuePair: keyValuePairs.entrySet())
             storage.put(keyValuePair.getKey(), keyValuePair.getValue());
     }
 
     @Override
-    public void batchSRemove(final List<String> keys) {
-        for(String key: keys)
+    public void batchSRemove(final List<ByteArray> keys) {
+        for(ByteArray key: keys)
             storage.remove(key);
     }
 
@@ -268,7 +268,7 @@ public class HTreeImpl implements HTree {
         }
     }
 
-    private int getSegmentId(String key) {
+    private int getSegmentId(ByteArray key) {
         int hcode = key.hashCode();
         return hcode & noOfSegments;
     }

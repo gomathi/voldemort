@@ -1,20 +1,22 @@
 package voldemort.hashtrees;
 
+import voldemort.utils.ByteArray;
+
 public class SegmentData {
 
-    private final String key;
-    private final String digest;
+    private final ByteArray key;
+    private final ByteArray digest;
 
-    public SegmentData(final String key, final String digest) {
+    public SegmentData(final ByteArray key, final ByteArray digest) {
         this.key = key;
         this.digest = digest;
     }
 
-    public String getKey() {
+    public ByteArray getKey() {
         return key;
     }
 
-    public String getValue() {
+    public ByteArray getValue() {
         return digest;
     }
 

@@ -4,6 +4,8 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 
+import voldemort.utils.ByteArray;
+
 /**
  * A class which forwards the calls to a remote node which is running another
  * hash tree.
@@ -16,16 +18,16 @@ public class RemoteHTreeImpl implements HTree {
     }
 
     @Override
-    public void put(String key, String value) {}
+    public void put(ByteArray key, ByteArray value) {}
 
     @Override
-    public void remove(String key) {}
+    public void remove(ByteArray key) {}
 
     @Override
-    public void batchSPut(Map<String, String> keyValuePairs) {}
+    public void batchSPut(Map<ByteArray, ByteArray> keyValuePairs) {}
 
     @Override
-    public void batchSRemove(List<String> key) {}
+    public void batchSRemove(List<ByteArray> key) {}
 
     @Override
     public void update(HTree remoteTree) {}

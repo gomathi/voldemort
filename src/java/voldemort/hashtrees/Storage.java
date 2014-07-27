@@ -1,10 +1,12 @@
 package voldemort.hashtrees;
 
+import voldemort.utils.ByteArray;
+
 public interface Storage {
 
-    String get(String key);
+    ByteArray get(ByteArray key);
 
-    void put(String key, String value);
+    void put(ByteArray key, ByteArray value);
 
-    void remove(String key);
+    void remove(ByteArray key);
 }

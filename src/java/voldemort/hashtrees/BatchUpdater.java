@@ -5,28 +5,30 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import voldemort.utils.ByteArray;
+
 public class BatchUpdater {
 
     private final int batchSize;
     private final HTree remoteHTree;
-    private final Map<String, String> keyValuePairsToAdd = new HashMap<String, String>();
-    private final List<String> keysToBeRemoved = new ArrayList<String>();
+    private final Map<ByteArray, ByteArray> keyValuePairsToAdd = new HashMap<ByteArray, ByteArray>();
+    private final List<ByteArray> keysToBeRemoved = new ArrayList<ByteArray>();
 
     public BatchUpdater(final int batchSize, final HTree remoteHTree) {
         this.batchSize = batchSize;
         this.remoteHTree = remoteHTree;
     }
 
-    public void addKeys(List<String> input) {
-        Map<String, String> kvPairs = getValues(input);
+    public void addKeys(List<ByteArray> input) {
+        Map<ByteArray, ByteArray> kvPairs = getValues(input);
         keyValuePairsToAdd.putAll(kvPairs);
     }
 
-    private Map<String, String> getValues(List<String> input) {
+    private Map<ByteArray, ByteArray> getValues(List<ByteArray> input) {
         return null;
     }
 
-    public void removeKeys(List<String> input) {
+    public void removeKeys(List<ByteArray> input) {
         keysToBeRemoved.addAll(input);
     }
 

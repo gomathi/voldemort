@@ -9,12 +9,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 
+import voldemort.utils.ByteArray;
 import voldemort.utils.Pair;
 
 public class HTreeStorageInMemory implements HTreeStorage {
 
     private final Map<Integer, String> segmentHashes = new TreeMap<Integer, String>();
-    private final Map<Integer, TreeMap<String, String>> segDataBlocks = new HashMap<Integer, TreeMap<String, String>>();
+    private final Map<Integer, TreeMap<ByteArray, ByteArray>> segDataBlocks = new HashMap<Integer, TreeMap<ByteArray, ByteArray>>();
     private final BitSet dirtySegments = new BitSet();
 
     @Override
@@ -23,15 +24,15 @@ public class HTreeStorageInMemory implements HTreeStorage {
     }
 
     @Override
-    public void putSegmentData(int segId, String key, String digest) {
+    public void putSegmentData(int segId, ByteArray key, ByteArray digest) {
         if(!segDataBlocks.containsKey(segId))
-            segDataBlocks.put(segId, new TreeMap<String, String>());
+            segDataBlocks.put(segId, new TreeMap<ByteArray, ByteArray>());
         segDataBlocks.get(segId).put(key, digest);
     }
 
     @Override
-    public void deleteSegmentData(int segId, String key) {
-        if(segDataBlocks.containsKey(segId)) {
+    public void deleteSegmentData(int segId, ByteArray key) {
+        if(segDataBlocks.containsKey(segId) && segDataBlocks.get(segId).containsKey(key)) {
             segDataBlocks.get(segId).remove(key);
         }
     }
@@ -40,9 +41,9 @@ public class HTreeStorageInMemory implements HTreeStorage {
     public List<SegmentData> getSegment(int segId) {
         if(!segDataBlocks.containsKey(segId))
             return Collections.emptyList();
-        TreeMap<String, String> segDataBlock = segDataBlocks.get(segId);
+        TreeMap<ByteArray, ByteArray> segDataBlock = segDataBlocks.get(segId);
         List<SegmentData> result = new ArrayList<SegmentData>();
-        for(Map.Entry<String, String> entry: segDataBlock.entrySet()) {
+        for(Map.Entry<ByteArray, ByteArray> entry: segDataBlock.entrySet()) {
             result.add(new SegmentData(entry.getKey(), entry.getValue()));
         }
         return result;
@@ -93,7 +94,7 @@ public class HTreeStorageInMemory implements HTreeStorage {
     }
 
     @Override
-    public void putSegmentHashes(List<Pair<Integer, String>> segmentHashPairs) {
+    public void putSegmentHashes(List<Pair<Integer, ByteArray>> segmentHashPairs) {
 
     }
 

@@ -8,7 +8,7 @@ import java.util.Arrays;
  * A byte array container that provides an equals and hashCode pair based on the
  * contents of the byte array. This is useful as a key for Maps.
  */
-public final class ByteArray implements Serializable {
+public final class ByteArray implements Serializable, Comparable<ByteArray> {
 
     private static final long serialVersionUID = 1L;
 
@@ -59,5 +59,10 @@ public final class ByteArray implements Serializable {
 
     public int length() {
         return underlying.length;
+    }
+
+    @Override
+    public int compareTo(ByteArray o) {
+        return ByteUtils.compare(underlying, o.underlying);
     }
 }

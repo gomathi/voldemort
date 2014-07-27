@@ -4,6 +4,8 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 
+import voldemort.utils.ByteArray;
+
 /**
  * Defines Hash tree methods. Hash tree provides a way for nodes to synch up
  * quickly by exchanging very little information.
@@ -17,14 +19,14 @@ public interface HTree {
      * @param key
      * @param value
      */
-    void put(String key, String value);
+    void put(ByteArray key, ByteArray value);
 
     /**
      * Deletes the key from the hash tree.
      * 
      * @param key
      */
-    void remove(String key);
+    void remove(ByteArray key);
 
     /**
      * Adds the (key,value) pair to the original storage. Intended to be used
@@ -33,14 +35,14 @@ public interface HTree {
      * @param key
      * @param value
      */
-    void batchSPut(Map<String, String> keyValuePairs);
+    void batchSPut(Map<ByteArray, ByteArray> keyValuePairs);
 
     /**
      * Deletes the keys from the storage. While synching this function is used.
      * 
      * @param key
      */
-    void batchSRemove(List<String> key);
+    void batchSRemove(List<ByteArray> key);
 
     /**
      * Updates the other HTree based on the differences with local objects.

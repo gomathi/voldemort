@@ -3,6 +3,7 @@ package voldemort.hashtrees;
 import java.util.Collection;
 import java.util.List;
 
+import voldemort.utils.ByteArray;
 import voldemort.utils.Pair;
 
 /**
@@ -18,7 +19,7 @@ public interface HTreeStorage {
      * @param key
      * @param digest
      */
-    void putSegmentData(int segId, String key, String digest);
+    void putSegmentData(int segId, ByteArray key, ByteArray digest);
 
     /**
      * Deletes the given segement data from the block.
@@ -26,7 +27,7 @@ public interface HTreeStorage {
      * @param segId
      * @param key
      */
-    void deleteSegmentData(int segId, String key);
+    void deleteSegmentData(int segId, ByteArray key);
 
     /**
      * Deletes list of segments.
@@ -65,7 +66,7 @@ public interface HTreeStorage {
      * 
      * @param segmentHashPairs
      */
-    void putSegmentHashes(List<Pair<Integer, String>> segmentHashPairs);
+    void putSegmentHashes(List<Pair<Integer, ByteArray>> segmentHashPairs);
 
     /**
      * Returns the data inside the nodes of the hash tree. If the node id is not
