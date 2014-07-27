@@ -2,6 +2,10 @@ package voldemort.hashtrees;
 
 import static voldemort.utils.ByteUtils.sha1;
 import static voldemort.utils.ByteUtils.toHexString;
+import static voldemort.utils.TreeUtils.getImmediateChildren;
+import static voldemort.utils.TreeUtils.getNoOfNodes;
+import static voldemort.utils.TreeUtils.getParent;
+import static voldemort.utils.TreeUtils.height;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -12,38 +16,44 @@ import java.util.Queue;
 import java.util.Set;
 import java.util.TreeSet;
 
+import org.apache.log4j.Logger;
+
 import com.google.common.base.Function;
 import com.google.common.collect.Collections2;
 
 /**
- * Uses a binary tree to store the segment hashes.
- * 
  * 1) Segment hashes and (Key, Hash) pairs are stored on the same storage
  * {@link HTreeStorage}
  * 
  */
 public class HTreeImpl implements HTree {
 
+    private final static Logger logger = Logger.getLogger(HTreeImpl.class);
+
     private final static int ROOT_NODE = 0;
     private final static int MAX_CAPACITY = 1 << 30;
+    private final static int FOUR_ARY_TREE = 4;
 
+    private final int noOfChildrenPerParent;
     private final int maxInternalNodeId;
     private final int noOfSegments;
     private final HTreeStorage hTStorage;
     private final Storage storage;
 
-    public HTreeImpl(final int noOfSegments, final HTreeStorage hTStroage, final Storage storage) {
+    public HTreeImpl(int noOfSegments, final HTreeStorage hTStroage, final Storage storage) {
         if(noOfSegments < 0)
             throw new IllegalArgumentException("noOfSegments can not be a negative value.");
         this.noOfSegments = noOfSegments > MAX_CAPACITY ? MAX_CAPACITY
                                                        : roundUpToPowerOf2(noOfSegments);
         this.hTStorage = hTStroage;
         this.storage = storage;
-        maxInternalNodeId = getNoOfInternalNodes(noOfSegments) - 2;
+        this.noOfChildrenPerParent = FOUR_ARY_TREE;
+        maxInternalNodeId = getNoOfNodes(height(this.noOfSegments, this.noOfChildrenPerParent) - 1,
+                                         this.noOfChildrenPerParent);
     }
 
     @Override
-    public void put(String key, String value) {
+    public void put(final String key, final String value) {
         int segId = getSegmentId(key);
         String digest = toHexString(sha1(value.getBytes()));
         hTStorage.putSegmentData(segId, key, digest);
@@ -58,7 +68,7 @@ public class HTreeImpl implements HTree {
     }
 
     @Override
-    public void update(HTree remoteTree) {
+    public void update(final HTree remoteTree) {
         Collection<Integer> leafNodesToCheck = new ArrayList<Integer>();
         Collection<Integer> missingNodes = new ArrayList<Integer>();
         Collection<Integer> nodesToDelete = new ArrayList<Integer>();
@@ -97,7 +107,8 @@ public class HTreeImpl implements HTree {
                         if(isLeafNode(local.getNodeId()))
                             nodesToCheck.add(local.getNodeId());
                         else
-                            pQueue.addAll(getImmediateChildren(local.getNodeId()));
+                            pQueue.addAll(getImmediateChildren(local.getNodeId(),
+                                                               this.noOfChildrenPerParent));
 
                     }
                     localItr.next();
@@ -158,7 +169,7 @@ public class HTreeImpl implements HTree {
     }
 
     @Override
-    public List<SegmentHash> getSegmentHashes(Collection<Integer> nodeIds) {
+    public List<SegmentHash> getSegmentHashes(final Collection<Integer> nodeIds) {
         return hTStorage.getSegmentHashes(nodeIds);
     }
 
@@ -182,13 +193,13 @@ public class HTreeImpl implements HTree {
     }
 
     @Override
-    public void batchSRemove(List<String> keys) {
+    public void batchSRemove(final List<String> keys) {
         for(String key: keys)
             storage.remove(key);
     }
 
     @Override
-    public void deleteNodes(Collection<Integer> nodeIds) {
+    public void deleteNodes(final Collection<Integer> nodeIds) {
         hTStorage.deleteSegments(getSegmentIdsOf(nodeIds));
     }
 
@@ -198,7 +209,7 @@ public class HTreeImpl implements HTree {
      * 
      * @return, the nodes ids of leaves in the tree.
      */
-    private List<Integer> rebuildLeaves(List<Integer> dirtySegments) {
+    private List<Integer> rebuildLeaves(final List<Integer> dirtySegments) {
         List<Integer> dirtyNodeIds = new ArrayList<Integer>();
         for(int dirtySegId: dirtySegments) {
             String digest = digestSegmentData(dirtySegId);
@@ -211,7 +222,7 @@ public class HTreeImpl implements HTree {
         return dirtyNodeIds;
     }
 
-    private String digestSegmentData(final int segId) {
+    private String digestSegmentData(int segId) {
         List<SegmentData> dirtySegmentData = hTStorage.getSegment(segId);
         if(dirtySegmentData.size() == 0)
             return "";
@@ -228,7 +239,7 @@ public class HTreeImpl implements HTree {
         Set<Integer> parentNodeIds = new TreeSet<Integer>();
         while(!nodeIds.isEmpty()) {
             for(int dirtyNodeId: nodeIds) {
-                parentNodeIds.add(getParent(dirtyNodeId));
+                parentNodeIds.add(getParent(dirtyNodeId, this.noOfChildrenPerParent));
             }
             updateInternalNodes(parentNodeIds);
 
@@ -247,7 +258,8 @@ public class HTreeImpl implements HTree {
         List<SegmentHash> segmentHashes;
         StringBuilder sb = new StringBuilder();
         for(int parentId: parentIds) {
-            segmentHashes = hTStorage.getSegmentHashes(getImmediateChildren(parentId));
+            segmentHashes = hTStorage.getSegmentHashes(getImmediateChildren(parentId,
+                                                                            this.noOfChildrenPerParent));
             for(SegmentHash sh: segmentHashes)
                 sb.append(sh.getHash() + "\n");
             String digest = toHexString(sha1(sb.toString().getBytes()));
@@ -269,7 +281,7 @@ public class HTreeImpl implements HTree {
      * @param leafNodeId
      * @return
      */
-    private int getSegmentIdFromLeafId(final int leafNodeId) {
+    private int getSegmentIdFromLeafId(int leafNodeId) {
         return leafNodeId - maxInternalNodeId;
     }
 
@@ -300,12 +312,12 @@ public class HTreeImpl implements HTree {
      * @param pId, parent id
      * @return
      */
-    private Collection<Integer> getAllLeafNodeIds(final int pId) {
+    private Collection<Integer> getAllLeafNodeIds(int pId) {
         Queue<Integer> pQueue = new ArrayDeque<Integer>();
         pQueue.add(pId);
         while(pQueue.peek() <= maxInternalNodeId) {
             int cNodeId = pQueue.remove();
-            pQueue.addAll(getImmediateChildren(cNodeId));
+            pQueue.addAll(getImmediateChildren(cNodeId, this.noOfChildrenPerParent));
         }
         return pQueue;
     }
@@ -317,7 +329,7 @@ public class HTreeImpl implements HTree {
      * @param nodeIds
      * @return, segment ids.
      */
-    private Collection<Integer> getSegmentIdsOf(Collection<Integer> nodeIds) {
+    private Collection<Integer> getSegmentIdsOf(final Collection<Integer> nodeIds) {
         Collection<Integer> leafNodeIds = new ArrayList<Integer>();
         for(int nodeId: nodeIds) {
             if(isLeafNode(nodeId)) {
@@ -333,58 +345,6 @@ public class HTreeImpl implements HTree {
     private static int roundUpToPowerOf2(int number) {
         return number >= MAX_CAPACITY ? MAX_CAPACITY
                                      : (number > 1) ? Integer.highestOneBit((number - 1) << 1) : 1;
-    }
-
-    /**
-     * Finds the count of internal nodes, given the no of leaf nodes.
-     * 
-     * @param noOfLeaves
-     * @return
-     */
-    private static int getNoOfInternalNodes(final int noOfLeaves) {
-        int result = ((int) Math.pow(2, height(noOfLeaves)));
-        return result;
-    }
-
-    /**
-     * Calculates the height of the tree, given the no of leaves.
-     * 
-     * @param noOfLeaves
-     * @return
-     */
-    private static int height(int noOfLeaves) {
-        int height = 0;
-        while(noOfLeaves > 0) {
-            noOfLeaves /= 2;
-            height++;
-        }
-        return height;
-    }
-
-    /**
-     * Returns the parent node id.
-     * 
-     * @param childId
-     * @return
-     */
-    private static int getParent(final int childId) {
-        if(childId <= 2)
-            return 0;
-        return (childId % 2 == 0) ? ((childId / 2) - 1) : (childId / 2);
-    }
-
-    /**
-     * Finds the internal nodes that can be reached directly from the parent.
-     * 
-     * @param parentId
-     * @return
-     */
-    private static List<Integer> getImmediateChildren(final int parentId) {
-        List<Integer> children = new ArrayList<Integer>(2);
-        for(int i = 1; i <= 2; i++) {
-            children.add((2 * parentId) + i);
-        }
-        return children;
     }
 
 }

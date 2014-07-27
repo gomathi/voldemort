@@ -1,6 +1,6 @@
 package voldemort.hashtrees;
 
 
-public class HTreeImplTest {
+public class TestHTreeImpl {
 
 }
