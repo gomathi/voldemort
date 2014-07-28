@@ -9,7 +9,6 @@ import static voldemort.utils.TreeUtils.height;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
@@ -17,11 +16,15 @@ import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.log4j.Logger;
-import org.mortbay.log.Log;
 
 import voldemort.annotations.concurrency.Threadsafe;
 import voldemort.utils.ByteArray;
@@ -34,9 +37,9 @@ import com.google.common.collect.Collections2;
  * HashTree has the following components
  * 
  * 1) Segments, where the (key, hash of value) pairs are stored. All the pairs
- * sorted. Whenever a key addition/removal happens on the node, HashTree segment
- * is updated. Keys are distributed using uniform hash distribution. Max no of
- * segments is {@link #MAX_NO_OF_BUCKETS}.
+ * are stored in sorted order. Whenever a key addition/removal happens on the
+ * node, HashTree segment is updated. Keys are distributed using uniform hash
+ * distribution. Max no of segments is {@link #MAX_NO_OF_BUCKETS}.
  * 
  * 2) A complete tree where the segments' hashes are updated and maintained.
  * Tree is not updated on every update on a segment. Rather, tree update is
@@ -59,14 +62,23 @@ public class HashTreeImpl implements HashTree {
     private final static int ROOT_NODE = 0;
     private final static int MAX_NO_OF_BUCKETS = 1 << 30;
     private final static int FOUR_ARY_TREE = 4;
+    private final static long REBUILD_HTREE_TIME_INTERVAL = 30 * 60 * 1000; // in
+                                                                            // milliseconds
+    private final static long REMOTE_TREE_SYNCH_INTERVAL = 5 * 60 * 1000; // in
+                                                                          // milliseconds
 
     private final int noOfChildrenPerParent;
     private final int maxInternalNodeId;
     private final int noOfSegments;
+
     private final HashTreeStorage hTStorage;
     private final Storage storage;
+
     private final ExecutorService executors;
+    private final ScheduledExecutorService scheduledExecutors;
+
     private final BackgroundSegmentDataUpdater segDataUpdater;
+    private final BackgroundSynchTask syncTask;
 
     private static enum HTOperation {
         PUT,
@@ -82,14 +94,26 @@ public class HashTreeImpl implements HashTree {
                         final ExecutorService executors) {
         this.noOfSegments = (noOfSegments > MAX_NO_OF_BUCKETS) || (noOfSegments < 0) ? MAX_NO_OF_BUCKETS
                                                                                     : roundUpToPowerOf2(noOfSegments);
+        this.noOfChildrenPerParent = FOUR_ARY_TREE;
+        this.maxInternalNodeId = getNoOfNodes(height(this.noOfSegments, this.noOfChildrenPerParent) - 1,
+                                              this.noOfChildrenPerParent);
+
         this.hTStorage = hTStroage;
         this.storage = storage;
         this.executors = executors;
-        noOfChildrenPerParent = FOUR_ARY_TREE;
-        segDataUpdater = new BackgroundSegmentDataUpdater();
-        maxInternalNodeId = getNoOfNodes(height(this.noOfSegments, this.noOfChildrenPerParent) - 1,
-                                         this.noOfChildrenPerParent);
+        this.scheduledExecutors = Executors.newScheduledThreadPool(2);
+        this.segDataUpdater = new BackgroundSegmentDataUpdater();
+        this.syncTask = new BackgroundSynchTask();
+
         new Thread(segDataUpdater).start();
+        scheduledExecutors.scheduleWithFixedDelay(syncTask,
+                                                  0,
+                                                  REMOTE_TREE_SYNCH_INTERVAL,
+                                                  TimeUnit.MILLISECONDS);
+        scheduledExecutors.scheduleWithFixedDelay(new RebuildHTreeTask(),
+                                                  0,
+                                                  REBUILD_HTREE_TIME_INTERVAL,
+                                                  TimeUnit.MILLISECONDS);
     }
 
     @Override
@@ -355,10 +379,22 @@ public class HashTreeImpl implements HashTree {
      */
     private class BackgroundSegmentDataUpdater implements Runnable {
 
-        private BlockingQueue<Pair<HTOperation, List<ByteArray>>> que = new ArrayBlockingQueue<Pair<HTOperation, List<ByteArray>>>(Integer.MAX_VALUE);
+        private final BlockingQueue<Pair<HTOperation, List<ByteArray>>> que = new ArrayBlockingQueue<Pair<HTOperation, List<ByteArray>>>(Integer.MAX_VALUE);
+        private volatile boolean shutdownRequested = false;
+        private volatile boolean hasShutdown = false;
 
         public void enque(Pair<HTOperation, List<ByteArray>> data) {
-            que.add(data);
+            if(shutdownRequested) {
+
+            }
+            if(data.getFirst() == HTOperation.STOP) {
+                shutdownRequested = true;
+                que.add(data);
+            }
+        }
+
+        public boolean isShutdown() {
+            return hasShutdown;
         }
 
         @Override
@@ -374,6 +410,7 @@ public class HashTreeImpl implements HashTree {
                             removeInternal(pair.getSecond().get(0));
                             break;
                         case STOP:
+                            hasShutdown = true;
                             logger.info("Stopping current thread as stop request received.");
                             return;
                     }
@@ -432,21 +469,19 @@ public class HashTreeImpl implements HashTree {
     @Threadsafe
     private class BackgroundSynchTask implements Runnable {
 
-        private Map<String, HashTree> hostNameAndRemoteHTrees = new HashMap<String, HashTree>();
+        private final ConcurrentMap<String, HashTree> hostNameAndRemoteHTrees = new ConcurrentHashMap<String, HashTree>();
 
-        public synchronized void add(String hostName, HashTree remoteHTree) {
-            if(!hostNameAndRemoteHTrees.containsKey(hostName)) {
-                hostNameAndRemoteHTrees.put(hostName, remoteHTree);
+        public void add(String hostName, HashTree remoteHTree) {
+            if(hostNameAndRemoteHTrees.putIfAbsent(hostName, remoteHTree) != null) {
                 logger.debug(hostName + " is already present on the synch list. Skipping the host.");
+                return;
             }
             logger.info(hostName + " is added to the synch list.");
         }
 
-        public synchronized void remove(String hostName) {
-            if(hostNameAndRemoteHTrees.containsKey(hostName)) {
-                Log.info(hostName + " is removed from synch list.");
-                return;
-            }
+        public void remove(String hostName) {
+            if(hostNameAndRemoteHTrees.remove(hostName) != null)
+                logger.info(hostName + " is removed from synch list.");
         }
 
         @Override
@@ -456,4 +491,24 @@ public class HashTreeImpl implements HashTree {
 
     }
 
+    /**
+     * Provides an option to clean shutdown the background threads running on
+     * this object.
+     */
+    public void safeShutdown() {
+        segDataUpdater.enque(new Pair<HashTreeImpl.HTOperation, List<ByteArray>>(HTOperation.STOP,
+                                                                                 null));
+        logger.info("Waiting for the shut down of background threads.");
+        while(!segDataUpdater.hasShutdown) {
+            try {
+                Thread.sleep(1000);
+            } catch(InterruptedException e) {
+                // TODO Auto-generated catch block
+                logger.warn("Exception occurred while shutting down.");
+            }
+        }
+        logger.info("Segment data updater has been shut down.");
+        executors.shutdownNow();
+        scheduledExecutors.shutdownNow();
+    }
 }

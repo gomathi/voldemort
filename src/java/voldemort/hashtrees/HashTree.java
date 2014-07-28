@@ -75,9 +75,9 @@ public interface HashTree {
 
     /**
      * Hash tree implementations usually do not update the segment hashes tree
-     * on every key change. Rather tree is rebuilt at every regular intervals.
-     * This function provides an option to make a force call to update the
-     * segment hashes.
+     * on every key change. Rather tree is rebuilt at regular intervals. This
+     * function provides an option to make a force call to update the segment
+     * hashes.
      */
     void updateSegmentHashes();
 }

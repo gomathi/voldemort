@@ -43,10 +43,9 @@ public class HashTreeStorageInMemory implements HashTreeStorage {
 
     @Override
     public List<SegmentData> getSegment(int segId) {
-        if(!segDataBlocks.containsKey(segId))
-            return Collections.emptyList();
         ConcurrentMap<ByteArray, ByteArray> segDataBlock = segDataBlocks.get(segId);
-
+        if(segDataBlock == null)
+            return Collections.emptyList();
         List<SegmentData> result = new ArrayList<SegmentData>();
         for(Map.Entry<ByteArray, ByteArray> entry: segDataBlock.entrySet()) {
             result.add(new SegmentData(entry.getKey(), entry.getValue()));

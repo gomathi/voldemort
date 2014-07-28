@@ -13,7 +13,7 @@ import voldemort.utils.Pair;
  * 
  */
 
-public class HashTreeStorageInLevelDB extends HashTreeStorageInMemory {
+public class HashTreeStorageInLevelDB implements HashTreeStorage {
 
     private final BitSet dirtySegments;
 
