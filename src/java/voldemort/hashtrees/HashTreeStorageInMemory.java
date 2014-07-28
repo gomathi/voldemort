@@ -12,7 +12,6 @@ import java.util.concurrent.ConcurrentSkipListMap;
 
 import voldemort.annotations.concurrency.Threadsafe;
 import voldemort.utils.ByteArray;
-import voldemort.utils.Pair;
 
 @Threadsafe
 public class HashTreeStorageInMemory implements HashTreeStorage {
@@ -34,11 +33,9 @@ public class HashTreeStorageInMemory implements HashTreeStorage {
 
     @Override
     public void deleteSegmentData(int segId, ByteArray key) {
-        if(segDataBlocks.containsKey(segId)) {
-            Map<ByteArray, ByteArray> segDataBlock = segDataBlocks.get(segId);
-            if(segDataBlock != null)
-                segDataBlock.remove(key);
-        }
+        Map<ByteArray, ByteArray> segDataBlock = segDataBlocks.get(segId);
+        if(segDataBlock != null)
+            segDataBlock.remove(key);
     }
 
     @Override
@@ -83,11 +80,6 @@ public class HashTreeStorageInMemory implements HashTreeStorage {
         for(int dirtySegId: dirtySegIds) {
             dirtySegments.clear(dirtySegId);
         }
-    }
-
-    @Override
-    public void putSegmentHashes(List<Pair<Integer, ByteArray>> segmentHashPairs) {
-
     }
 
 }

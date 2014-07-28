@@ -5,8 +5,10 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import voldemort.annotations.concurrency.NotThreadsafe;
 import voldemort.utils.ByteArray;
 
+@NotThreadsafe
 public class BatchUpdater {
 
     private final int batchSize;
@@ -32,7 +34,7 @@ public class BatchUpdater {
         keysToBeRemoved.addAll(input);
     }
 
-    public void close() {
+    public void finish() {
 
     }
 }

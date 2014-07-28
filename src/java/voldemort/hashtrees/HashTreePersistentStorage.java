@@ -5,7 +5,6 @@ import java.util.Collection;
 import java.util.List;
 
 import voldemort.utils.ByteArray;
-import voldemort.utils.Pair;
 
 /**
  * Uses level db for storing segment data. Uses {@link HashTreeStorageInMemory}
@@ -13,11 +12,11 @@ import voldemort.utils.Pair;
  * 
  */
 
-public class HashTreeStorageInLevelDB implements HashTreeStorage {
+public class HashTreePersistentStorage implements HashTreeStorage {
 
     private final BitSet dirtySegments;
 
-    public HashTreeStorageInLevelDB(final int noOfSegments) {
+    public HashTreePersistentStorage(final int noOfSegments) {
         dirtySegments = new BitSet(noOfSegments);
     }
 
@@ -34,9 +33,6 @@ public class HashTreeStorageInLevelDB implements HashTreeStorage {
 
     @Override
     public void putSegmentHash(int nodeId, ByteArray digest) {}
-
-    @Override
-    public void putSegmentHashes(List<Pair<Integer, ByteArray>> segmentHashPairs) {}
 
     @Override
     public List<SegmentHash> getSegmentHashes(Collection<Integer> nodeIds) {

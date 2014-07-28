@@ -45,4 +45,10 @@ public class RemoteHashTree implements HashTree {
     @Override
     public void updateSegmentHashes() {}
 
+    @Override
+    public void addTreeToSyncList(String hostName, HashTree remoteTree) {}
+
+    @Override
+    public void removeTreeFromSyncList(String hostName) {}
+
 }

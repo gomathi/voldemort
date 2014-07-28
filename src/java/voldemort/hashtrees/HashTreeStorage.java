@@ -4,7 +4,6 @@ import java.util.Collection;
 import java.util.List;
 
 import voldemort.utils.ByteArray;
-import voldemort.utils.Pair;
 
 /**
  * Defines storage interface to be used by higher level HTree.
@@ -46,13 +45,6 @@ public interface HashTreeStorage {
      * @param digest
      */
     void putSegmentHash(int nodeId, ByteArray digest);
-
-    /**
-     * Updates a list of segment hash values on the tree.
-     * 
-     * @param segmentHashPairs
-     */
-    void putSegmentHashes(List<Pair<Integer, ByteArray>> segmentHashPairs);
 
     /**
      * Returns the data inside the nodes of the hash tree. If the node id is not

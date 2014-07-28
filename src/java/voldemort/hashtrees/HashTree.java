@@ -55,6 +55,22 @@ public interface HashTree {
     void update(HashTree remoteTree);
 
     /**
+     * Implementation is expected to run a background task at regular intervals
+     * to update remote hash trees. This function adds a remote tree to synch
+     * exclusion list.
+     * 
+     * @param remoteTree
+     */
+    void addTreeToSyncList(String hostName, HashTree remoteTree);
+
+    /**
+     * Removes the remoteTree from sync list.
+     * 
+     * @param remoteTree
+     */
+    void removeTreeFromSyncList(String hostName);
+
+    /**
      * Hash tree internal nodes store the hash of their children nodes. Given a
      * set of internal node ids, this returns the hashes that are stored on the
      * internal node.
