@@ -23,7 +23,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.log4j.Logger;
 
@@ -78,8 +77,10 @@ public class HashTreeImpl implements HashTree {
     private final ExecutorService executors;
     private final ScheduledExecutorService scheduledExecutors;
 
-    private final BackgroundSegmentDataUpdater segDataUpdater;
-    private final BackgroundSynchTask syncTask;
+    // Background tasks.
+    private final BackgroundSegmentDataUpdater bgSegDataUpdater;
+    private final BackgroundSynchTask bgSyncTask;
+    private final BackgroundRebuildTask bgRebuildTask;
 
     // A latch that is used internally while shutting down. Shutdown operation
     // is waiting on this latch for all other threads to finish up their work.
@@ -87,10 +88,7 @@ public class HashTreeImpl implements HashTree {
 
     private static enum HTOperation {
         PUT,
-        REMOVE,
-        // Indicates the thread to stop processing when it receives this value.
-        // Used for safe shutdown operation.
-        STOP;
+        REMOVE
     }
 
     public HashTreeImpl(int noOfSegments,
@@ -108,15 +106,17 @@ public class HashTreeImpl implements HashTree {
         this.executors = executors;
         this.scheduledExecutors = Executors.newScheduledThreadPool(2);
         this.shutdownLatch = new CountDownLatch(3);
-        this.segDataUpdater = new BackgroundSegmentDataUpdater();
-        this.syncTask = new BackgroundSynchTask();
 
-        new Thread(segDataUpdater).start();
-        scheduledExecutors.scheduleWithFixedDelay(syncTask,
+        this.bgSegDataUpdater = new BackgroundSegmentDataUpdater();
+        this.bgSyncTask = new BackgroundSynchTask();
+        this.bgRebuildTask = new BackgroundRebuildTask();
+
+        new Thread(bgSegDataUpdater).start();
+        scheduledExecutors.scheduleWithFixedDelay(bgSyncTask,
                                                   0,
                                                   REMOTE_TREE_SYNCH_INTERVAL,
                                                   TimeUnit.MILLISECONDS);
-        scheduledExecutors.scheduleWithFixedDelay(new RebuildHashTreeTask(),
+        scheduledExecutors.scheduleWithFixedDelay(bgRebuildTask,
                                                   0,
                                                   REBUILD_HTREE_TIME_INTERVAL,
                                                   TimeUnit.MILLISECONDS);
@@ -127,16 +127,16 @@ public class HashTreeImpl implements HashTree {
         List<ByteArray> second = new ArrayList<ByteArray>(2);
         second.add(key);
         second.add(value);
-        segDataUpdater.enque(new Pair<HashTreeImpl.HTOperation, List<ByteArray>>(HTOperation.PUT,
-                                                                                 second));
+        bgSegDataUpdater.enque(new Pair<HashTreeImpl.HTOperation, List<ByteArray>>(HTOperation.PUT,
+                                                                                   second));
     }
 
     @Override
     public void remove(final ByteArray key) {
         List<ByteArray> second = new ArrayList<ByteArray>(1);
         second.add(key);
-        segDataUpdater.enque(new Pair<HashTreeImpl.HTOperation, List<ByteArray>>(HTOperation.REMOVE,
-                                                                                 second));
+        bgSegDataUpdater.enque(new Pair<HashTreeImpl.HTOperation, List<ByteArray>>(HTOperation.REMOVE,
+                                                                                   second));
     }
 
     private void putInternal(final ByteArray key, final ByteArray value) {
@@ -276,12 +276,12 @@ public class HashTreeImpl implements HashTree {
 
     @Override
     public void addTreeToSyncList(String hostName, HashTree remoteTree) {
-        syncTask.add(hostName, remoteTree);
+        bgSyncTask.add(hostName, remoteTree);
     }
 
     @Override
     public void removeTreeFromSyncList(String hostName) {
-        syncTask.remove(hostName);
+        bgSyncTask.remove(hostName);
     }
 
     /**
@@ -387,6 +387,11 @@ public class HashTreeImpl implements HashTree {
                                                         : 1;
     }
 
+    private static interface StoppableTask {
+
+        void stop();
+    }
+
     /**
      * A task to enable non blocking calls on all
      * {@link HashTreeImpl#put(ByteArray, ByteArray)} and
@@ -395,19 +400,16 @@ public class HashTreeImpl implements HashTree {
      * This class provides a cleaner way to stop itself.
      */
     @Threadsafe
-    private class BackgroundSegmentDataUpdater implements Runnable {
+    private class BackgroundSegmentDataUpdater implements Runnable, StoppableTask {
 
         private final BlockingQueue<Pair<HTOperation, List<ByteArray>>> que = new ArrayBlockingQueue<Pair<HTOperation, List<ByteArray>>>(Integer.MAX_VALUE);
-        private volatile boolean shutdownRequested = false;
+        private volatile boolean stopRequested = false;
 
         public void enque(Pair<HTOperation, List<ByteArray>> data) {
-            if(shutdownRequested) {
+            if(stopRequested) {
                 throw new IllegalStateException("Shut down is initiated. Unable to store the data.");
             }
-            if(data.getFirst() == HTOperation.STOP) {
-                shutdownRequested = true;
-                que.add(data);
-            }
+            que.add(data);
         }
 
         @Override
@@ -422,11 +424,8 @@ public class HashTreeImpl implements HashTree {
                         case REMOVE:
                             removeInternal(pair.getSecond().get(0));
                             break;
-                        case STOP:
-                            // no op
-                            break;
                     }
-                    if(shutdownRequested && que.isEmpty()) {
+                    if(stopRequested && que.isEmpty()) {
                         shutdownLatch.countDown();
                         return;
                     }
@@ -437,34 +436,62 @@ public class HashTreeImpl implements HashTree {
                 }
             }
         }
+
+        @Override
+        public void stop() {
+            stopRequested = true;
+        }
     }
 
     /**
      * This reads all the keys from storage, and rebuilds the complete HTree.
-     * This task can be scheduled through the executor service.
+     * This task can be scheduled through the executor service. This class makes
+     * sure only one rebuilding task can run at any time. This task can be
+     * safely shut down.
      * 
      */
     @Threadsafe
-    private class RebuildHashTreeTask implements Runnable {
+    private class BackgroundRebuildTask implements Runnable, StoppableTask {
 
-        private final AtomicBoolean isRunning = new AtomicBoolean(false);
+        private boolean running = false;
+        private boolean stopRequested = false;
+
+        /**
+         * If a rebuild task is already running or stop has been requested, this
+         * will return false. Otherwise enables running status to be true.
+         * 
+         * @return
+         */
+        private synchronized boolean enableRunningStatus() {
+            if(stopRequested || running)
+                return false;
+            running = true;
+            return true;
+        }
+
+        private synchronized void disableRunningStatus() {
+            running = false;
+            if(stopRequested)
+                shutdownLatch.countDown();
+        }
 
         @Override
         public void run() {
-            if(!isRunning.get()) {
-                boolean statusUpdated = isRunning.compareAndSet(false, true);
-                if(statusUpdated) {
-                    executors.submit(new Runnable() {
+            if(enableRunningStatus()) {
 
-                        @Override
-                        public void run() {
+                executors.submit(new Runnable() {
+
+                    @Override
+                    public void run() {
+                        try {
                             rebuildHashTree();
+                        } finally {
+                            disableRunningStatus();
                         }
-                    });
-                    return;
-                }
-            }
-            logger.info("A task for rebuilding hash tree is already running. Skipping the current task.");
+                    }
+                });
+            } else
+                logger.info("A task for rebuilding hash tree is already running or stop has been requested. Skipping the current task.");
         }
 
         private void rebuildHashTree() {
@@ -474,6 +501,15 @@ public class HashTreeImpl implements HashTree {
             long endTime = System.currentTimeMillis();
             logger.info("Total time took for rebuilding htree (in ms) : " + (endTime - startTime));
             logger.info("Rebuilding HTree - Done");
+        }
+
+        @Override
+        public synchronized void stop() {
+            if(stopRequested)
+                return;
+            stopRequested = true;
+            if(!running)
+                shutdownLatch.countDown();
         }
     }
 
@@ -512,8 +548,8 @@ public class HashTreeImpl implements HashTree {
      * this object.
      */
     public void safeShutdown() {
-        segDataUpdater.enque(new Pair<HashTreeImpl.HTOperation, List<ByteArray>>(HTOperation.STOP,
-                                                                                 null));
+        bgSegDataUpdater.stop();
+        bgRebuildTask.stop();
         logger.info("Waiting for the shut down of background threads.");
         try {
             shutdownLatch.await();
