@@ -56,6 +56,18 @@ public class ThreadSafeBitSetTest {
     }
 
     @Test
+    public void testClearAndGetSetBitsForEmptyArgs() {
+        ThreadSafeBitSet obj = new ThreadSafeBitSet(1000);
+
+        int actualCount = 0;
+        for(int i = obj.clearAndGetNextSetBit(0); i >= 0; i = obj.clearAndGetNextSetBit(i + 1)) {
+            actualCount++;
+        }
+
+        Assert.assertEquals(0, actualCount);
+    }
+
+    @Test
     public void testCompareAndSet() {
         ThreadSafeBitSet obj = new ThreadSafeBitSet(64);
         obj.set(0);
