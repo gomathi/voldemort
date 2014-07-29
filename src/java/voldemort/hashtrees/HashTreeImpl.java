@@ -260,7 +260,7 @@ public class HashTreeImpl implements HashTree {
 
     @Override
     public void updateSegmentHashes() {
-        List<Integer> dirtySegmentBuckets = hTStorage.getAndClearDirtySegments();
+        List<Integer> dirtySegmentBuckets = hTStorage.clearAndGetDirtySegments();
         List<Integer> dirtyLeafNodes = rebuildLeaves(dirtySegmentBuckets);
         rebuildInternalNodes(dirtyLeafNodes);
     }

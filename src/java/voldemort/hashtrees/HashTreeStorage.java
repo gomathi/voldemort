@@ -68,6 +68,6 @@ public interface HashTreeStorage {
      * 
      * @return
      */
-    List<Integer> getAndClearDirtySegments();
+    List<Integer> clearAndGetDirtySegments();
 
 }

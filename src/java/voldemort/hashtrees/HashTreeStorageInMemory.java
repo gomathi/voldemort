@@ -18,11 +18,9 @@ public class HashTreeStorageInMemory implements HashTreeStorage {
     private final ConcurrentMap<Integer, ByteArray> segmentHashes = new ConcurrentSkipListMap<Integer, ByteArray>();
     private final ConcurrentMap<Integer, ConcurrentSkipListMap<ByteArray, ByteArray>> segDataBlocks = new ConcurrentHashMap<Integer, ConcurrentSkipListMap<ByteArray, ByteArray>>();
     private final ThreadSafeBitSet dirtySegments;
-    private final int noOfSegDataBlocks;
 
     public HashTreeStorageInMemory(int noOfSegDataBlocks) {
         this.dirtySegments = new ThreadSafeBitSet(noOfSegDataBlocks);
-        this.noOfSegDataBlocks = noOfSegDataBlocks;
     }
 
     @Override
@@ -72,7 +70,7 @@ public class HashTreeStorageInMemory implements HashTreeStorage {
     }
 
     @Override
-    public List<Integer> getAndClearDirtySegments() {
+    public List<Integer> clearAndGetDirtySegments() {
         List<Integer> result = new ArrayList<Integer>();
         for(int itr = dirtySegments.clearAndGetNextSetBit(0); itr >= 0; itr = dirtySegments.clearAndGetNextSetBit(itr + 1)) {
             result.add(itr);
