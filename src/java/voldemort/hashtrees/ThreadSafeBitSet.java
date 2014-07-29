@@ -29,24 +29,46 @@ public class ThreadSafeBitSet {
     }
 
     private static int calcLength(int totBits, int bitsPerBlock) {
-        return totBits / bitsPerBlock + (((totBits % bitsPerBlock) == 0) ? 0 : 1);
+        return (totBits / bitsPerBlock) + (((totBits % bitsPerBlock) == 0) ? 0 : 1);
     }
 
+    /**
+     * 
+     * @param value
+     * @param pos
+     * @return
+     */
     private static int getNthBit(int value, int pos) {
         value = value >> pos;
         return value & 1;
     }
 
+    private void validateArgument(int bitIndex) {
+        if(bitIndex >= totBits || bitIndex < 0)
+            throw new ArrayIndexOutOfBoundsException("Given index is invalid : " + bitIndex);
+    }
+
+    /**
+     * Gets the index of the element in {@link #bitsHolder} for the given
+     * bitIndex.
+     * 
+     * @param bitIndex, values can be between 0 and {@link #totBits} - 1
+     * @return
+     */
+    private int getArrayIndex(int bitIndex) {
+        return calcLength(bitIndex + 1, NO_OF_BITS) - 1;
+    }
+
     /**
      * Sets given bitIndex.
      * 
-     * @param bitIndex, can not be negative or larger than the size of length of
-     *        the bitset.
+     * @param bitIndex, can not be negative or larger than or equal to the
+     *        length of the bitSet.
      */
     public void set(int bitIndex) {
-        int arrIndex = calcLength(bitIndex + 1, NO_OF_BITS) - 1;
-        if(arrIndex >= totBits || arrIndex < 0)
-            throw new ArrayIndexOutOfBoundsException("Given index is invalid : " + bitIndex);
+        validateArgument(bitIndex);
+
+        int arrIndex = getArrayIndex(bitIndex);
         int noOfShifts = bitIndex % NO_OF_BITS;
         int value = 1 << noOfShifts;
         while(true) {
@@ -58,35 +80,42 @@ public class ThreadSafeBitSet {
     }
 
     /**
+     * Gets the value of bitIndex.
+     * 
+     * @param bitIndex, can not be negative or larger than or equal to the
+     *        length of the bitSet.
+     * @return, true corresponds to setBit and false corresponds to clearBit
+     */
+    public boolean get(int bitIndex) {
+        validateArgument(bitIndex);
+
+        int pos = bitIndex % NO_OF_BITS;
+        int arrIndex = getArrayIndex(bitIndex);
+        return getNthBit(bitsHolder.get(arrIndex), pos) == 1;
+    }
+
+    /**
      * Clears the first setBit from the startIndex, and returns the index. If
      * there is no such value, returns -1.
      * 
-     * @param startIndex, can not be negative or larger than the size of length
-     *        of the bitset.
-     * @return
+     * @param bitIndex
+     * @return, cleared setBit index.
      */
     public int clearAndGetNextSetBit(int startIndex) {
-        if(startIndex < 0 || startIndex >= totBits)
-            throw new ArrayIndexOutOfBoundsException("Given index is invalid : " + startIndex);
-
         int localStartInd = startIndex % NO_OF_BITS;
         int localEndInd = NO_OF_BITS - 1;
         int endIndex = (totBits - 1) % NO_OF_BITS;
-        int arrStartPos = calcLength(startIndex + 1, NO_OF_BITS) - 1;
+        int arrStartPos = getArrayIndex(startIndex);
         int arrEndPos = bitsHolder.length() - 1;
+        int currPos = startIndex;
 
         for(int i = arrStartPos; i <= arrEndPos; i++) {
             if(i == arrEndPos)
                 localEndInd = endIndex;
             for(int j = localStartInd; j <= localEndInd; j++) {
-                int value = ~(1 << j);
-                int oldValue = bitsHolder.get(i);
-                while(getNthBit(oldValue, j) == 1) {
-                    int newValue = oldValue & value;
-                    if(bitsHolder.compareAndSet(i, oldValue, newValue))
-                        return i;
-                    oldValue = bitsHolder.get(i);
-                }
+                if(compareAndSet(i, j, true, false))
+                    return currPos;
+                currPos++;
             }
             localStartInd = 0;
             localEndInd = NO_OF_BITS - 1;
@@ -94,17 +123,38 @@ public class ThreadSafeBitSet {
         return -1;
     }
 
+    public boolean compareAndSet(int bitIndex, boolean expectedVal, boolean value) {
+        validateArgument(bitIndex);
+
+        int arrIndex = getArrayIndex(bitIndex);
+        int noOfShifts = bitIndex % NO_OF_BITS;
+        return compareAndSet(arrIndex, noOfShifts, expectedVal, value);
+    }
+
+    private boolean compareAndSet(int arrIndex, int bitIndex, boolean expectedVal, boolean value) {
+        int concValue = (value) ? (1 << bitIndex) : (~(1 << bitIndex));
+        while(true) {
+            int oldValue = bitsHolder.get(arrIndex);
+            boolean currValue = getNthBit(oldValue, bitIndex) == 1;
+            if(currValue == expectedVal) {
+                int newValue = (value) ? (oldValue | concValue) : (oldValue & concValue);
+                if(bitsHolder.compareAndSet(arrIndex, oldValue, newValue))
+                    return true;
+            } else
+                return false;
+        }
+    }
+
     /**
      * Clears the given bitIndex.
      * 
-     * @param bitIndex, can not be negative or greater than length of the
-     *        bitSet.
+     * @param bitIndex, can not be negative or larger than or equal to the
+     *        length of the bitSet.
      */
     public void clear(int bitIndex) {
-        if(bitIndex >= totBits || bitIndex < 0)
-            throw new ArrayIndexOutOfBoundsException("Given index is invalid : " + bitIndex);
+        validateArgument(bitIndex);
 
-        int arrIndex = calcLength(bitIndex + 1, NO_OF_BITS) - 1;
+        int arrIndex = getArrayIndex(bitIndex);
         int noOfShifts = bitIndex % NO_OF_BITS;
         int value = ~(1 << noOfShifts);
         while(true) {
