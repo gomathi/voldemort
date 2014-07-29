@@ -43,11 +43,7 @@ public class HashTreePersistentStorage implements HashTreeStorage {
     public void setDirtySegment(int segId) {}
 
     @Override
-    public List<Integer> getDirtySegments() {
+    public List<Integer> getAndClearDirtySegments() {
         return null;
     }
-
-    @Override
-    public void unsetDirtySegmens(Collection<Integer> dirtySegIds) {}
-
 }

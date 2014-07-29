@@ -1,7 +1,6 @@
 package voldemort.hashtrees;
 
 import java.util.ArrayList;
-import java.util.BitSet;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
@@ -18,7 +17,11 @@ public class HashTreeStorageInMemory implements HashTreeStorage {
 
     private final ConcurrentMap<Integer, ByteArray> segmentHashes = new ConcurrentSkipListMap<Integer, ByteArray>();
     private final ConcurrentMap<Integer, ConcurrentSkipListMap<ByteArray, ByteArray>> segDataBlocks = new ConcurrentHashMap<Integer, ConcurrentSkipListMap<ByteArray, ByteArray>>();
-    private final BitSet dirtySegments = new BitSet();
+    private final ThreadSafeBitSet dirtySegments;
+
+    public HashTreeStorageInMemory(int noOfSegDataBlocks) {
+        dirtySegments = new ThreadSafeBitSet(noOfSegDataBlocks);
+    }
 
     @Override
     public void putSegmentHash(int nodeId, ByteArray digest) {
@@ -67,19 +70,12 @@ public class HashTreeStorageInMemory implements HashTreeStorage {
     }
 
     @Override
-    public List<Integer> getDirtySegments() {
+    public List<Integer> getAndClearDirtySegments() {
         List<Integer> result = new ArrayList<Integer>();
-        for(int itr = dirtySegments.nextSetBit(0); itr >= 0; itr = dirtySegments.nextSetBit(itr + 1)) {
+        for(int itr = dirtySegments.clearAndGetNextSetBit(0); itr >= 0; itr = dirtySegments.clearAndGetNextSetBit(itr + 1)) {
             result.add(itr);
         }
         return result;
-    }
-
-    @Override
-    public void unsetDirtySegmens(Collection<Integer> dirtySegIds) {
-        for(int dirtySegId: dirtySegIds) {
-            dirtySegments.clear(dirtySegId);
-        }
     }
 
 }

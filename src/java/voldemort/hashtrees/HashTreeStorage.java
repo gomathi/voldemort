@@ -63,17 +63,11 @@ public interface HashTreeStorage {
     void setDirtySegment(int segId);
 
     /**
-     * Returns all the ids of the dirty segments.
+     * Returns all the ids of the dirty segments. Dirty markers are reset while
+     * returning the result. This operation is atomic.
      * 
      * @return
      */
-    List<Integer> getDirtySegments();
-
-    /**
-     * Clears the dirty bits of the dirty segments.
-     * 
-     * @param dirtySegIds
-     */
-    void unsetDirtySegmens(Collection<Integer> dirtySegIds);
+    List<Integer> getAndClearDirtySegments();
 
 }

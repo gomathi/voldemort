@@ -62,12 +62,11 @@ public class HashTreeImpl implements HashTree {
     private final static int ROOT_NODE = 0;
     private final static int MAX_NO_OF_BUCKETS = 1 << 30;
     private final static int FOUR_ARY_TREE = 4;
-    private final static long REBUILD_SEG_TIME_INTERVAL = 2 * 60 * 1000; // in
-                                                                         // milliseconds
-    private final static long REBUILD_HTREE_TIME_INTERVAL = 30 * 60 * 1000; // in
-                                                                            // milliseconds
-    private final static long REMOTE_TREE_SYNCH_INTERVAL = 5 * 60 * 1000; // in
-                                                                          // milliseconds
+
+    // In milliseconds
+    private final static long REBUILD_SEG_TIME_INTERVAL = 2 * 60 * 1000;
+    private final static long REBUILD_HTREE_TIME_INTERVAL = 30 * 60 * 1000;
+    private final static long REMOTE_TREE_SYNCH_INTERVAL = 5 * 60 * 1000;
 
     private final int noOfChildrenPerParent;
     private final int maxInternalNodeId;
@@ -80,8 +79,8 @@ public class HashTreeImpl implements HashTree {
     private final ScheduledExecutorService scheduledExecutors;
 
     // Background tasks.
-    private final BackgroundSegmentDataUpdater bgSegDataUpdater;
-    private final BackgroundSynchTask bgSyncTask;
+    private final BGSegmentDataUpdater bgSegDataUpdater;
+    private final BGSynchTask bgSyncTask;
     private final BGRebuildEntireTreeTask bgRebuildTreeTask;
     private final BGRebuildSegmentTreeTask bgSegmentTreeTask;
 
@@ -111,8 +110,8 @@ public class HashTreeImpl implements HashTree {
         this.scheduledExecutors = Executors.newScheduledThreadPool(2);
         this.shutdownLatch = new CountDownLatch(3);
 
-        this.bgSegDataUpdater = new BackgroundSegmentDataUpdater();
-        this.bgSyncTask = new BackgroundSynchTask();
+        this.bgSegDataUpdater = new BGSegmentDataUpdater();
+        this.bgSyncTask = new BGSynchTask();
         this.bgRebuildTreeTask = new BGRebuildEntireTreeTask(executors, shutdownLatch);
         this.bgSegmentTreeTask = new BGRebuildSegmentTreeTask(this, shutdownLatch);
 
@@ -261,10 +260,9 @@ public class HashTreeImpl implements HashTree {
 
     @Override
     public void updateSegmentHashes() {
-        List<Integer> dirtySegmentBuckets = hTStorage.getDirtySegments();
+        List<Integer> dirtySegmentBuckets = hTStorage.getAndClearDirtySegments();
         List<Integer> dirtyLeafNodes = rebuildLeaves(dirtySegmentBuckets);
         rebuildInternalNodes(dirtyLeafNodes);
-        hTStorage.unsetDirtySegmens(dirtySegmentBuckets);
     }
 
     @Override
@@ -396,7 +394,7 @@ public class HashTreeImpl implements HashTree {
      * This class provides a cleaner way to stop itself.
      */
     @Threadsafe
-    private class BackgroundSegmentDataUpdater implements Runnable, Stoppable {
+    private class BGSegmentDataUpdater implements Runnable, Stoppable {
 
         private final BlockingQueue<Pair<HTOperation, List<ByteArray>>> que = new ArrayBlockingQueue<Pair<HTOperation, List<ByteArray>>>(Integer.MAX_VALUE);
         private volatile boolean stopRequested = false;
@@ -446,7 +444,7 @@ public class HashTreeImpl implements HashTree {
      * 
      */
     @Threadsafe
-    private class BackgroundSynchTask implements Runnable, Stoppable {
+    private class BGSynchTask implements Runnable, Stoppable {
 
         private final ConcurrentMap<String, HashTree> hostNameAndRemoteHTrees = new ConcurrentHashMap<String, HashTree>();
 
