@@ -17,32 +17,34 @@ public class HashTreeStorageInMemory implements HashTreeStorage {
 
     private final ConcurrentMap<Integer, ByteArray> segmentHashes = new ConcurrentSkipListMap<Integer, ByteArray>();
     private final ConcurrentMap<Integer, ConcurrentSkipListMap<ByteArray, ByteArray>> segDataBlocks = new ConcurrentHashMap<Integer, ConcurrentSkipListMap<ByteArray, ByteArray>>();
-    private final ThreadSafeBitSet dirtySegments;
+    private final ConcurrentMap<Integer, ThreadSafeBitSet> treeIdsAnddirtySegments;
+    private final int noOfSegDataBlocks;
 
     public HashTreeStorageInMemory(int noOfSegDataBlocks) {
-        this.dirtySegments = new ThreadSafeBitSet(noOfSegDataBlocks);
+        this.noOfSegDataBlocks = noOfSegDataBlocks;
+        this.treeIdsAnddirtySegments = new ConcurrentHashMap<Integer, ThreadSafeBitSet>();
     }
 
     @Override
-    public void putSegmentHash(int nodeId, ByteArray digest) {
+    public void putSegmentHash(int treeId, int nodeId, ByteArray digest) {
         segmentHashes.put(nodeId, digest);
     }
 
     @Override
-    public void putSegmentData(int segId, ByteArray key, ByteArray digest) {
+    public void putSegmentData(int treeId, int segId, ByteArray key, ByteArray digest) {
         segDataBlocks.putIfAbsent(segId, new ConcurrentSkipListMap<ByteArray, ByteArray>());
         segDataBlocks.get(segId).put(key, digest);
     }
 
     @Override
-    public void deleteSegmentData(int segId, ByteArray key) {
+    public void deleteSegmentData(int treeId, int segId, ByteArray key) {
         Map<ByteArray, ByteArray> segDataBlock = segDataBlocks.get(segId);
         if(segDataBlock != null)
             segDataBlock.remove(key);
     }
 
     @Override
-    public List<SegmentData> getSegment(int segId) {
+    public List<SegmentData> getSegment(int treeId, int segId) {
         ConcurrentMap<ByteArray, ByteArray> segDataBlock = segDataBlocks.get(segId);
         if(segDataBlock == null)
             return Collections.emptyList();
@@ -54,7 +56,7 @@ public class HashTreeStorageInMemory implements HashTreeStorage {
     }
 
     @Override
-    public List<SegmentHash> getSegmentHashes(Collection<Integer> nodeIds) {
+    public List<SegmentHash> getSegmentHashes(int treeId, Collection<Integer> nodeIds) {
         List<SegmentHash> result = new ArrayList<SegmentHash>();
         for(int nodeId: nodeIds) {
             ByteArray hash = segmentHashes.get(nodeId);
@@ -65,14 +67,17 @@ public class HashTreeStorageInMemory implements HashTreeStorage {
     }
 
     @Override
-    public void setDirtySegment(int segId) {
-        dirtySegments.set(segId);
+    public void setDirtySegment(int treeId, int segId) {
+        treeIdsAnddirtySegments.putIfAbsent(treeId, new ThreadSafeBitSet(noOfSegDataBlocks));
+        treeIdsAnddirtySegments.get(treeId).set(segId);
     }
 
     @Override
-    public List<Integer> clearAndGetDirtySegments() {
+    public List<Integer> clearAndGetDirtySegments(int treeId) {
+        treeIdsAnddirtySegments.putIfAbsent(treeId, new ThreadSafeBitSet(noOfSegDataBlocks));
         List<Integer> result = new ArrayList<Integer>();
-        for(int itr = dirtySegments.clearAndGetNextSetBit(0); itr >= 0; itr = dirtySegments.clearAndGetNextSetBit(itr + 1)) {
+        for(int itr = treeIdsAnddirtySegments.get(treeId).clearAndGetNextSetBit(0); itr >= 0; itr = treeIdsAnddirtySegments.get(treeId)
+                                                                                                                           .clearAndGetNextSetBit(itr + 1)) {
             result.add(itr);
         }
         return result;

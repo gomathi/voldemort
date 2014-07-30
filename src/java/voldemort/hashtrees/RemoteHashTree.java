@@ -13,10 +13,6 @@ import voldemort.utils.ByteArray;
  */
 public class RemoteHashTree implements HashTree {
 
-    public RemoteHashTree() {
-
-    }
-
     @Override
     public void put(ByteArray key, ByteArray value) {}
 
@@ -30,25 +26,25 @@ public class RemoteHashTree implements HashTree {
     public void batchSRemove(List<ByteArray> key) {}
 
     @Override
-    public void update(HashTree remoteTree) {}
-
-    @Override
-    public List<SegmentHash> getSegmentHashes(Collection<Integer> nodeIds) {
-        return null;
-    }
-
-    @Override
-    public List<SegmentData> getSegment(int segId) {
-        return null;
-    }
-
-    @Override
-    public void updateSegmentHashes() {}
+    public void update(int treeId, HashTree remoteTree) {}
 
     @Override
     public void addTreeToSyncList(String hostName, HashTree remoteTree) {}
 
     @Override
     public void removeTreeFromSyncList(String hostName) {}
+
+    @Override
+    public List<SegmentHash> getSegmentHashes(int treeId, Collection<Integer> nodeIds) {
+        return null;
+    }
+
+    @Override
+    public List<SegmentData> getSegment(int treeId, int segId) {
+        return null;
+    }
+
+    @Override
+    public void updateSegmentHashes() {}
 
 }

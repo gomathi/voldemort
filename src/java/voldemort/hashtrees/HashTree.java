@@ -52,12 +52,12 @@ public interface HashTree {
      * 
      * @param remoteTree
      */
-    void update(HashTree remoteTree);
+    void update(int treeId, HashTree remoteTree);
 
     /**
      * Implementation is expected to run a background task at regular intervals
      * to update remote hash trees. This function adds a remote tree to synch
-     * exclusion list.
+     * list.
      * 
      * @param remoteTree
      */
@@ -78,7 +78,7 @@ public interface HashTree {
      * @param nodeIds, internal tree node ids.
      * @return
      */
-    List<SegmentHash> getSegmentHashes(Collection<Integer> nodeIds);
+    List<SegmentHash> getSegmentHashes(int treeId, Collection<Integer> nodeIds);
 
     /**
      * Hash tree data is stored on the leaf blocks. Given a segment id this
@@ -87,13 +87,12 @@ public interface HashTree {
      * @param segId, id of the segment block.
      * @return
      */
-    List<SegmentData> getSegment(int segId);
+    List<SegmentData> getSegment(int treeId, int segId);
 
     /**
-     * Hash tree implementations usually do not update the segment hashes tree
-     * on every key change. Rather tree is rebuilt at regular intervals. This
-     * function provides an option to make a force call to update the segment
-     * hashes.
+     * Hash tree implementations do not update the segment hashes tree on every
+     * key change. Rather tree is rebuilt at regular intervals. This function
+     * provides an option to make a force call to update the segment hashes.
      */
     void updateSegmentHashes();
 }

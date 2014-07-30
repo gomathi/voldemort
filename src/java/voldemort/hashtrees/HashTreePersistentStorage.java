@@ -1,6 +1,5 @@
 package voldemort.hashtrees;
 
-import java.util.BitSet;
 import java.util.Collection;
 import java.util.List;
 
@@ -14,36 +13,31 @@ import voldemort.utils.ByteArray;
 
 public class HashTreePersistentStorage implements HashTreeStorage {
 
-    private final BitSet dirtySegments;
-
-    public HashTreePersistentStorage(final int noOfSegments) {
-        dirtySegments = new BitSet(noOfSegments);
-    }
+    @Override
+    public void putSegmentData(int treeId, int segId, ByteArray key, ByteArray digest) {}
 
     @Override
-    public void putSegmentData(int segId, ByteArray key, ByteArray digest) {}
+    public void deleteSegmentData(int treeId, int segId, ByteArray key) {}
 
     @Override
-    public void deleteSegmentData(int segId, ByteArray key) {}
-
-    @Override
-    public List<SegmentData> getSegment(int segId) {
+    public List<SegmentData> getSegment(int treeId, int segId) {
         return null;
     }
 
     @Override
-    public void putSegmentHash(int nodeId, ByteArray digest) {}
+    public void putSegmentHash(int treeId, int nodeId, ByteArray digest) {}
 
     @Override
-    public List<SegmentHash> getSegmentHashes(Collection<Integer> nodeIds) {
+    public List<SegmentHash> getSegmentHashes(int treeId, Collection<Integer> nodeIds) {
         return null;
     }
 
     @Override
-    public void setDirtySegment(int segId) {}
+    public void setDirtySegment(int treeId, int segId) {}
 
     @Override
-    public List<Integer> clearAndGetDirtySegments() {
+    public List<Integer> clearAndGetDirtySegments(int treeId) {
         return null;
     }
+
 }

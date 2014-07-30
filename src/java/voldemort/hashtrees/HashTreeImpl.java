@@ -74,10 +74,10 @@ public class HashTreeImpl implements HashTree {
 
     private final HashTreeStorage hTStorage;
     private final Storage storage;
+    private final HashTreeIdProvider treeIdProvider;
 
     private final ExecutorService executors;
     private final ScheduledExecutorService scheduledExecutors;
-
     // Background tasks.
     private final BGSegmentDataUpdater bgSegDataUpdater;
     private final BGSynchTask bgSyncTask;
@@ -96,6 +96,7 @@ public class HashTreeImpl implements HashTree {
     public HashTreeImpl(int noOfSegments,
                         int noOfChildrenPerParent,
                         final HashTreeStorage hTStroage,
+                        final HashTreeIdProvider treeIdProvider,
                         final Storage storage,
                         final ExecutorService executors) {
         this.noOfSegments = (noOfSegments > MAX_NO_OF_BUCKETS) || (noOfSegments < 0) ? MAX_NO_OF_BUCKETS
@@ -103,7 +104,7 @@ public class HashTreeImpl implements HashTree {
         this.noOfChildrenPerParent = noOfChildrenPerParent;
         this.maxInternalNodeId = getNoOfNodes(height(this.noOfSegments, this.noOfChildrenPerParent) - 1,
                                               this.noOfChildrenPerParent);
-
+        this.treeIdProvider = treeIdProvider;
         this.hTStorage = hTStroage;
         this.storage = storage;
         this.executors = executors;
@@ -112,16 +113,17 @@ public class HashTreeImpl implements HashTree {
 
         this.bgSegDataUpdater = new BGSegmentDataUpdater();
         this.bgSyncTask = new BGSynchTask();
-        this.bgRebuildTreeTask = new BGRebuildEntireTreeTask(executors, shutdownLatch);
+        this.bgRebuildTreeTask = new BGRebuildEntireTreeTask(shutdownLatch);
         this.bgSegmentTreeTask = new BGRebuildSegmentTreeTask(this, shutdownLatch);
 
         startBackgroundTasks();
     }
 
     public HashTreeImpl(final HashTreeStorage hTStorage,
+                        final HashTreeIdProvider treeIdProvider,
                         final Storage storage,
                         final ExecutorService executors) {
-        this(MAX_NO_OF_BUCKETS, FOUR_ARY_TREE, hTStorage, storage, executors);
+        this(MAX_NO_OF_BUCKETS, FOUR_ARY_TREE, hTStorage, treeIdProvider, storage, executors);
     }
 
     @Override
@@ -144,31 +146,32 @@ public class HashTreeImpl implements HashTree {
     private void putInternal(final ByteArray key, final ByteArray value) {
         int segId = getSegmentId(key);
         ByteArray digest = new ByteArray(sha1(value.get()));
-        hTStorage.putSegmentData(segId, key, digest);
-        hTStorage.setDirtySegment(segId);
+        hTStorage.putSegmentData(treeIdProvider.getTreeId(key), segId, key, digest);
+        hTStorage.setDirtySegment(treeIdProvider.getTreeId(key), segId);
     }
 
     private void removeInternal(final ByteArray key) {
         int segId = getSegmentId(key);
-        hTStorage.deleteSegmentData(segId, key);
-        hTStorage.setDirtySegment(segId);
+        hTStorage.deleteSegmentData(treeIdProvider.getTreeId(key), segId, key);
+        hTStorage.setDirtySegment(treeIdProvider.getTreeId(key), segId);
     }
 
     @Override
-    public void update(final HashTree remoteTree) {
+    public void update(int treeId, final HashTree remoteTree) {
         Collection<Integer> leafNodesToCheck = new ArrayList<Integer>();
         Collection<Integer> missingNodes = new ArrayList<Integer>();
 
-        findDifferences(remoteTree, leafNodesToCheck, missingNodes);
+        findDifferences(treeId, remoteTree, leafNodesToCheck, missingNodes);
 
         BatchUpdater batchUpdater = new BatchUpdater(1000, remoteTree);
 
         Collection<Integer> segsToCheck = getSegmentIdsFromLeafIds(leafNodesToCheck);
-        syncSegments(segsToCheck, remoteTree, batchUpdater);
+        syncSegments(treeId, segsToCheck, remoteTree, batchUpdater);
 
     }
 
-    private void findDifferences(HashTree remoteTree,
+    private void findDifferences(int treeId,
+                                 HashTree remoteTree,
                                  Collection<Integer> nodesToCheck,
                                  Collection<Integer> missingNodes) {
         CollectionPeekingIterator<SegmentHash> localItr = null, remoteItr = null;
@@ -178,8 +181,9 @@ public class HashTreeImpl implements HashTree {
         pQueue.add(ROOT_NODE);
         while(!pQueue.isEmpty()) {
 
-            localItr = new CollectionPeekingIterator<SegmentHash>(getSegmentHashes(pQueue));
-            remoteItr = new CollectionPeekingIterator<SegmentHash>(remoteTree.getSegmentHashes(pQueue));
+            localItr = new CollectionPeekingIterator<SegmentHash>(getSegmentHashes(treeId, pQueue));
+            remoteItr = new CollectionPeekingIterator<SegmentHash>(remoteTree.getSegmentHashes(treeId,
+                                                                                               pQueue));
             pQueue = new ArrayDeque<Integer>();
             while(localItr.hasNext() && remoteItr.hasNext()) {
                 local = localItr.peek();
@@ -209,16 +213,19 @@ public class HashTreeImpl implements HashTree {
         }
     }
 
-    private void syncSegments(Collection<Integer> segIds,
+    private void syncSegments(int treeId,
+                              Collection<Integer> segIds,
                               HashTree remoteTree,
                               BatchUpdater batchUpdater) {
         for(int segId: segIds)
-            syncSegment(segId, remoteTree, batchUpdater);
+            syncSegment(treeId, segId, remoteTree, batchUpdater);
     }
 
-    private void syncSegment(int segId, HashTree remoteTree, BatchUpdater batchUpdater) {
-        CollectionPeekingIterator<SegmentData> localDataItr = new CollectionPeekingIterator<SegmentData>(getSegment(segId));
-        CollectionPeekingIterator<SegmentData> remoteDataItr = new CollectionPeekingIterator<SegmentData>(remoteTree.getSegment(segId));
+    private void syncSegment(int treeId, int segId, HashTree remoteTree, BatchUpdater batchUpdater) {
+        CollectionPeekingIterator<SegmentData> localDataItr = new CollectionPeekingIterator<SegmentData>(getSegment(treeId,
+                                                                                                                    segId));
+        CollectionPeekingIterator<SegmentData> remoteDataItr = new CollectionPeekingIterator<SegmentData>(remoteTree.getSegment(treeId,
+                                                                                                                                segId));
         SegmentData local, remote;
         List<ByteArray> keysToBeUpdated = new ArrayList<ByteArray>();
         List<ByteArray> keysToBeRemoved = new ArrayList<ByteArray>();
@@ -249,20 +256,23 @@ public class HashTreeImpl implements HashTree {
     }
 
     @Override
-    public List<SegmentHash> getSegmentHashes(final Collection<Integer> nodeIds) {
-        return hTStorage.getSegmentHashes(nodeIds);
+    public List<SegmentHash> getSegmentHashes(int treeId, final Collection<Integer> nodeIds) {
+        return hTStorage.getSegmentHashes(treeId, nodeIds);
     }
 
     @Override
-    public List<SegmentData> getSegment(int segId) {
-        return hTStorage.getSegment(segId);
+    public List<SegmentData> getSegment(int treeId, int segId) {
+        return hTStorage.getSegment(treeId, segId);
     }
 
     @Override
     public void updateSegmentHashes() {
-        List<Integer> dirtySegmentBuckets = hTStorage.clearAndGetDirtySegments();
-        List<Integer> dirtyLeafNodes = rebuildLeaves(dirtySegmentBuckets);
-        rebuildInternalNodes(dirtyLeafNodes);
+        List<Integer> treeIds = treeIdProvider.getAllTreeIds();
+        for(int treeId: treeIds) {
+            List<Integer> dirtySegmentBuckets = hTStorage.clearAndGetDirtySegments(treeId);
+            List<Integer> dirtyLeafNodes = rebuildLeaves(treeId, dirtySegmentBuckets);
+            rebuildInternalNodes(treeId, dirtyLeafNodes);
+        }
     }
 
     @Override
@@ -293,19 +303,19 @@ public class HashTreeImpl implements HashTree {
      * 
      * @return, the nodes ids of leaves in the tree.
      */
-    private List<Integer> rebuildLeaves(final List<Integer> dirtySegments) {
+    private List<Integer> rebuildLeaves(int treeId, final List<Integer> dirtySegments) {
         List<Integer> dirtyNodeIds = new ArrayList<Integer>();
         for(int dirtySegId: dirtySegments) {
-            ByteArray digest = digestSegmentData(dirtySegId);
+            ByteArray digest = digestSegmentData(treeId, dirtySegId);
             int nodeId = getSegmentIdFromLeafId(dirtySegId);
-            hTStorage.putSegmentHash(nodeId, digest);
+            hTStorage.putSegmentHash(treeId, nodeId, digest);
             dirtyNodeIds.add(nodeId);
         }
         return dirtyNodeIds;
     }
 
-    private ByteArray digestSegmentData(int segId) {
-        List<SegmentData> dirtySegmentData = hTStorage.getSegment(segId);
+    private ByteArray digestSegmentData(int treeId, int segId) {
+        List<SegmentData> dirtySegmentData = hTStorage.getSegment(treeId, segId);
 
         StringBuilder sb = new StringBuilder();
         for(SegmentData sd: dirtySegmentData)
@@ -314,13 +324,18 @@ public class HashTreeImpl implements HashTree {
         return new ByteArray(sha1(sb.toString().getBytes()));
     }
 
-    private void rebuildInternalNodes(final List<Integer> nodeIds) {
+    /**
+     * Updates the segment hashes iteratively for each level on the tree.
+     * 
+     * @param nodeIds
+     */
+    private void rebuildInternalNodes(int treeId, final List<Integer> nodeIds) {
         Set<Integer> parentNodeIds = new TreeSet<Integer>();
         while(!nodeIds.isEmpty()) {
-            for(int dirtyNodeId: nodeIds) {
-                parentNodeIds.add(getParent(dirtyNodeId, this.noOfChildrenPerParent));
+            for(int nodeId: nodeIds) {
+                parentNodeIds.add(getParent(nodeId, this.noOfChildrenPerParent));
             }
-            updateInternalNodes(parentNodeIds);
+            updateInternalNodes(treeId, parentNodeIds);
 
             nodeIds.clear();
             nodeIds.addAll(parentNodeIds);
@@ -333,23 +348,24 @@ public class HashTreeImpl implements HashTree {
      * 
      * @param parentIds
      */
-    private void updateInternalNodes(final Set<Integer> parentIds) {
+    private void updateInternalNodes(int treeId, final Set<Integer> parentIds) {
         List<SegmentHash> segmentHashes;
         StringBuilder sb = new StringBuilder();
         for(int parentId: parentIds) {
-            segmentHashes = hTStorage.getSegmentHashes(getImmediateChildren(parentId,
+            segmentHashes = hTStorage.getSegmentHashes(treeId,
+                                                       getImmediateChildren(parentId,
                                                                             this.noOfChildrenPerParent));
             for(SegmentHash sh: segmentHashes)
                 sb.append(sh.getHash() + "\n");
             ByteArray digest = new ByteArray(sha1(sb.toString().getBytes()));
-            hTStorage.putSegmentHash(parentId, digest);
+            hTStorage.putSegmentHash(treeId, parentId, digest);
             sb.setLength(0);
         }
     }
 
     private int getSegmentId(ByteArray key) {
         int hcode = key.hashCode();
-        return hcode & noOfSegments;
+        return hcode & (noOfSegments - 1);
     }
 
     /**

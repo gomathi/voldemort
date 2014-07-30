@@ -9,8 +9,7 @@ import voldemort.annotations.concurrency.Threadsafe;
  * Default {@link BitSet} provided in java is not thread safe. This class
  * provides a minimalistic thread safe version of BitSet.
  * 
- * Unlike BitSet, this class does not grow automatically, the BitSet size is
- * fixed.
+ * Unlike BitSet, this class does not grow automatically.
  * 
  */
 @Threadsafe
