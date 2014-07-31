@@ -75,9 +75,9 @@ public class HashTreeImpl implements HashTree {
 
     public HashTreeImpl(int noOfSegments,
                         int noOfChildrenPerParent,
-                        final HashTreeStorage hTStroage,
                         final HashTreeIdProvider treeIdProvider,
                         final SegmentIdProvider segIdProvider,
+                        final HashTreeStorage hTStroage,
                         final Storage storage,
                         final ExecutorService executors) {
         this.noOfSegments = (noOfSegments > MAX_NO_OF_BUCKETS) || (noOfSegments < 0) ? MAX_NO_OF_BUCKETS
@@ -105,15 +105,15 @@ public class HashTreeImpl implements HashTree {
      * @param storage
      * @param executors
      */
-    public HashTreeImpl(final HashTreeStorage hTStorage,
-                        final HashTreeIdProvider treeIdProvider,
+    public HashTreeImpl(final HashTreeIdProvider treeIdProvider,
+                        final HashTreeStorage hTStorage,
                         final Storage storage,
                         final ExecutorService executors) {
         this(MAX_NO_OF_BUCKETS,
              FOUR_ARY_TREE,
-             hTStorage,
              treeIdProvider,
              new SegmentIdProviderImpl(MAX_NO_OF_BUCKETS),
+             hTStorage,
              storage,
              executors);
     }
@@ -127,15 +127,15 @@ public class HashTreeImpl implements HashTree {
      * @param segIdProvider
      * @param storage
      */
-    public HashTreeImpl(final HashTreeStorage hTStorage,
-                        final HashTreeIdProvider treeIdProvider,
+    public HashTreeImpl(final HashTreeIdProvider treeIdProvider,
                         final SegmentIdProvider segIdProvider,
+                        final HashTreeStorage hTStorage,
                         final Storage storage) {
         this(MAX_NO_OF_BUCKETS,
              FOUR_ARY_TREE,
-             hTStorage,
              treeIdProvider,
              segIdProvider,
+             hTStorage,
              storage,
              null);
     }
@@ -241,7 +241,7 @@ public class HashTreeImpl implements HashTree {
             }
         }
         while(localItr != null && localItr.hasNext()) {
-            missingNodesInRemote.addAll(getAllLeafNodeIds(localItr.next().getNodeId()));
+            missingNodesInRemote.add(localItr.next().getNodeId());
         }
         while(remoteItr != null && remoteItr.hasNext()) {
             missingNodesInLocal.add(remoteItr.next().getNodeId());

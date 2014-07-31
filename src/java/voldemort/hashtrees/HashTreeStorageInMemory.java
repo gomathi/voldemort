@@ -12,7 +12,6 @@ import voldemort.utils.ByteArray;
  * In memory implementation of {@link HashTreeStorage}, can be used for testing,
  * or in nodes where the partition itself is small enough.
  * 
- * This class never returns a null value for any of the methods.
  */
 @Threadsafe
 public class HashTreeStorageInMemory implements HashTreeStorage {
@@ -67,6 +66,11 @@ public class HashTreeStorageInMemory implements HashTreeStorage {
     @Override
     public void deleteTree(int treeId) {
         treeIdAndIndHashTree.remove(treeId);
+    }
+
+    @Override
+    public SegmentData getSegmentData(int treeId, int segId, ByteArray key) {
+        return getIndHTree(treeId).getSegmentData(segId, key);
     }
 
 }

@@ -43,4 +43,9 @@ public class HashTreePersistentStorage implements HashTreeStorage {
     @Override
     public void deleteTree(int treeId) {}
 
+    @Override
+    public SegmentData getSegmentData(int treeId, int segId, ByteArray key) {
+        return null;
+    }
+
 }

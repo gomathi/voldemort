@@ -36,6 +36,16 @@ class IndHashTreeStorageInMemory {
         segDataBlocks.get(segId).put(key, digest);
     }
 
+    public SegmentData getSegmentData(int segId, ByteArray key) {
+        ConcurrentSkipListMap<ByteArray, ByteArray> segDataBlock = segDataBlocks.get(segId);
+        if(segDataBlock != null) {
+            ByteArray value = segDataBlock.get(key);
+            if(value != null)
+                return new SegmentData(key, value);
+        }
+        return null;
+    }
+
     public void deleteSegmentData(int segId, ByteArray key) {
         Map<ByteArray, ByteArray> segDataBlock = segDataBlocks.get(segId);
         if(segDataBlock != null)
