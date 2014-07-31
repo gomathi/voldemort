@@ -40,4 +40,7 @@ public class HashTreePersistentStorage implements HashTreeStorage {
         return null;
     }
 
+    @Override
+    public void deleteTree(int treeId) {}
+
 }

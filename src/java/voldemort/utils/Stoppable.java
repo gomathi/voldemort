@@ -1,4 +1,4 @@
-package voldemort.hashtrees.tasks;
+package voldemort.utils;
 
 /**
  * Indicates a class that accepts a stop signal, and does a clean shut down

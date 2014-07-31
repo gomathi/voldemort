@@ -1,10 +1,8 @@
-package voldemort.hashtrees.tasks;
+package voldemort.hashtrees;
 
 import java.util.concurrent.CountDownLatch;
 
 import org.apache.log4j.Logger;
-
-import voldemort.hashtrees.HashTree;
 
 /**
  * This updates just the segment hashes on the tree.

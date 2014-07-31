@@ -77,4 +77,10 @@ public interface HashTreeStorage {
      */
     List<Integer> clearAndGetDirtySegments(int treeId);
 
+    /**
+     * Deletes the segment hashes, and segment data for the given treeId.
+     * 
+     * @param treeId
+     */
+    void deleteTree(int treeId);
 }

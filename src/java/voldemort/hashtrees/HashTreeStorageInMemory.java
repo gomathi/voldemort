@@ -1,86 +1,72 @@
 package voldemort.hashtrees;
 
-import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.ConcurrentSkipListMap;
 
 import voldemort.annotations.concurrency.Threadsafe;
 import voldemort.utils.ByteArray;
 
+/**
+ * In memory implementation of {@link HashTreeStorage}, can be used for testing,
+ * or in nodes where the partition itself is small enough.
+ * 
+ * This class never returns a null value for any of the methods.
+ */
 @Threadsafe
 public class HashTreeStorageInMemory implements HashTreeStorage {
 
-    private final ConcurrentMap<Integer, ByteArray> segmentHashes = new ConcurrentSkipListMap<Integer, ByteArray>();
-    private final ConcurrentMap<Integer, ConcurrentSkipListMap<ByteArray, ByteArray>> segDataBlocks = new ConcurrentHashMap<Integer, ConcurrentSkipListMap<ByteArray, ByteArray>>();
-    private final ConcurrentMap<Integer, ThreadSafeBitSet> treeIdsAnddirtySegments;
     private final int noOfSegDataBlocks;
+    private final ConcurrentMap<Integer, IndHashTreeStorageInMemory> treeIdAndIndHashTree = new ConcurrentHashMap<Integer, IndHashTreeStorageInMemory>();
 
     public HashTreeStorageInMemory(int noOfSegDataBlocks) {
         this.noOfSegDataBlocks = noOfSegDataBlocks;
-        this.treeIdsAnddirtySegments = new ConcurrentHashMap<Integer, ThreadSafeBitSet>();
     }
 
-    @Override
-    public void putSegmentHash(int treeId, int nodeId, ByteArray digest) {
-        segmentHashes.put(nodeId, digest);
+    private IndHashTreeStorageInMemory getIndHTree(int treeId) {
+        treeIdAndIndHashTree.putIfAbsent(treeId, new IndHashTreeStorageInMemory(noOfSegDataBlocks));
+        return treeIdAndIndHashTree.get(treeId);
     }
 
     @Override
     public void putSegmentData(int treeId, int segId, ByteArray key, ByteArray digest) {
-        segDataBlocks.putIfAbsent(segId, new ConcurrentSkipListMap<ByteArray, ByteArray>());
-        segDataBlocks.get(segId).put(key, digest);
+        getIndHTree(treeId).putSegmentData(segId, key, digest);
     }
 
     @Override
     public void deleteSegmentData(int treeId, int segId, ByteArray key) {
-        Map<ByteArray, ByteArray> segDataBlock = segDataBlocks.get(segId);
-        if(segDataBlock != null)
-            segDataBlock.remove(key);
+        getIndHTree(treeId).deleteSegmentData(segId, key);
     }
 
     @Override
     public List<SegmentData> getSegment(int treeId, int segId) {
-        ConcurrentMap<ByteArray, ByteArray> segDataBlock = segDataBlocks.get(segId);
-        if(segDataBlock == null)
-            return Collections.emptyList();
-        List<SegmentData> result = new ArrayList<SegmentData>();
-        for(Map.Entry<ByteArray, ByteArray> entry: segDataBlock.entrySet()) {
-            result.add(new SegmentData(entry.getKey(), entry.getValue()));
-        }
-        return result;
+        return getIndHTree(treeId).getSegment(segId);
+    }
+
+    @Override
+    public void putSegmentHash(int treeId, int nodeId, ByteArray digest) {
+        getIndHTree(treeId).putSegmentHash(nodeId, digest);
     }
 
     @Override
     public List<SegmentHash> getSegmentHashes(int treeId, Collection<Integer> nodeIds) {
-        List<SegmentHash> result = new ArrayList<SegmentHash>();
-        for(int nodeId: nodeIds) {
-            ByteArray hash = segmentHashes.get(nodeId);
-            if(hash != null)
-                result.add(new SegmentHash(nodeId, hash));
-        }
-        return result;
+        return getIndHTree(treeId).getSegmentHashes(nodeIds);
     }
 
     @Override
     public void setDirtySegment(int treeId, int segId) {
-        treeIdsAnddirtySegments.putIfAbsent(treeId, new ThreadSafeBitSet(noOfSegDataBlocks));
-        treeIdsAnddirtySegments.get(treeId).set(segId);
+        getIndHTree(treeId).setDirtySegment(segId);
     }
 
     @Override
     public List<Integer> clearAndGetDirtySegments(int treeId) {
-        treeIdsAnddirtySegments.putIfAbsent(treeId, new ThreadSafeBitSet(noOfSegDataBlocks));
-        List<Integer> result = new ArrayList<Integer>();
-        for(int itr = treeIdsAnddirtySegments.get(treeId).clearAndGetNextSetBit(0); itr >= 0; itr = treeIdsAnddirtySegments.get(treeId)
-                                                                                                                           .clearAndGetNextSetBit(itr + 1)) {
-            result.add(itr);
-        }
-        return result;
+        return getIndHTree(treeId).clearAndGetDirtySegments();
+    }
+
+    @Override
+    public void deleteTree(int treeId) {
+        treeIdAndIndHashTree.remove(treeId);
     }
 
 }

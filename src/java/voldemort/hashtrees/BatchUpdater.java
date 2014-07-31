@@ -7,6 +7,7 @@ import java.util.Map;
 
 import voldemort.annotations.concurrency.NotThreadsafe;
 import voldemort.utils.ByteArray;
+import voldemort.utils.Pair;
 
 @NotThreadsafe
 public class BatchUpdater {
@@ -21,20 +22,33 @@ public class BatchUpdater {
         this.remoteHTree = remoteHTree;
     }
 
-    public void addKeys(List<ByteArray> input) {
-        Map<ByteArray, ByteArray> kvPairs = getValues(input);
+    public void addKeys(List<ByteArray> keys) {
+        Map<ByteArray, ByteArray> kvPairs = getKeysAndValues(keys);
         keyValuePairsToAdd.putAll(kvPairs);
     }
 
-    private Map<ByteArray, ByteArray> getValues(List<ByteArray> input) {
+    public void addKey(ByteArray key) {
+        Pair<ByteArray, ByteArray> keyValue = getKeyValue(key);
+        keyValuePairsToAdd.put(keyValue.getFirst(), keyValue.getSecond());
+    }
+
+    private Pair<ByteArray, ByteArray> getKeyValue(ByteArray key) {
         return null;
     }
 
-    public void removeKeys(List<ByteArray> input) {
-        keysToBeRemoved.addAll(input);
+    private Map<ByteArray, ByteArray> getKeysAndValues(List<ByteArray> keys) {
+        return null;
     }
 
-    public void finish() {
+    public void removeKeys(List<ByteArray> keys) {
+        keysToBeRemoved.addAll(keys);
+    }
+
+    public void removeKey(ByteArray key) {
+        keysToBeRemoved.add(key);
+    }
+
+    public void flush() {
 
     }
 }

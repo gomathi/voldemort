@@ -1,4 +1,4 @@
-package voldemort.hashtrees;
+package voldemort.utils;
 
 import java.util.ArrayDeque;
 import java.util.Collection;
@@ -6,15 +6,18 @@ import java.util.Iterator;
 import java.util.NoSuchElementException;
 import java.util.Queue;
 
+import voldemort.annotations.concurrency.NotThreadsafe;
+
 import com.google.common.collect.PeekingIterator;
 
+@NotThreadsafe
 public class CollectionPeekingIterator<T> implements PeekingIterator<T> {
 
     private final Queue<T> pQueue;
     private final Iterator<T> iItr;
 
     public CollectionPeekingIterator(Collection<T> collection) {
-        pQueue = new ArrayDeque<T>();
+        pQueue = new ArrayDeque<T>(1);
         iItr = collection.iterator();
     }
 

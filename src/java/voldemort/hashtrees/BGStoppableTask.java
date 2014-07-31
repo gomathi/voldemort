@@ -1,11 +1,16 @@
-package voldemort.hashtrees.tasks;
+package voldemort.hashtrees;
 
 import java.util.concurrent.CountDownLatch;
 
+import voldemort.annotations.concurrency.Threadsafe;
+import voldemort.utils.Stoppable;
+
 /**
- * A stoppable abstract class, and the implementations are expected to provide
- * code for {@link #run()} method. Also the callers of stop method, can use the
- * latch {@link #shutdownLatch} to wait for the complete stop of this task.
+ * A stoppable abstract class which can be scheduled through executors. This
+ * abstract class makes sure only one task can run at any time. The
+ * implementations are expected to provide code for {@link #run()} method. Also
+ * the callers of stop method, can use the latch {@link #shutdownLatch} to wait
+ * for the complete stop of this task.
  * 
  * Implementations need to get true value from {@link #enableRunningStatus()}
  * before doing the actual task in {@link #run()} method. Otherwise, should not
@@ -13,11 +18,12 @@ import java.util.concurrent.CountDownLatch;
  * call {@link #disableRunningStatus()} method.
  * 
  */
+@Threadsafe
 public abstract class BGStoppableTask implements Runnable, Stoppable {
 
+    // all variables are locked by instance of this object.
     private boolean running = false;
-    private boolean stopRequested = false;
-
+    private volatile boolean stopRequested = false;
     private final CountDownLatch shutdownLatch;
 
     public BGStoppableTask(CountDownLatch shutdownLatch) {
@@ -38,9 +44,15 @@ public abstract class BGStoppableTask implements Runnable, Stoppable {
     }
 
     protected synchronized void disableRunningStatus() {
+        if(!running)
+            return;
         running = false;
         if(stopRequested)
             shutdownLatch.countDown();
+    }
+
+    protected boolean hasStopRequested() {
+        return stopRequested;
     }
 
     @Override

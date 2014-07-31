@@ -12,6 +12,8 @@ import junit.framework.Assert;
 
 import org.junit.Test;
 
+import voldemort.utils.ThreadSafeBitSet;
+
 public class ThreadSafeBitSetTest {
 
     @Test(expected = ArrayIndexOutOfBoundsException.class)

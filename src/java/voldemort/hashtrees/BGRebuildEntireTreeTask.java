@@ -1,4 +1,4 @@
-package voldemort.hashtrees.tasks;
+package voldemort.hashtrees;
 
 import java.util.concurrent.CountDownLatch;
 
@@ -7,11 +7,7 @@ import org.apache.log4j.Logger;
 import voldemort.annotations.concurrency.Threadsafe;
 
 /**
- * This reads all the keys from storage, and rebuilds the complete HTree. This
- * task can be scheduled through the executor service. This class makes sure
- * only one rebuilding task can run at any time. This task can be safely shut
- * down.
- * 
+ * This reads all the keys from storage, and rebuilds the complete HTree.
  */
 
 @Threadsafe

@@ -1,4 +1,4 @@
-package voldemort.hashtrees;
+package voldemort.utils;
 
 import java.util.BitSet;
 import java.util.concurrent.atomic.AtomicIntegerArray;
@@ -9,7 +9,7 @@ import voldemort.annotations.concurrency.Threadsafe;
  * Default {@link BitSet} provided in java is not thread safe. This class
  * provides a minimalistic thread safe version of BitSet.
  * 
- * Unlike BitSet, this class does not grow automatically.
+ * This class does not grow automatically.
  * 
  */
 @Threadsafe
