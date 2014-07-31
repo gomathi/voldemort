@@ -95,4 +95,12 @@ public interface HashTree {
      * provides an option to make a force call to update the segment hashes.
      */
     void updateSegmentHashes();
+
+    /**
+     * Deletes tree nodes from the hash tree, and the corresponding segments.
+     * 
+     * @param treeId
+     * @param nodeIds
+     */
+    void deleteTreeNodes(int treeId, Collection<Integer> nodeIds);
 }

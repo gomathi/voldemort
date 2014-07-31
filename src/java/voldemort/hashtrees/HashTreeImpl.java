@@ -61,34 +61,23 @@ public class HashTreeImpl implements HashTree {
     private final static int MAX_NO_OF_BUCKETS = 1 << 30;
     private final static int FOUR_ARY_TREE = 4;
 
-    // In milliseconds
-    private final static long REBUILD_SEG_TIME_INTERVAL = 2 * 60 * 1000;
-    private final static long REBUILD_HTREE_TIME_INTERVAL = 30 * 60 * 1000;
-    private final static long REMOTE_TREE_SYNCH_INTERVAL = 5 * 60 * 1000;
-
     private final int noOfChildrenPerParent;
     private final int maxInternalNodeId;
     private final int noOfSegments;
 
     private final HashTreeStorage hTStorage;
-    private final Storage storage;
     private final HashTreeIdProvider treeIdProvider;
+    private final SegmentIdProvider segIdProvider;
+    private final Storage storage;
 
-    private final ExecutorService executors;
-    private final ScheduledExecutorService scheduledExecutors;
-    // Background tasks.
-    private final List<BGStoppableTask> bgTasks;
-    private final BGSegmentDataUpdater bgSegDataUpdater;
-    private final BGSynchTask bgSyncTask;
-
-    // A latch that is used internally while shutting down. Shutdown operation
-    // is waiting on this latch for all other threads to finish up their work.
-    private final CountDownLatch shutdownLatch;
+    private final boolean enabledBGTasks;
+    private final BGTasksManager bgTasksMgr;
 
     public HashTreeImpl(int noOfSegments,
                         int noOfChildrenPerParent,
                         final HashTreeStorage hTStroage,
                         final HashTreeIdProvider treeIdProvider,
+                        final SegmentIdProvider segIdProvider,
                         final Storage storage,
                         final ExecutorService executors) {
         this.noOfSegments = (noOfSegments > MAX_NO_OF_BUCKETS) || (noOfSegments < 0) ? MAX_NO_OF_BUCKETS
@@ -97,49 +86,92 @@ public class HashTreeImpl implements HashTree {
         this.maxInternalNodeId = getNoOfNodes(height(this.noOfSegments, this.noOfChildrenPerParent) - 1,
                                               this.noOfChildrenPerParent);
         this.treeIdProvider = treeIdProvider;
+        this.segIdProvider = segIdProvider;
         this.hTStorage = hTStroage;
         this.storage = storage;
-        this.executors = executors;
-        this.scheduledExecutors = Executors.newScheduledThreadPool(2);
-        this.shutdownLatch = new CountDownLatch(3);
-
-        this.bgTasks = new ArrayList<BGStoppableTask>();
-        this.bgSegDataUpdater = new BGSegmentDataUpdater(shutdownLatch, this);
-        this.bgSyncTask = new BGSynchTask(shutdownLatch);
-        startBackgroundTasks();
+        this.bgTasksMgr = (executors == null) ? null : new BGTasksManager(executors);
+        this.enabledBGTasks = (executors == null) ? false : true;
+        if(enabledBGTasks)
+            bgTasksMgr.startBackgroundTasks();
     }
 
+    /**
+     * Launches the HashTree with nonblocking puts and removes, also
+     * additionally launches background threads to update segments, rebuild the
+     * entire tree, and to synch remote hashtrees at regular intervals.
+     * 
+     * @param hTStorage
+     * @param treeIdProvider
+     * @param storage
+     * @param executors
+     */
     public HashTreeImpl(final HashTreeStorage hTStorage,
                         final HashTreeIdProvider treeIdProvider,
                         final Storage storage,
                         final ExecutorService executors) {
-        this(MAX_NO_OF_BUCKETS, FOUR_ARY_TREE, hTStorage, treeIdProvider, storage, executors);
+        this(MAX_NO_OF_BUCKETS,
+             FOUR_ARY_TREE,
+             hTStorage,
+             treeIdProvider,
+             new SegmentIdProviderImpl(MAX_NO_OF_BUCKETS),
+             storage,
+             executors);
+    }
+
+    /**
+     * Launches the HashTree, with no background threads to update the hash
+     * tree. This is mainly used for unit tests.
+     * 
+     * @param hTStorage
+     * @param treeIdProvider
+     * @param segIdProvider
+     * @param storage
+     */
+    public HashTreeImpl(final HashTreeStorage hTStorage,
+                        final HashTreeIdProvider treeIdProvider,
+                        final SegmentIdProvider segIdProvider,
+                        final Storage storage) {
+        this(MAX_NO_OF_BUCKETS,
+             FOUR_ARY_TREE,
+             hTStorage,
+             treeIdProvider,
+             segIdProvider,
+             storage,
+             null);
     }
 
     @Override
     public void put(final ByteArray key, final ByteArray value) {
-        List<ByteArray> second = new ArrayList<ByteArray>(2);
-        second.add(key);
-        second.add(value);
-        bgSegDataUpdater.enque(new Pair<HTOperation, List<ByteArray>>(HTOperation.PUT, second));
+        if(enabledBGTasks) {
+            List<ByteArray> second = new ArrayList<ByteArray>(2);
+            second.add(key);
+            second.add(value);
+            bgTasksMgr.bgSegDataUpdater.enque(new Pair<HTOperation, List<ByteArray>>(HTOperation.PUT,
+                                                                                     second));
+        } else
+            putInternal(key, value);
     }
 
     @Override
     public void remove(final ByteArray key) {
-        List<ByteArray> second = new ArrayList<ByteArray>(1);
-        second.add(key);
-        bgSegDataUpdater.enque(new Pair<HTOperation, List<ByteArray>>(HTOperation.REMOVE, second));
+        if(enabledBGTasks) {
+            List<ByteArray> second = new ArrayList<ByteArray>(1);
+            second.add(key);
+            bgTasksMgr.bgSegDataUpdater.enque(new Pair<HTOperation, List<ByteArray>>(HTOperation.REMOVE,
+                                                                                     second));
+        } else
+            removeInternal(key);
     }
 
     void putInternal(final ByteArray key, final ByteArray value) {
-        int segId = getSegmentId(key);
+        int segId = segIdProvider.getSegmentId(key);
         ByteArray digest = new ByteArray(sha1(value.get()));
         hTStorage.putSegmentData(treeIdProvider.getTreeId(key), segId, key, digest);
         hTStorage.setDirtySegment(treeIdProvider.getTreeId(key), segId);
     }
 
     void removeInternal(final ByteArray key) {
-        int segId = getSegmentId(key);
+        int segId = segIdProvider.getSegmentId(key);
         hTStorage.deleteSegmentData(treeIdProvider.getTreeId(key), segId, key);
         hTStorage.setDirtySegment(treeIdProvider.getTreeId(key), segId);
     }
@@ -147,27 +179,26 @@ public class HashTreeImpl implements HashTree {
     @Override
     public void update(int treeId, final HashTree remoteTree) {
         Collection<Integer> leafNodesToCheck = new ArrayList<Integer>();
-        Collection<Integer> missingSegsInRemote = new ArrayList<Integer>();
-        Collection<Integer> missingSegsInLocal = new ArrayList<Integer>();
+        Collection<Integer> missingNodesInRemote = new ArrayList<Integer>();
+        Collection<Integer> missingNodesInLocal = new ArrayList<Integer>();
 
         findDifferences(treeId,
                         remoteTree,
                         leafNodesToCheck,
-                        missingSegsInRemote,
-                        missingSegsInLocal);
+                        missingNodesInRemote,
+                        missingNodesInLocal);
 
         BatchUpdater batchUpdater = new BatchUpdater(1000, remoteTree);
 
         Collection<Integer> segsToCheck = getSegmentIdsFromLeafIds(leafNodesToCheck);
         syncSegments(treeId, segsToCheck, remoteTree, batchUpdater);
 
+        Collection<Integer> missingSegsInRemote = getSegmentIdsFromLeafIds(missingNodesInRemote);
         updateRemoteTreeWithMissingSegments(treeId, missingSegsInRemote, batchUpdater);
-        deleteSegmentsFromRemoteTree(treeId, missingSegsInLocal, batchUpdater);
-    }
+        batchUpdater.flush();
 
-    private void deleteSegmentsFromRemoteTree(int treeId,
-                                              Collection<Integer> missingSegsInLocal,
-                                              BatchUpdater batchUpdater) {}
+        remoteTree.deleteTreeNodes(treeId, missingNodesInLocal);
+    }
 
     private void findDifferences(int treeId,
                                  HashTree remoteTree,
@@ -201,10 +232,10 @@ public class HashTreeImpl implements HashTree {
                     localItr.next();
                     remoteItr.next();
                 } else if(local.getNodeId() < remote.getNodeId()) {
-                    missingNodesInRemote.addAll(getAllLeafNodeIds(local.getNodeId()));
+                    missingNodesInRemote.add(local.getNodeId());
                     localItr.next();
                 } else {
-                    missingNodesInLocal.addAll(getAllLeafNodeIds(remote.getNodeId()));
+                    missingNodesInLocal.add(remote.getNodeId());
                     remoteItr.next();
                 }
             }
@@ -213,7 +244,7 @@ public class HashTreeImpl implements HashTree {
             missingNodesInRemote.addAll(getAllLeafNodeIds(localItr.next().getNodeId()));
         }
         while(remoteItr != null && remoteItr.hasNext()) {
-            missingNodesInLocal.addAll(getAllLeafNodeIds(remoteItr.next().getNodeId()));
+            missingNodesInLocal.add(remoteItr.next().getNodeId());
         }
     }
 
@@ -304,12 +335,25 @@ public class HashTreeImpl implements HashTree {
 
     @Override
     public void addTreeToSyncList(String hostName, HashTree remoteTree) {
-        bgSyncTask.add(hostName, remoteTree);
+        if(enabledBGTasks)
+            bgTasksMgr.bgSyncTask.add(hostName, remoteTree);
     }
 
     @Override
     public void removeTreeFromSyncList(String hostName) {
-        bgSyncTask.remove(hostName);
+        if(enabledBGTasks)
+            bgTasksMgr.bgSyncTask.remove(hostName);
+    }
+
+    @Override
+    public void deleteTreeNodes(int treeId, Collection<Integer> nodeIds) {
+        Collection<Integer> segIds = getSegmentIdsFromLeafIds(getAllLeafNodeIds(nodeIds));
+        for(int segId: segIds) {
+            Iterator<SegmentData> segDataItr = getSegment(treeId, segId).iterator();
+            while(segDataItr.hasNext()) {
+                storage.remove(segDataItr.next().getKey());
+            }
+        }
     }
 
     /**
@@ -378,11 +422,6 @@ public class HashTreeImpl implements HashTree {
         }
     }
 
-    private int getSegmentId(ByteArray key) {
-        int hcode = key.hashCode();
-        return hcode & (noOfSegments - 1);
-    }
-
     /**
      * Segment block id starts with 0. Each leaf node corresponds to a segment
      * block. This function does the mapping from leaf node id to segment block
@@ -404,10 +443,10 @@ public class HashTreeImpl implements HashTree {
 
     /**
      * Given a node id, finds all the leaves that can be reached from this node.
-     * If the nodeId is a leave, then that will be returned as the result.
+     * If the nodeId is a leaf node, then that will be returned as the result.
      * 
      * @param nodeId
-     * @return
+     * @return, all ids of leaf nodes.
      */
     private Collection<Integer> getAllLeafNodeIds(int nodeId) {
         Queue<Integer> pQueue = new ArrayDeque<Integer>();
@@ -417,6 +456,14 @@ public class HashTreeImpl implements HashTree {
             pQueue.addAll(getImmediateChildren(cNodeId, noOfChildrenPerParent));
         }
         return pQueue;
+    }
+
+    private Collection<Integer> getAllLeafNodeIds(Collection<Integer> nodeIds) {
+        Collection<Integer> result = new ArrayList<Integer>();
+        for(int nodeId: nodeIds) {
+            result.addAll(getAllLeafNodeIds(nodeId));
+        }
+        return result;
     }
 
     /**
@@ -434,52 +481,113 @@ public class HashTreeImpl implements HashTree {
                                                         : 1;
     }
 
-    private void startBackgroundTasks() {
-        new Thread(bgSegDataUpdater).start();
-        bgTasks.add(bgSegDataUpdater);
-
-        scheduledExecutors.scheduleWithFixedDelay(bgSyncTask,
-                                                  0,
-                                                  REMOTE_TREE_SYNCH_INTERVAL,
-                                                  TimeUnit.MILLISECONDS);
-        bgTasks.add(bgSyncTask);
-
-        BGStoppableTask bgRebuildTreeTask = new BGRebuildEntireTreeTask(shutdownLatch);
-        scheduledExecutors.scheduleWithFixedDelay(bgRebuildTreeTask,
-                                                  0,
-                                                  REBUILD_HTREE_TIME_INTERVAL,
-                                                  TimeUnit.MILLISECONDS);
-        bgTasks.add(bgRebuildTreeTask);
-
-        BGStoppableTask bgSegmentTreeTask = new BGRebuildSegmentTreeTask(this, shutdownLatch);
-        scheduledExecutors.scheduleWithFixedDelay(bgSegmentTreeTask,
-                                                  0,
-                                                  REBUILD_SEG_TIME_INTERVAL,
-                                                  TimeUnit.MILLISECONDS);
-        bgTasks.add(bgSegmentTreeTask);
-    }
-
-    private void stopBackgroundTasks() {
-        for(BGStoppableTask task: bgTasks)
-            task.stop();
-    }
-
-    /**
-     * Provides an option to clean shutdown the background threads running on
-     * this object.
-     */
-    public void safeShutdown() {
-        stopBackgroundTasks();
-        logger.info("Waiting for the shut down of background threads.");
-        try {
-            shutdownLatch.await();
-            logger.info("Segment data updater has been shut down.");
-        } catch(InterruptedException e) {
-            // TODO Auto-generated catch block
-            logger.warn("Interrupted while waiting for the shut down of background threads.");
+    public void shutdown() {
+        if(enabledBGTasks) {
+            bgTasksMgr.safeShutdown();
         }
-        executors.shutdownNow();
-        scheduledExecutors.shutdownNow();
+    }
+
+    public static interface SegmentIdProvider {
+
+        int getSegmentId(ByteArray key);
+    }
+
+    private static class SegmentIdProviderImpl implements SegmentIdProvider {
+
+        private final int noOfBuckets;
+
+        public SegmentIdProviderImpl(int noOfBuckets) {
+            this.noOfBuckets = noOfBuckets;
+        }
+
+        @Override
+        public int getSegmentId(ByteArray key) {
+            int hcode = key.hashCode();
+            return hcode & (noOfBuckets - 1);
+        }
+
+    }
+
+    private class BGTasksManager {
+
+        // In milliseconds
+        private final static long REBUILD_SEG_TIME_INTERVAL = 2 * 60 * 1000;
+        private final static long REBUILD_HTREE_TIME_INTERVAL = 30 * 60 * 1000;
+        private final static long REMOTE_TREE_SYNCH_INTERVAL = 5 * 60 * 1000;
+
+        private final ExecutorService executors;
+        private final ScheduledExecutorService scheduledExecutors;
+        // Background tasks.
+        private final List<BGStoppableTask> bgTasks;
+        private final BGSegmentDataUpdater bgSegDataUpdater;
+        private final BGSynchTask bgSyncTask;
+
+        // A latch that is used internally while shutting down. Shutdown
+        // operation
+        // is waiting on this latch for all other threads to finish up their
+        // work.
+        private final CountDownLatch shutdownLatch;
+
+        public BGTasksManager(final ExecutorService executors) {
+
+            this.executors = executors;
+            this.scheduledExecutors = Executors.newScheduledThreadPool(2);
+            this.shutdownLatch = new CountDownLatch(3);
+
+            this.bgTasks = new ArrayList<BGStoppableTask>();
+            this.bgSegDataUpdater = new BGSegmentDataUpdater(shutdownLatch, HashTreeImpl.this);
+            this.bgSyncTask = new BGSynchTask(shutdownLatch);
+
+        }
+
+        private void startBackgroundTasks() {
+            new Thread(bgSegDataUpdater).start();
+            bgTasks.add(bgSegDataUpdater);
+
+            scheduledExecutors.scheduleWithFixedDelay(bgSyncTask,
+                                                      0,
+                                                      REMOTE_TREE_SYNCH_INTERVAL,
+                                                      TimeUnit.MILLISECONDS);
+            bgTasks.add(bgSyncTask);
+
+            BGStoppableTask bgRebuildTreeTask = new BGRebuildEntireTreeTask(shutdownLatch);
+            scheduledExecutors.scheduleWithFixedDelay(bgRebuildTreeTask,
+                                                      0,
+                                                      REBUILD_HTREE_TIME_INTERVAL,
+                                                      TimeUnit.MILLISECONDS);
+            bgTasks.add(bgRebuildTreeTask);
+
+            BGStoppableTask bgSegmentTreeTask = new BGRebuildSegmentTreeTask(HashTreeImpl.this,
+                                                                             shutdownLatch);
+            scheduledExecutors.scheduleWithFixedDelay(bgSegmentTreeTask,
+                                                      0,
+                                                      REBUILD_SEG_TIME_INTERVAL,
+                                                      TimeUnit.MILLISECONDS);
+            bgTasks.add(bgSegmentTreeTask);
+        }
+
+        private void stopBackgroundTasks() {
+            for(BGStoppableTask task: bgTasks)
+                task.stop();
+        }
+
+        /**
+         * Provides an option to clean shutdown the background threads running
+         * on this object.
+         */
+        public void safeShutdown() {
+            stopBackgroundTasks();
+            logger.info("Waiting for the shut down of background threads.");
+            try {
+                shutdownLatch.await();
+                logger.info("Segment data updater has been shut down.");
+            } catch(InterruptedException e) {
+                // TODO Auto-generated catch block
+                logger.warn("Interrupted while waiting for the shut down of background threads.");
+            }
+            executors.shutdownNow();
+            scheduledExecutors.shutdownNow();
+        }
     }
 
 }

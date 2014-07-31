@@ -47,4 +47,7 @@ public class RemoteHashTree implements HashTree {
     @Override
     public void updateSegmentHashes() {}
 
+    @Override
+    public void deleteTreeNodes(int treeId, Collection<Integer> nodeIds) {}
+
 }
