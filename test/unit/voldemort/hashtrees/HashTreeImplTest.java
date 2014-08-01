@@ -15,6 +15,8 @@ import voldemort.utils.ByteArray;
 import voldemort.utils.ByteUtils;
 import voldemort.utils.Pair;
 
+import com.google.common.primitives.Bytes;
+
 public class HashTreeImplTest {
 
     private static class SegIdProviderTest implements SegmentIdProvider {
@@ -81,7 +83,8 @@ public class HashTreeImplTest {
     private static Pair<HashTree, HashTreeStorage> getHashTreeImpl(int noOfSegDataBlocks,
                                                                    final StorageImplTest localStorage) {
         HashTreeStorage localTreeStorage = new HashTreeStorageInMemory(noOfSegDataBlocks);
-        return new Pair<HashTree, HashTreeStorage>(new HashTreeImpl(treeIdProvider,
+        return new Pair<HashTree, HashTreeStorage>(new HashTreeImpl(noOfSegDataBlocks,
+                                                                    treeIdProvider,
                                                                     segIdProvider,
                                                                     localTreeStorage,
                                                                     localStorage), localTreeStorage);
@@ -136,5 +139,36 @@ public class HashTreeImplTest {
     @Test
     public void testUpdateTree() {
         int noOfSegDataBlocks = 1024;
+    }
+
+    @Test
+    public void testUpdateSegmentHashesTest() {
+
+        int noOfSegDataBlocks = 4;
+        StorageImplTest testStorage = new StorageImplTest();
+        Pair<HashTree, HashTreeStorage> pair = getHashTreeImpl(noOfSegDataBlocks, testStorage);
+        HashTree testTree = pair.getFirst();
+        HashTreeStorage testTreeStorage = pair.getSecond();
+
+        ByteArray key = new ByteArray("1".getBytes());
+        ByteArray value = new ByteArray(randomBytes());
+        testTree.put(key, value);
+        ByteArray digest = new ByteArray(ByteUtils.sha1(value.get()));
+
+        testTree.updateHashTrees();
+
+        StringBuffer sb = new StringBuffer();
+        sb.append(new ByteArray(Bytes.concat(key.get(), digest.get())) + "\n");
+        ByteArray expectedLeafNodeDigest = new ByteArray(ByteUtils.sha1(sb.toString().getBytes()));
+        SegmentHash segHash = testTreeStorage.getSegmentHash(1, 2);
+        Assert.assertNotNull(segHash);
+        Assert.assertEquals(expectedLeafNodeDigest, segHash.getHash());
+
+        sb.setLength(0);
+        sb.append(ByteUtils.toHexString(expectedLeafNodeDigest.get()) + "\n");
+        ByteArray expectedRootNodeDigest = new ByteArray(ByteUtils.sha1(sb.toString().getBytes()));
+        SegmentHash actualRootNodeDigest = testTreeStorage.getSegmentHash(1, 0);
+        Assert.assertNotNull(actualRootNodeDigest);
+        Assert.assertEquals(expectedRootNodeDigest, actualRootNodeDigest.getHash());
     }
 }

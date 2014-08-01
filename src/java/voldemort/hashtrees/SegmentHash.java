@@ -1,6 +1,7 @@
 package voldemort.hashtrees;
 
 import voldemort.utils.ByteArray;
+import voldemort.utils.ByteUtils;
 
 /**
  * Usually stored in memory.
@@ -18,6 +19,10 @@ public class SegmentHash {
 
     public ByteArray getHash() {
         return hash;
+    }
+
+    public String getHashString() {
+        return ByteUtils.toHexString(hash.get());
     }
 
     public int getNodeId() {

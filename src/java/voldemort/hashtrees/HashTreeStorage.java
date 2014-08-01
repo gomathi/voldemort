@@ -22,6 +22,8 @@ public interface HashTreeStorage {
     void putSegmentData(int treeId, int segId, ByteArray key, ByteArray digest);
 
     /**
+     * Returns the SegmentData for the given key if available, otherwise returns
+     * null.
      * 
      * @param treeId
      * @param segId
@@ -58,6 +60,14 @@ public interface HashTreeStorage {
      * @param digest
      */
     void putSegmentHash(int treeId, int nodeId, ByteArray digest);
+
+    /**
+     * 
+     * @param treeId
+     * @param nodeId
+     * @return
+     */
+    SegmentHash getSegmentHash(int treeId, int nodeId);
 
     /**
      * Returns the data inside the nodes of the hash tree. If the node id is not

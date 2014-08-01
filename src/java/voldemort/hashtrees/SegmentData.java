@@ -1,6 +1,9 @@
 package voldemort.hashtrees;
 
 import voldemort.utils.ByteArray;
+import voldemort.utils.ByteUtils;
+
+import com.google.common.primitives.Bytes;
 
 /**
  * Usually stored on disk.
@@ -22,6 +25,10 @@ public class SegmentData {
 
     public ByteArray getValue() {
         return digest;
+    }
+
+    public String getKeyAndDigestString() {
+        return ByteUtils.toHexString(Bytes.concat(key.get(), digest.get()));
     }
 
 }

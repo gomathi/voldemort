@@ -23,7 +23,7 @@ public class BGRebuildSegmentTreeTask extends BGStoppableTask {
         if(enableRunningStatus()) {
             try {
                 long startTime = System.currentTimeMillis();
-                hTree.updateSegmentHashes();
+                hTree.updateHashTrees();
                 long endTime = System.currentTimeMillis();
                 logger.debug("Total time taken to update segment hashes : (in ms)"
                              + (endTime - startTime));

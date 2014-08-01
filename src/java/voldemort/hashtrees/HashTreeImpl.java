@@ -61,9 +61,9 @@ public class HashTreeImpl implements HashTree {
     private final static int MAX_NO_OF_BUCKETS = 1 << 30;
     private final static int FOUR_ARY_TREE = 4;
 
-    private final int noOfChildrenPerParent;
-    private final int maxInternalNodeId;
-    private final int noOfSegments;
+    private final int childrenCountPerParent;
+    private final int internalNodesCount;
+    private final int segmentsCount;
 
     private final HashTreeStorage hTStorage;
     private final HashTreeIdProvider treeIdProvider;
@@ -80,11 +80,12 @@ public class HashTreeImpl implements HashTree {
                         final HashTreeStorage hTStroage,
                         final Storage storage,
                         final ExecutorService executors) {
-        this.noOfSegments = (noOfSegments > MAX_NO_OF_BUCKETS) || (noOfSegments < 0) ? MAX_NO_OF_BUCKETS
-                                                                                    : roundUpToPowerOf2(noOfSegments);
-        this.noOfChildrenPerParent = noOfChildrenPerParent;
-        this.maxInternalNodeId = getNoOfNodes(height(this.noOfSegments, this.noOfChildrenPerParent) - 1,
-                                              this.noOfChildrenPerParent);
+        this.segmentsCount = ((noOfSegments > MAX_NO_OF_BUCKETS) || (noOfSegments < 0)) ? MAX_NO_OF_BUCKETS
+                                                                                       : roundUpToPowerOf2(noOfSegments);
+        this.childrenCountPerParent = noOfChildrenPerParent;
+        this.internalNodesCount = getNoOfNodes((height(this.segmentsCount,
+                                                       this.childrenCountPerParent) - 1),
+                                               this.childrenCountPerParent);
         this.treeIdProvider = treeIdProvider;
         this.segIdProvider = segIdProvider;
         this.hTStorage = hTStroage;
@@ -112,7 +113,7 @@ public class HashTreeImpl implements HashTree {
         this(MAX_NO_OF_BUCKETS,
              FOUR_ARY_TREE,
              treeIdProvider,
-             new SegmentIdProviderImpl(MAX_NO_OF_BUCKETS),
+             new DefaultSegIdProviderImpl(MAX_NO_OF_BUCKETS),
              hTStorage,
              storage,
              executors);
@@ -127,17 +128,12 @@ public class HashTreeImpl implements HashTree {
      * @param segIdProvider
      * @param storage
      */
-    public HashTreeImpl(final HashTreeIdProvider treeIdProvider,
+    public HashTreeImpl(int noOfSegments,
+                        final HashTreeIdProvider treeIdProvider,
                         final SegmentIdProvider segIdProvider,
                         final HashTreeStorage hTStorage,
                         final Storage storage) {
-        this(MAX_NO_OF_BUCKETS,
-             FOUR_ARY_TREE,
-             treeIdProvider,
-             segIdProvider,
-             hTStorage,
-             storage,
-             null);
+        this(noOfSegments, FOUR_ARY_TREE, treeIdProvider, segIdProvider, hTStorage, storage, null);
     }
 
     @Override
@@ -226,7 +222,7 @@ public class HashTreeImpl implements HashTree {
                             nodesToCheck.add(local.getNodeId());
                         else
                             pQueue.addAll(getImmediateChildren(local.getNodeId(),
-                                                               this.noOfChildrenPerParent));
+                                                               this.childrenCountPerParent));
 
                     }
                     localItr.next();
@@ -312,7 +308,7 @@ public class HashTreeImpl implements HashTree {
     }
 
     @Override
-    public void updateSegmentHashes() {
+    public void updateHashTrees() {
         List<Integer> treeIds = treeIdProvider.getAllTreeIds();
         for(int treeId: treeIds) {
             List<Integer> dirtySegmentBuckets = hTStorage.clearAndGetDirtySegments(treeId);
@@ -366,7 +362,7 @@ public class HashTreeImpl implements HashTree {
         List<Integer> dirtyNodeIds = new ArrayList<Integer>();
         for(int dirtySegId: dirtySegments) {
             ByteArray digest = digestSegmentData(treeId, dirtySegId);
-            int nodeId = getSegmentIdFromLeafId(dirtySegId);
+            int nodeId = getLeafIdFromSegmentId(dirtySegId);
             hTStorage.putSegmentHash(treeId, nodeId, digest);
             dirtyNodeIds.add(nodeId);
         }
@@ -378,7 +374,7 @@ public class HashTreeImpl implements HashTree {
 
         StringBuilder sb = new StringBuilder();
         for(SegmentData sd: dirtySegmentData)
-            sb.append(sd.getValue() + "\n");
+            sb.append(sd.getKeyAndDigestString() + "\n");
 
         return new ByteArray(sha1(sb.toString().getBytes()));
     }
@@ -392,12 +388,14 @@ public class HashTreeImpl implements HashTree {
         Set<Integer> parentNodeIds = new TreeSet<Integer>();
         while(!nodeIds.isEmpty()) {
             for(int nodeId: nodeIds) {
-                parentNodeIds.add(getParent(nodeId, this.noOfChildrenPerParent));
+                parentNodeIds.add(getParent(nodeId, this.childrenCountPerParent));
             }
             updateInternalNodes(treeId, parentNodeIds);
 
             nodeIds.clear();
             nodeIds.addAll(parentNodeIds);
+            if(nodeIds.size() == 1 && nodeIds.get(0) == ROOT_NODE)
+                break;
         }
     }
 
@@ -413,9 +411,9 @@ public class HashTreeImpl implements HashTree {
         for(int parentId: parentIds) {
             segmentHashes = hTStorage.getSegmentHashes(treeId,
                                                        getImmediateChildren(parentId,
-                                                                            this.noOfChildrenPerParent));
+                                                                            this.childrenCountPerParent));
             for(SegmentHash sh: segmentHashes)
-                sb.append(sh.getHash() + "\n");
+                sb.append(sh.getHashString() + "\n");
             ByteArray digest = new ByteArray(sha1(sb.toString().getBytes()));
             hTStorage.putSegmentHash(treeId, parentId, digest);
             sb.setLength(0);
@@ -427,11 +425,20 @@ public class HashTreeImpl implements HashTree {
      * block. This function does the mapping from leaf node id to segment block
      * id.
      * 
+     * @param segId
+     * @return
+     */
+    private int getLeafIdFromSegmentId(int segId) {
+        return internalNodesCount + segId;
+    }
+
+    /**
+     * 
      * @param leafNodeId
      * @return
      */
     private int getSegmentIdFromLeafId(int leafNodeId) {
-        return leafNodeId - maxInternalNodeId;
+        return leafNodeId - internalNodesCount;
     }
 
     private Collection<Integer> getSegmentIdsFromLeafIds(final Collection<Integer> leafNodeIds) {
@@ -451,9 +458,9 @@ public class HashTreeImpl implements HashTree {
     private Collection<Integer> getAllLeafNodeIds(int nodeId) {
         Queue<Integer> pQueue = new ArrayDeque<Integer>();
         pQueue.add(nodeId);
-        while(pQueue.peek() <= maxInternalNodeId) {
+        while(pQueue.peek() <= internalNodesCount) {
             int cNodeId = pQueue.remove();
-            pQueue.addAll(getImmediateChildren(cNodeId, noOfChildrenPerParent));
+            pQueue.addAll(getImmediateChildren(cNodeId, childrenCountPerParent));
         }
         return pQueue;
     }
@@ -472,13 +479,13 @@ public class HashTreeImpl implements HashTree {
      * @return
      */
     private boolean isLeafNode(int nodeId) {
-        return nodeId > maxInternalNodeId;
+        return nodeId > internalNodesCount;
     }
 
     private static int roundUpToPowerOf2(int number) {
-        return number >= MAX_NO_OF_BUCKETS ? MAX_NO_OF_BUCKETS
-                                          : (number > 1) ? Integer.highestOneBit((number - 1) << 1)
-                                                        : 1;
+        return (number >= MAX_NO_OF_BUCKETS) ? MAX_NO_OF_BUCKETS
+                                            : ((number > 1) ? Integer.highestOneBit((number - 1) << 1)
+                                                           : 1);
     }
 
     public void shutdown() {
@@ -492,11 +499,11 @@ public class HashTreeImpl implements HashTree {
         int getSegmentId(ByteArray key);
     }
 
-    private static class SegmentIdProviderImpl implements SegmentIdProvider {
+    private static class DefaultSegIdProviderImpl implements SegmentIdProvider {
 
         private final int noOfBuckets;
 
-        public SegmentIdProviderImpl(int noOfBuckets) {
+        public DefaultSegIdProviderImpl(int noOfBuckets) {
             this.noOfBuckets = noOfBuckets;
         }
 
@@ -508,6 +515,11 @@ public class HashTreeImpl implements HashTree {
 
     }
 
+    /**
+     * Manages all the background threads like rebuilding segment hashes,
+     * rebuilding segment trees and non blocking segment data updater thread.
+     * 
+     */
     private class BGTasksManager {
 
         // In milliseconds
@@ -589,5 +601,4 @@ public class HashTreeImpl implements HashTree {
             scheduledExecutors.shutdownNow();
         }
     }
-
 }

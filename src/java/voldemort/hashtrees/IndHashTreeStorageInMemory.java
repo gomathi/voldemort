@@ -73,6 +73,13 @@ class IndHashTreeStorageInMemory {
         return result;
     }
 
+    public SegmentHash getSegmentHash(int nodeId) {
+        ByteArray hash = segmentHashes.get(nodeId);
+        if(hash == null)
+            return null;
+        return new SegmentHash(nodeId, hash);
+    }
+
     public void setDirtySegment(int segId) {
         dirtySegments.set(segId);
     }

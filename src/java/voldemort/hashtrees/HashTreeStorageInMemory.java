@@ -73,4 +73,9 @@ public class HashTreeStorageInMemory implements HashTreeStorage {
         return getIndHTree(treeId).getSegmentData(segId, key);
     }
 
+    @Override
+    public SegmentHash getSegmentHash(int treeId, int nodeId) {
+        return getIndHTree(treeId).getSegmentHash(nodeId);
+    }
+
 }

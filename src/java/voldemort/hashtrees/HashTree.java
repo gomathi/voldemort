@@ -92,9 +92,9 @@ public interface HashTree {
     /**
      * Hash tree implementations do not update the segment hashes tree on every
      * key change. Rather tree is rebuilt at regular intervals. This function
-     * provides an option to make a force call to update the segment hashes.
+     * provides an option to make a force call to update the entire tree.
      */
-    void updateSegmentHashes();
+    void updateHashTrees();
 
     /**
      * Deletes tree nodes from the hash tree, and the corresponding segments.

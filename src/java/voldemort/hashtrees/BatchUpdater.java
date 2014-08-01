@@ -32,14 +32,6 @@ public class BatchUpdater {
         keyValuePairsToAdd.put(keyValue.getFirst(), keyValue.getSecond());
     }
 
-    private Pair<ByteArray, ByteArray> getKeyValue(ByteArray key) {
-        return null;
-    }
-
-    private Map<ByteArray, ByteArray> getKeysAndValues(List<ByteArray> keys) {
-        return null;
-    }
-
     public void removeKeys(List<ByteArray> keys) {
         keysToBeRemoved.addAll(keys);
     }
@@ -50,5 +42,13 @@ public class BatchUpdater {
 
     public void flush() {
 
+    }
+
+    private Pair<ByteArray, ByteArray> getKeyValue(ByteArray key) {
+        return null;
+    }
+
+    private Map<ByteArray, ByteArray> getKeysAndValues(List<ByteArray> keys) {
+        return null;
     }
 }
