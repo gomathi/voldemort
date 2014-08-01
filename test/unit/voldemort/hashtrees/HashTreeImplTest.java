@@ -13,7 +13,6 @@ import org.junit.Test;
 import voldemort.hashtrees.HashTreeImpl.SegmentIdProvider;
 import voldemort.utils.ByteArray;
 import voldemort.utils.ByteUtils;
-import voldemort.utils.Pair;
 
 import com.google.common.primitives.Bytes;
 
@@ -82,6 +81,21 @@ public class HashTreeImplTest {
 
     }
 
+    private static class HTreeComponents {
+
+        public final HashTreeStorage hTStorage;
+        public final StorageImplTest storage;
+        public final HashTree hTree;
+
+        public HTreeComponents(final HashTreeStorage hTStorage,
+                               final StorageImplTest storage,
+                               final HashTree hTree) {
+            this.hTStorage = hTStorage;
+            this.storage = storage;
+            this.hTree = hTree;
+        }
+    }
+
     private static final SegIdProviderTest segIdProvider = new SegIdProviderTest();
     private static final HashTreeIdProviderTest treeIdProvider = new HashTreeIdProviderTest();
     private static final Random RANDOM = new Random(System.currentTimeMillis());
@@ -94,24 +108,48 @@ public class HashTreeImplTest {
         return emptyBuffer;
     }
 
-    private static Pair<HashTree, HashTreeStorage> getHashTreeImpl(int noOfSegDataBlocks,
-                                                                   final StorageImplTest localStorage) {
-        HashTreeStorage localTreeStorage = new HashTreeStorageInMemory(noOfSegDataBlocks);
-        return new Pair<HashTree, HashTreeStorage>(new HashTreeImpl(noOfSegDataBlocks,
-                                                                    treeIdProvider,
-                                                                    segIdProvider,
-                                                                    localTreeStorage,
-                                                                    localStorage), localTreeStorage);
+    private static ByteArray randomByteArray() {
+        byte[] random = new byte[16];
+        RANDOM.nextBytes(random);
+        return new ByteArray(random);
+    }
+
+    private static HTreeComponents createHashTreeAndStorage(int noOfSegDataBlocks,
+                                                            HashTreeIdProvider treeIdProv,
+                                                            SegmentIdProvider segIdPro) {
+        HashTreeStorage hTStorage = new HashTreeStorageInMemory(noOfSegDataBlocks);
+        StorageImplTest storage = new StorageImplTest();
+        HashTree hTree = new HashTreeImpl(noOfSegDataBlocks,
+                                          treeIdProv,
+                                          segIdPro,
+                                          hTStorage,
+                                          storage);
+        return new HTreeComponents(hTStorage, storage, hTree);
+    }
+
+    private static HTreeComponents createHashTreeAndStorage(int noOfSegments,
+                                                            int noOfChildrenPerParent) {
+        HashTreeIdProvider treeIdProvider = new HashTreeIdProviderTest();
+        HashTreeStorage hTStorage = new HashTreeStorageInMemory(noOfSegments);
+        StorageImplTest storage = new StorageImplTest();
+        HashTree hTree = new HashTreeImpl(noOfSegments,
+                                          noOfChildrenPerParent,
+                                          treeIdProvider,
+                                          hTStorage,
+                                          storage);
+        storage.setHashTree(hTree);
+        return new HTreeComponents(hTStorage, storage, hTree);
     }
 
     @Test
     public void testPut() {
 
         int noOfSegDataBlocks = 1024;
-        StorageImplTest testStorage = new StorageImplTest();
-        Pair<HashTree, HashTreeStorage> pair = getHashTreeImpl(noOfSegDataBlocks, testStorage);
-        HashTree testTree = pair.getFirst();
-        HashTreeStorage testTreeStorage = pair.getSecond();
+        HTreeComponents components = createHashTreeAndStorage(noOfSegDataBlocks,
+                                                              treeIdProvider,
+                                                              segIdProvider);
+        HashTree testTree = components.hTree;
+        HashTreeStorage testTreeStorage = components.hTStorage;
 
         ByteArray key = new ByteArray("1".getBytes());
         ByteArray value = new ByteArray(randomBytes());
@@ -132,10 +170,11 @@ public class HashTreeImplTest {
     public void testRemove() {
 
         int noOfSegDataBlocks = 1024;
-        StorageImplTest testStorage = new StorageImplTest();
-        Pair<HashTree, HashTreeStorage> pair = getHashTreeImpl(noOfSegDataBlocks, testStorage);
-        HashTree testTree = pair.getFirst();
-        HashTreeStorage testTreeStorage = pair.getSecond();
+        HTreeComponents components = createHashTreeAndStorage(noOfSegDataBlocks,
+                                                              treeIdProvider,
+                                                              segIdProvider);
+        HashTree testTree = components.hTree;
+        HashTreeStorage testTreeStorage = components.hTStorage;
 
         ByteArray key = new ByteArray("2".getBytes());
         ByteArray value = new ByteArray(randomBytes());
@@ -150,39 +189,36 @@ public class HashTreeImplTest {
         Assert.assertEquals(2, dirtySegs.get(0).intValue());
     }
 
-    private static class HTreeComponents {
+    @Test
+    public void testUpdateSegmentHashesTest() {
 
-        public final HashTreeStorage hTStorage;
-        public final StorageImplTest storage;
-        public final HashTree hTree;
+        int noOfSegDataBlocks = 4;
+        HTreeComponents components = createHashTreeAndStorage(noOfSegDataBlocks,
+                                                              treeIdProvider,
+                                                              segIdProvider);
+        HashTree testTree = components.hTree;
+        HashTreeStorage testTreeStorage = components.hTStorage;
 
-        public HTreeComponents(final HashTreeStorage hTStorage,
-                               final StorageImplTest storage,
-                               final HashTree hTree) {
-            this.hTStorage = hTStorage;
-            this.storage = storage;
-            this.hTree = hTree;
-        }
-    }
+        ByteArray key = new ByteArray("1".getBytes());
+        ByteArray value = new ByteArray(randomBytes());
+        testTree.hPut(key, value);
+        ByteArray digest = new ByteArray(ByteUtils.sha1(value.get()));
 
-    private static HTreeComponents createHashTreeAndStorage(int noOfSegments,
-                                                            int noOfChildrenPerParent) {
-        HashTreeIdProvider treeIdProvider = new HashTreeIdProviderTest();
-        HashTreeStorage hTStorage = new HashTreeStorageInMemory(noOfSegments);
-        StorageImplTest storage = new StorageImplTest();
-        HashTree hTree = new HashTreeImpl(noOfSegments,
-                                          noOfChildrenPerParent,
-                                          treeIdProvider,
-                                          hTStorage,
-                                          storage);
-        storage.setHashTree(hTree);
-        return new HTreeComponents(hTStorage, storage, hTree);
-    }
+        testTree.updateHashTrees();
 
-    private static ByteArray randomByteArray() {
-        byte[] random = new byte[16];
-        RANDOM.nextBytes(random);
-        return new ByteArray(random);
+        StringBuffer sb = new StringBuffer();
+        sb.append(new ByteArray(Bytes.concat(key.get(), digest.get())) + "\n");
+        ByteArray expectedLeafNodeDigest = new ByteArray(ByteUtils.sha1(sb.toString().getBytes()));
+        SegmentHash segHash = testTreeStorage.getSegmentHash(1, 2);
+        Assert.assertNotNull(segHash);
+        Assert.assertEquals(expectedLeafNodeDigest, segHash.getHash());
+
+        sb.setLength(0);
+        sb.append(ByteUtils.toHexString(expectedLeafNodeDigest.get()) + "\n");
+        ByteArray expectedRootNodeDigest = new ByteArray(ByteUtils.sha1(sb.toString().getBytes()));
+        SegmentHash actualRootNodeDigest = testTreeStorage.getSegmentHash(1, 0);
+        Assert.assertNotNull(actualRootNodeDigest);
+        Assert.assertEquals(expectedRootNodeDigest, actualRootNodeDigest.getHash());
     }
 
     @Test
@@ -302,36 +338,5 @@ public class HashTreeImplTest {
             Assert.assertEquals(localHTreeComp.storage.localStorage,
                                 remoteHTreeComp.storage.localStorage);
         }
-    }
-
-    @Test
-    public void testUpdateSegmentHashesTest() {
-
-        int noOfSegDataBlocks = 4;
-        StorageImplTest testStorage = new StorageImplTest();
-        Pair<HashTree, HashTreeStorage> pair = getHashTreeImpl(noOfSegDataBlocks, testStorage);
-        HashTree testTree = pair.getFirst();
-        HashTreeStorage testTreeStorage = pair.getSecond();
-
-        ByteArray key = new ByteArray("1".getBytes());
-        ByteArray value = new ByteArray(randomBytes());
-        testTree.hPut(key, value);
-        ByteArray digest = new ByteArray(ByteUtils.sha1(value.get()));
-
-        testTree.updateHashTrees();
-
-        StringBuffer sb = new StringBuffer();
-        sb.append(new ByteArray(Bytes.concat(key.get(), digest.get())) + "\n");
-        ByteArray expectedLeafNodeDigest = new ByteArray(ByteUtils.sha1(sb.toString().getBytes()));
-        SegmentHash segHash = testTreeStorage.getSegmentHash(1, 2);
-        Assert.assertNotNull(segHash);
-        Assert.assertEquals(expectedLeafNodeDigest, segHash.getHash());
-
-        sb.setLength(0);
-        sb.append(ByteUtils.toHexString(expectedLeafNodeDigest.get()) + "\n");
-        ByteArray expectedRootNodeDigest = new ByteArray(ByteUtils.sha1(sb.toString().getBytes()));
-        SegmentHash actualRootNodeDigest = testTreeStorage.getSegmentHash(1, 0);
-        Assert.assertNotNull(actualRootNodeDigest);
-        Assert.assertEquals(expectedRootNodeDigest, actualRootNodeDigest.getHash());
     }
 }
