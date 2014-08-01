@@ -52,6 +52,11 @@ public class HashTreeImplTest {
     private static class StorageImplTest implements Storage {
 
         private final ConcurrentMap<ByteArray, ByteArray> localStorage = new ConcurrentHashMap<ByteArray, ByteArray>();
+        private volatile HashTree hashTree;
+
+        public void setHashTree(final HashTree hashTree) {
+            this.hashTree = hashTree;
+        }
 
         @Override
         public ByteArray get(ByteArray key) {
@@ -61,11 +66,15 @@ public class HashTreeImplTest {
         @Override
         public void put(ByteArray key, ByteArray value) {
             localStorage.put(key, value);
+            if(hashTree != null)
+                hashTree.hPut(key, value);
         }
 
         @Override
         public void remove(ByteArray key) {
             localStorage.remove(key);
+            if(hashTree != null)
+                hashTree.hRemove(key);
         }
 
     }
@@ -136,9 +145,57 @@ public class HashTreeImplTest {
         Assert.assertEquals(2, dirtySegs.get(0).intValue());
     }
 
+    private static class HTreeComponents {
+
+        public final HashTreeStorage hTStorage;
+        public final StorageImplTest storage;
+        public final HashTree hTree;
+
+        public HTreeComponents(final HashTreeStorage hTStorage,
+                               final StorageImplTest storage,
+                               final HashTree hTree) {
+            this.hTStorage = hTStorage;
+            this.storage = storage;
+            this.hTree = hTree;
+        }
+    }
+
+    private static HTreeComponents createHashTreeAndStorage(int noOfSegments,
+                                                            int noOfChildrenPerParent) {
+        HashTreeIdProvider treeIdProvider = new HashTreeIdProviderTest();
+        HashTreeStorage hTStorage = new HashTreeStorageInMemory(noOfSegments);
+        StorageImplTest storage = new StorageImplTest();
+        HashTree hTree = new HashTreeImpl(noOfSegments,
+                                          noOfChildrenPerParent,
+                                          treeIdProvider,
+                                          hTStorage,
+                                          storage);
+        storage.setHashTree(hTree);
+        return new HTreeComponents(hTStorage, storage, hTree);
+    }
+
+    private static ByteArray randomByteArray() {
+        byte[] random = new byte[16];
+        RANDOM.nextBytes(random);
+        return new ByteArray(random);
+    }
+
     @Test
-    public void testUpdateTree() {
+    public void testUpdateWithEmptyTree() {
         int noOfSegDataBlocks = 1024;
+        int noOfChildren = 2;
+
+        HTreeComponents localHTreeComp = createHashTreeAndStorage(noOfSegDataBlocks, noOfChildren);
+        HTreeComponents remoteHTreeComp = createHashTreeAndStorage(noOfSegDataBlocks, noOfChildren);
+
+        for(int i = 1; i <= 2 * noOfSegDataBlocks; i++) {
+            localHTreeComp.storage.put(randomByteArray(), randomByteArray());
+        }
+
+        localHTreeComp.hTree.updateHashTrees();
+        boolean anyUpdates = localHTreeComp.hTree.synch(1, remoteHTreeComp.hTree);
+
+        Assert.assertTrue(anyUpdates);
     }
 
     @Test

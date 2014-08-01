@@ -67,8 +67,10 @@ public interface HashTree {
      * and not the other way.
      * 
      * @param remoteTree
+     * @return, true indicates some modifications made to the remote tree, false
+     *          means two trees were already in synch status.
      */
-    void synch(int treeId, HashTree remoteTree);
+    boolean synch(int treeId, HashTree remoteTree);
 
     /**
      * Implementation is expected to run a background task at regular intervals

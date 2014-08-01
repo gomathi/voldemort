@@ -137,6 +137,21 @@ public class HashTreeImpl implements HashTree {
         this(noOfSegments, FOUR_ARY_TREE, treeIdProvider, segIdProvider, hTStorage, storage, null);
     }
 
+    // For unit tests
+    public HashTreeImpl(int noOfSegments,
+                        int noOfChildrenPerParent,
+                        final HashTreeIdProvider treeIdProvider,
+                        final HashTreeStorage hTStorage,
+                        final Storage storage) {
+        this(noOfSegments,
+             noOfChildrenPerParent,
+             treeIdProvider,
+             new DefaultSegIdProviderImpl(noOfSegments),
+             hTStorage,
+             storage,
+             null);
+    }
+
     @Override
     public void hPut(final ByteArray key, final ByteArray value) {
         if(enabledBGTasks) {
@@ -174,7 +189,7 @@ public class HashTreeImpl implements HashTree {
     }
 
     @Override
-    public void synch(int treeId, final HashTree remoteTree) {
+    public boolean synch(int treeId, final HashTree remoteTree) {
         Collection<Integer> leafNodesToCheck = new ArrayList<Integer>();
         Collection<Integer> missingNodesInRemote = new ArrayList<Integer>();
         Collection<Integer> missingNodesInLocal = new ArrayList<Integer>();
@@ -185,13 +200,18 @@ public class HashTreeImpl implements HashTree {
                         missingNodesInRemote,
                         missingNodesInLocal);
 
+        if(leafNodesToCheck.isEmpty() && missingNodesInLocal.isEmpty()
+           && missingNodesInLocal.isEmpty())
+            return true;
+
         Collection<Integer> segsToCheck = getSegmentIdsFromLeafIds(leafNodesToCheck);
         syncSegments(treeId, segsToCheck, remoteTree);
 
-        Collection<Integer> missingSegsInRemote = getSegmentIdsFromLeafIds(missingNodesInRemote);
+        Collection<Integer> missingSegsInRemote = getSegmentIdsFromLeafIds(getAllLeafNodeIds(missingNodesInRemote));
         updateRemoteTreeWithMissingSegments(treeId, missingSegsInRemote, remoteTree);
 
         remoteTree.deleteTreeNodes(treeId, missingNodesInLocal);
+        return false;
     }
 
     private void findDifferences(int treeId,
@@ -405,6 +425,7 @@ public class HashTreeImpl implements HashTree {
 
             nodeIds.clear();
             nodeIds.addAll(parentNodeIds);
+            parentNodeIds.clear();
             if(nodeIds.size() == 1 && nodeIds.get(0) == ROOT_NODE)
                 break;
         }
@@ -616,4 +637,5 @@ public class HashTreeImpl implements HashTree {
             scheduledExecutors.shutdownNow();
         }
     }
+
 }

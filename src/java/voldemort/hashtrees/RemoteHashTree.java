@@ -32,7 +32,9 @@ public class RemoteHashTree implements HashTree {
     public void sRemove(List<ByteArray> key) {}
 
     @Override
-    public void synch(int treeId, HashTree remoteTree) {}
+    public boolean synch(int treeId, HashTree remoteTree) {
+        return false;
+    }
 
     @Override
     public void addTreeToSyncList(String hostName, HashTree remoteTree) {}
