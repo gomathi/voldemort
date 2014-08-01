@@ -521,7 +521,7 @@ public class HashTreeImpl implements HashTree {
      * @return
      */
     private boolean isLeafNode(int nodeId) {
-        return nodeId > internalNodesCount;
+        return nodeId >= internalNodesCount;
     }
 
     private static int roundUpToPowerOf2(int number) {

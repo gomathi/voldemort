@@ -8,5 +8,5 @@ public interface Storage {
 
     void put(ByteArray key, ByteArray value);
 
-    void remove(ByteArray key);
+    ByteArray remove(ByteArray key);
 }

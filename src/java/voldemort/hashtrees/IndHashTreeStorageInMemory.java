@@ -13,8 +13,8 @@ import voldemort.utils.ByteArray;
 import voldemort.utils.ThreadSafeBitSet;
 
 /**
- * Hash tree can host multiple smaller hash trees. This stores the data for
- * smaller hash tree.
+ * Hash tree can host multiple similar hash trees. This stores the data for one
+ * such hash tree.
  * 
  */
 class IndHashTreeStorageInMemory {
