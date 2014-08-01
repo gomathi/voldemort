@@ -9,6 +9,7 @@ import static voldemort.utils.TreeUtils.height;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -137,7 +138,7 @@ public class HashTreeImpl implements HashTree {
     }
 
     @Override
-    public void put(final ByteArray key, final ByteArray value) {
+    public void hPut(final ByteArray key, final ByteArray value) {
         if(enabledBGTasks) {
             List<ByteArray> second = new ArrayList<ByteArray>(2);
             second.add(key);
@@ -149,7 +150,7 @@ public class HashTreeImpl implements HashTree {
     }
 
     @Override
-    public void remove(final ByteArray key) {
+    public void hRemove(final ByteArray key) {
         if(enabledBGTasks) {
             List<ByteArray> second = new ArrayList<ByteArray>(1);
             second.add(key);
@@ -173,7 +174,7 @@ public class HashTreeImpl implements HashTree {
     }
 
     @Override
-    public void update(int treeId, final HashTree remoteTree) {
+    public void synch(int treeId, final HashTree remoteTree) {
         Collection<Integer> leafNodesToCheck = new ArrayList<Integer>();
         Collection<Integer> missingNodesInRemote = new ArrayList<Integer>();
         Collection<Integer> missingNodesInLocal = new ArrayList<Integer>();
@@ -184,14 +185,11 @@ public class HashTreeImpl implements HashTree {
                         missingNodesInRemote,
                         missingNodesInLocal);
 
-        BatchUpdater batchUpdater = new BatchUpdater(1000, remoteTree);
-
         Collection<Integer> segsToCheck = getSegmentIdsFromLeafIds(leafNodesToCheck);
-        syncSegments(treeId, segsToCheck, remoteTree, batchUpdater);
+        syncSegments(treeId, segsToCheck, remoteTree);
 
         Collection<Integer> missingSegsInRemote = getSegmentIdsFromLeafIds(missingNodesInRemote);
-        updateRemoteTreeWithMissingSegments(treeId, missingSegsInRemote, batchUpdater);
-        batchUpdater.flush();
+        updateRemoteTreeWithMissingSegments(treeId, missingSegsInRemote, remoteTree);
 
         remoteTree.deleteTreeNodes(treeId, missingNodesInLocal);
     }
@@ -244,22 +242,21 @@ public class HashTreeImpl implements HashTree {
         }
     }
 
-    private void syncSegments(int treeId,
-                              Collection<Integer> segIds,
-                              HashTree remoteTree,
-                              BatchUpdater batchUpdater) {
+    private void syncSegments(int treeId, Collection<Integer> segIds, HashTree remoteTree) {
         for(int segId: segIds)
-            syncSegment(treeId, segId, remoteTree, batchUpdater);
+            syncSegment(treeId, segId, remoteTree);
     }
 
-    private void syncSegment(int treeId, int segId, HashTree remoteTree, BatchUpdater batchUpdater) {
+    private void syncSegment(int treeId, int segId, HashTree remoteTree) {
         CollectionPeekingIterator<SegmentData> localDataItr = new CollectionPeekingIterator<SegmentData>(getSegment(treeId,
                                                                                                                     segId));
         CollectionPeekingIterator<SegmentData> remoteDataItr = new CollectionPeekingIterator<SegmentData>(remoteTree.getSegment(treeId,
                                                                                                                                 segId));
+
+        Map<ByteArray, ByteArray> kvsForAddition = new HashMap<ByteArray, ByteArray>();
+        List<ByteArray> keysForeRemoval = new ArrayList<ByteArray>();
+
         SegmentData local, remote;
-        List<ByteArray> keysToBeUpdated = new ArrayList<ByteArray>();
-        List<ByteArray> keysToBeRemoved = new ArrayList<ByteArray>();
         while(localDataItr.hasNext() && remoteDataItr.hasNext()) {
             local = localDataItr.peek();
             remote = remoteDataItr.peek();
@@ -267,33 +264,37 @@ public class HashTreeImpl implements HashTree {
             int compRes = local.getKey().compareTo(remote.getKey());
             if(compRes == 0) {
                 if(!local.getValue().equals(remote.getValue()))
-                    keysToBeUpdated.add(local.getKey());
+                    kvsForAddition.put(local.getKey(), storage.get(local.getKey()));
                 localDataItr.next();
                 remoteDataItr.next();
             } else if(compRes < 0) {
-                keysToBeUpdated.add(local.getKey());
+                kvsForAddition.put(local.getKey(), storage.get(local.getKey()));
                 localDataItr.next();
             } else {
-                keysToBeRemoved.add(remote.getKey());
+                keysForeRemoval.add(remote.getKey());
                 remoteDataItr.next();
             }
         }
-        while(localDataItr.hasNext())
-            keysToBeUpdated.add(localDataItr.next().getKey());
+        while(localDataItr.hasNext()) {
+            local = localDataItr.next();
+            kvsForAddition.put(local.getKey(), storage.get(local.getKey()));
+        }
         while(remoteDataItr.hasNext())
-            keysToBeRemoved.add(remoteDataItr.next().getKey());
-        batchUpdater.addKeys(keysToBeUpdated);
-        batchUpdater.removeKeys(keysToBeRemoved);
+            keysForeRemoval.add(remoteDataItr.next().getKey());
+
+        remoteTree.sPut(kvsForAddition);
+        remoteTree.sRemove(keysForeRemoval);
     }
 
     private void updateRemoteTreeWithMissingSegments(int treeId,
                                                      Collection<Integer> segIds,
-                                                     BatchUpdater batchUpdater) {
+                                                     HashTree remoteTree) {
         for(int segId: segIds) {
-            Iterator<SegmentData> localDataItr = getSegment(treeId, segId).iterator();
-            while(localDataItr.hasNext()) {
-                batchUpdater.addKey(localDataItr.next().getKey());
-            }
+            final Map<ByteArray, ByteArray> keyValuePairs = new HashMap<ByteArray, ByteArray>();
+            List<SegmentData> sdValues = getSegment(treeId, segId);
+            for(SegmentData sd: sdValues)
+                keyValuePairs.put(sd.getKey(), storage.get(sd.getKey()));
+            remoteTree.sPut(keyValuePairs);
         }
     }
 
@@ -318,13 +319,23 @@ public class HashTreeImpl implements HashTree {
     }
 
     @Override
-    public void batchSPut(Map<ByteArray, ByteArray> keyValuePairs) {
+    public void sPut(ByteArray key, ByteArray value) {
+        storage.put(key, value);
+    }
+
+    @Override
+    public void sPut(final Map<ByteArray, ByteArray> keyValuePairs) {
         for(Map.Entry<ByteArray, ByteArray> keyValuePair: keyValuePairs.entrySet())
             storage.put(keyValuePair.getKey(), keyValuePair.getValue());
     }
 
     @Override
-    public void batchSRemove(final List<ByteArray> keys) {
+    public void sRemove(final ByteArray key) {
+        storage.remove(key);
+    }
+
+    @Override
+    public void sRemove(final List<ByteArray> keys) {
         for(ByteArray key: keys)
             storage.remove(key);
     }
@@ -494,6 +505,10 @@ public class HashTreeImpl implements HashTree {
         }
     }
 
+    /**
+     * Defines the function to return the segId given the key.
+     * 
+     */
     public static interface SegmentIdProvider {
 
         int getSegmentId(ByteArray key);

@@ -14,19 +14,25 @@ import voldemort.utils.ByteArray;
 public class RemoteHashTree implements HashTree {
 
     @Override
-    public void put(ByteArray key, ByteArray value) {}
+    public void hPut(ByteArray key, ByteArray value) {}
 
     @Override
-    public void remove(ByteArray key) {}
+    public void hRemove(ByteArray key) {}
 
     @Override
-    public void batchSPut(Map<ByteArray, ByteArray> keyValuePairs) {}
+    public void sPut(ByteArray key, ByteArray value) {}
 
     @Override
-    public void batchSRemove(List<ByteArray> key) {}
+    public void sPut(Map<ByteArray, ByteArray> keyValuePairs) {}
 
     @Override
-    public void update(int treeId, HashTree remoteTree) {}
+    public void sRemove(ByteArray key) {}
+
+    @Override
+    public void sRemove(List<ByteArray> key) {}
+
+    @Override
+    public void synch(int treeId, HashTree remoteTree) {}
 
     @Override
     public void addTreeToSyncList(String hostName, HashTree remoteTree) {}

@@ -14,19 +14,28 @@ import voldemort.utils.ByteArray;
 public interface HashTree {
 
     /**
-     * Adds the key, and digest of value to the segment block.
+     * Adds the key, and digest of value to the segment block in HashTree.
      * 
      * @param key
      * @param value
      */
-    void put(ByteArray key, ByteArray value);
+    void hPut(ByteArray key, ByteArray value);
 
     /**
      * Deletes the key from the hash tree.
      * 
      * @param key
      */
-    void remove(ByteArray key);
+    void hRemove(ByteArray key);
+
+    /**
+     * Adds the key,value pair to the storage, not the hash tree. This is used
+     * while sync operation between two nodes.
+     * 
+     * @param key
+     * @param value
+     */
+    void sPut(ByteArray key, ByteArray value);
 
     /**
      * Adds the (key,value) pair to the original storage. Intended to be used
@@ -35,14 +44,21 @@ public interface HashTree {
      * @param key
      * @param value
      */
-    void batchSPut(Map<ByteArray, ByteArray> keyValuePairs);
+    void sPut(Map<ByteArray, ByteArray> keyValuePairs);
+
+    /**
+     * Removes the key from storage.
+     * 
+     * @param key
+     */
+    void sRemove(ByteArray key);
 
     /**
      * Deletes the keys from the storage. While synching this function is used.
      * 
      * @param key
      */
-    void batchSRemove(List<ByteArray> key);
+    void sRemove(List<ByteArray> key);
 
     /**
      * Updates the other HTree based on the differences with local objects.
@@ -52,7 +68,7 @@ public interface HashTree {
      * 
      * @param remoteTree
      */
-    void update(int treeId, HashTree remoteTree);
+    void synch(int treeId, HashTree remoteTree);
 
     /**
      * Implementation is expected to run a background task at regular intervals

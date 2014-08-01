@@ -101,7 +101,7 @@ public class HashTreeImplTest {
 
         ByteArray key = new ByteArray("1".getBytes());
         ByteArray value = new ByteArray(randomBytes());
-        testTree.put(key, value);
+        testTree.hPut(key, value);
         ByteArray digest = new ByteArray(ByteUtils.sha1(value.get()));
 
         SegmentData segData = testTreeStorage.getSegmentData(1, 1, key);
@@ -125,8 +125,8 @@ public class HashTreeImplTest {
 
         ByteArray key = new ByteArray("2".getBytes());
         ByteArray value = new ByteArray(randomBytes());
-        testTree.put(key, value);
-        testTree.remove(key);
+        testTree.hPut(key, value);
+        testTree.hRemove(key);
 
         SegmentData segData = testTreeStorage.getSegmentData(1, 2, key);
         Assert.assertNull(segData);
@@ -152,7 +152,7 @@ public class HashTreeImplTest {
 
         ByteArray key = new ByteArray("1".getBytes());
         ByteArray value = new ByteArray(randomBytes());
-        testTree.put(key, value);
+        testTree.hPut(key, value);
         ByteArray digest = new ByteArray(ByteUtils.sha1(value.get()));
 
         testTree.updateHashTrees();

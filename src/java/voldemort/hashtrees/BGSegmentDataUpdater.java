@@ -13,8 +13,8 @@ import voldemort.utils.Pair;
 
 /**
  * A task to enable non blocking calls on all
- * {@link HashTreeImpl#put(ByteArray, ByteArray)} and
- * {@link HashTreeImpl#remove(ByteArray)} operation.
+ * {@link HashTreeImpl#hPut(ByteArray, ByteArray)} and
+ * {@link HashTreeImpl#hRemove(ByteArray)} operation.
  * 
  */
 @Threadsafe
