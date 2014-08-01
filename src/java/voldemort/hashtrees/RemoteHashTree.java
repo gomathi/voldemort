@@ -58,4 +58,14 @@ public class RemoteHashTree implements HashTree {
     @Override
     public void deleteTreeNodes(int treeId, Collection<Integer> nodeIds) {}
 
+    @Override
+    public SegmentHash getSegmentHash(int treeId, int nodeId) {
+        return null;
+    }
+
+    @Override
+    public SegmentData getSegmentData(int treeId, int segId, ByteArray key) {
+        return null;
+    }
+
 }

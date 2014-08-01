@@ -82,6 +82,8 @@ public class HashTreeImplTest {
     private static final SegIdProviderTest segIdProvider = new SegIdProviderTest();
     private static final HashTreeIdProviderTest treeIdProvider = new HashTreeIdProviderTest();
     private static final Random RANDOM = new Random(System.currentTimeMillis());
+    private static final int ROOT_NODE = 0;
+    private static final int DEFAULT_TREE_ID = 1;
 
     private static byte[] randomBytes() {
         byte[] emptyBuffer = new byte[8];
@@ -182,20 +184,31 @@ public class HashTreeImplTest {
 
     @Test
     public void testUpdateWithEmptyTree() {
-        int noOfSegDataBlocks = 1024;
+        int noOfSegDataBlocks = 1 << 10;
         int noOfChildren = 2;
 
         HTreeComponents localHTreeComp = createHashTreeAndStorage(noOfSegDataBlocks, noOfChildren);
         HTreeComponents remoteHTreeComp = createHashTreeAndStorage(noOfSegDataBlocks, noOfChildren);
 
-        for(int i = 1; i <= 2 * noOfSegDataBlocks; i++) {
+        for(int i = 1; i <= noOfSegDataBlocks; i++) {
             localHTreeComp.storage.put(randomByteArray(), randomByteArray());
         }
 
         localHTreeComp.hTree.updateHashTrees();
         boolean anyUpdates = localHTreeComp.hTree.synch(1, remoteHTreeComp.hTree);
-
         Assert.assertTrue(anyUpdates);
+
+        remoteHTreeComp.hTree.updateHashTrees();
+        anyUpdates = localHTreeComp.hTree.synch(1, remoteHTreeComp.hTree);
+        Assert.assertFalse(anyUpdates);
+
+        SegmentHash localRootHash = localHTreeComp.hTree.getSegmentHash(DEFAULT_TREE_ID, ROOT_NODE);
+        Assert.assertNotNull(localRootHash);
+        SegmentHash remoteRootHash = remoteHTreeComp.hTree.getSegmentHash(DEFAULT_TREE_ID,
+                                                                          ROOT_NODE);
+        Assert.assertNotNull(remoteRootHash);
+
+        Assert.assertTrue(localRootHash.getHash().equals(remoteRootHash.getHash()));
     }
 
     @Test

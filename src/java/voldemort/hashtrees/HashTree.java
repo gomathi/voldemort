@@ -89,6 +89,15 @@ public interface HashTree {
     void removeTreeFromSyncList(String hostName);
 
     /**
+     * Returns the segment hash that is stored on the tree.
+     * 
+     * @param treeId, hash tree id.
+     * @param nodeId, node id
+     * @return
+     */
+    SegmentHash getSegmentHash(int treeId, int nodeId);
+
+    /**
      * Hash tree internal nodes store the hash of their children nodes. Given a
      * set of internal node ids, this returns the hashes that are stored on the
      * internal node.
@@ -97,6 +106,16 @@ public interface HashTree {
      * @return
      */
     List<SegmentHash> getSegmentHashes(int treeId, Collection<Integer> nodeIds);
+
+    /**
+     * Returns the (key,digest) for the given key in the given segment.
+     * 
+     * @param treeId, hash tree id
+     * @param segId
+     * @param key
+     * @return
+     */
+    SegmentData getSegmentData(int treeId, int segId, ByteArray key);
 
     /**
      * Hash tree data is stored on the leaf blocks. Given a segment id this

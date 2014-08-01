@@ -1,6 +1,8 @@
 package voldemort.utils;
 
+import java.util.ArrayList;
 import java.util.BitSet;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicIntegerArray;
 
 import voldemort.annotations.concurrency.Threadsafe;
@@ -122,6 +124,21 @@ public class ThreadSafeBitSet {
         return -1;
     }
 
+    public List<Integer> clearAndGetAllSetBits() {
+        List<Integer> result = new ArrayList<Integer>();
+        for(int i = 0; i < bitsHolder.length(); i++) {
+            int oldValue = bitsHolder.get(i);
+            while(!bitsHolder.compareAndSet(i, oldValue, 0))
+                oldValue = bitsHolder.get(i);
+            for(int j = i * 32, max = ((i * 32) + 32); j < max && j < totBits && oldValue != 0; j++) {
+                if((oldValue & 1) == 1)
+                    result.add(j);
+                oldValue = oldValue >> 1;
+            }
+        }
+        return result;
+    }
+
     public boolean compareAndSet(int bitIndex, boolean expectedVal, boolean value) {
         validateArgument(bitIndex);
 
@@ -163,4 +180,5 @@ public class ThreadSafeBitSet {
                 return;
         }
     }
+
 }

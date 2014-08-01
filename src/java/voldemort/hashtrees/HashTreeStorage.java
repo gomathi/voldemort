@@ -22,6 +22,15 @@ public interface HashTreeStorage {
     void putSegmentData(int treeId, int segId, ByteArray key, ByteArray digest);
 
     /**
+     * Deletes the given segement data from the block.
+     * 
+     * @param treeId
+     * @param segId
+     * @param key
+     */
+    void deleteSegmentData(int treeId, int segId, ByteArray key);
+
+    /**
      * Returns the SegmentData for the given key if available, otherwise returns
      * null.
      * 
@@ -31,15 +40,6 @@ public interface HashTreeStorage {
      * @return
      */
     SegmentData getSegmentData(int treeId, int segId, ByteArray key);
-
-    /**
-     * Deletes the given segement data from the block.
-     * 
-     * @param treeId
-     * @param segId
-     * @param key
-     */
-    void deleteSegmentData(int treeId, int segId, ByteArray key);
 
     /**
      * Given a segment id, returns the list of all segment data in the

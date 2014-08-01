@@ -17,6 +17,12 @@ import voldemort.utils.ByteArray;
  */
 public interface HashTreeIdProvider {
 
+    /**
+     * Returned treeId should be a positive value.
+     * 
+     * @param key
+     * @return
+     */
     int getTreeId(ByteArray key);
 
     List<Integer> getAllTreeIds();

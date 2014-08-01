@@ -85,10 +85,6 @@ class IndHashTreeStorageInMemory {
     }
 
     public List<Integer> clearAndGetDirtySegments() {
-        List<Integer> result = new ArrayList<Integer>();
-        for(int itr = dirtySegments.clearAndGetNextSetBit(0); itr >= 0; itr = dirtySegments.clearAndGetNextSetBit(itr + 1)) {
-            result.add(itr);
-        }
-        return result;
+        return dirtySegments.clearAndGetAllSetBits();
     }
 }

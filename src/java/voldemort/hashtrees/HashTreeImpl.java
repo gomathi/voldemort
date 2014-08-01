@@ -201,8 +201,8 @@ public class HashTreeImpl implements HashTree {
                         missingNodesInLocal);
 
         if(leafNodesToCheck.isEmpty() && missingNodesInLocal.isEmpty()
-           && missingNodesInLocal.isEmpty())
-            return true;
+           && missingNodesInRemote.isEmpty())
+            return false;
 
         Collection<Integer> segsToCheck = getSegmentIdsFromLeafIds(leafNodesToCheck);
         syncSegments(treeId, segsToCheck, remoteTree);
@@ -211,7 +211,7 @@ public class HashTreeImpl implements HashTree {
         updateRemoteTreeWithMissingSegments(treeId, missingSegsInRemote, remoteTree);
 
         remoteTree.deleteTreeNodes(treeId, missingNodesInLocal);
-        return false;
+        return true;
     }
 
     private void findDifferences(int treeId,
@@ -319,8 +319,18 @@ public class HashTreeImpl implements HashTree {
     }
 
     @Override
+    public SegmentHash getSegmentHash(int treeId, int nodeId) {
+        return hTStorage.getSegmentHash(treeId, nodeId);
+    }
+
+    @Override
     public List<SegmentHash> getSegmentHashes(int treeId, final Collection<Integer> nodeIds) {
         return hTStorage.getSegmentHashes(treeId, nodeIds);
+    }
+
+    @Override
+    public SegmentData getSegmentData(int treeId, int segId, ByteArray key) {
+        return hTStorage.getSegmentData(treeId, segId, key);
     }
 
     @Override
@@ -490,7 +500,7 @@ public class HashTreeImpl implements HashTree {
     private Collection<Integer> getAllLeafNodeIds(int nodeId) {
         Queue<Integer> pQueue = new ArrayDeque<Integer>();
         pQueue.add(nodeId);
-        while(pQueue.peek() <= internalNodesCount) {
+        while(pQueue.peek() < internalNodesCount) {
             int cNodeId = pQueue.remove();
             pQueue.addAll(getImmediateChildren(cNodeId, childrenCountPerParent));
         }
