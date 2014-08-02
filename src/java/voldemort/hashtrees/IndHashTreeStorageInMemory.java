@@ -9,8 +9,8 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ConcurrentSkipListMap;
 
+import voldemort.utils.AtomicBitSet;
 import voldemort.utils.ByteArray;
-import voldemort.utils.ThreadSafeBitSet;
 
 /**
  * Hash tree can host multiple similar hash trees. This stores the data for one
@@ -21,10 +21,10 @@ class IndHashTreeStorageInMemory {
 
     private final ConcurrentMap<Integer, ByteArray> segmentHashes = new ConcurrentSkipListMap<Integer, ByteArray>();
     private final ConcurrentMap<Integer, ConcurrentSkipListMap<ByteArray, ByteArray>> segDataBlocks = new ConcurrentHashMap<Integer, ConcurrentSkipListMap<ByteArray, ByteArray>>();
-    private final ThreadSafeBitSet dirtySegments;
+    private final AtomicBitSet dirtySegments;
 
     public IndHashTreeStorageInMemory(int noOfSegDataBlocks) {
-        this.dirtySegments = new ThreadSafeBitSet(noOfSegDataBlocks);
+        this.dirtySegments = new AtomicBitSet(noOfSegDataBlocks);
     }
 
     public void putSegmentHash(int nodeId, ByteArray digest) {
@@ -86,5 +86,9 @@ class IndHashTreeStorageInMemory {
 
     public List<Integer> clearAndGetDirtySegments() {
         return dirtySegments.clearAndGetAllSetBits();
+    }
+
+    public static void main(String[] args) {
+        System.out.println((5 >> 32) & 1);
     }
 }
