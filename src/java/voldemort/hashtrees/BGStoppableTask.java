@@ -30,6 +30,10 @@ public abstract class BGStoppableTask implements Runnable, Stoppable {
         this.shutdownLatch = shutdownLatch;
     }
 
+    public synchronized boolean isRunning() {
+        return running;
+    }
+
     /**
      * If a task is already running or stop has been requested, this will return
      * false. Otherwise enables running status to be true.

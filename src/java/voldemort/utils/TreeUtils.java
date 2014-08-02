@@ -61,4 +61,8 @@ public class TreeUtils {
         }
         return children;
     }
+
+    public static void main(String[] args) {
+        System.out.println(getNoOfNodes(height(1000000, 2), 2));
+    }
 }

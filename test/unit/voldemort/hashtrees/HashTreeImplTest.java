@@ -2,6 +2,7 @@ package voldemort.hashtrees;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
@@ -13,6 +14,7 @@ import org.junit.Test;
 import voldemort.hashtrees.HashTreeImpl.SegmentIdProvider;
 import voldemort.utils.ByteArray;
 import voldemort.utils.ByteUtils;
+import voldemort.utils.Pair;
 
 import com.google.common.primitives.Bytes;
 
@@ -79,6 +81,11 @@ public class HashTreeImplTest {
             return null;
         }
 
+        @Override
+        public Iterator<Pair<ByteArray, ByteArray>> iterator() {
+            return null;
+        }
+
     }
 
     private static class HTreeComponents {
@@ -101,6 +108,8 @@ public class HashTreeImplTest {
     private static final Random RANDOM = new Random(System.currentTimeMillis());
     private static final int ROOT_NODE = 0;
     private static final int DEFAULT_TREE_ID = 1;
+    private static final int DEFAULT_SEG_DATA_BLOCKS_COUNT = 1 << 10;
+    private static final int DEFAULT_NO_OF_CHILDREN = 2;
 
     private static byte[] randomBytes() {
         byte[] emptyBuffer = new byte[8];
@@ -223,13 +232,12 @@ public class HashTreeImplTest {
 
     @Test
     public void testUpdateWithEmptyTree() {
-        int noOfSegDataBlocks = 1 << 10;
-        int noOfChildren = 2;
+        HTreeComponents localHTreeComp = createHashTreeAndStorage(DEFAULT_SEG_DATA_BLOCKS_COUNT,
+                                                                  DEFAULT_NO_OF_CHILDREN);
+        HTreeComponents remoteHTreeComp = createHashTreeAndStorage(DEFAULT_SEG_DATA_BLOCKS_COUNT,
+                                                                   DEFAULT_NO_OF_CHILDREN);
 
-        HTreeComponents localHTreeComp = createHashTreeAndStorage(noOfSegDataBlocks, noOfChildren);
-        HTreeComponents remoteHTreeComp = createHashTreeAndStorage(noOfSegDataBlocks, noOfChildren);
-
-        for(int i = 1; i <= noOfSegDataBlocks; i++) {
+        for(int i = 1; i <= DEFAULT_SEG_DATA_BLOCKS_COUNT; i++) {
             localHTreeComp.storage.put(randomByteArray(), randomByteArray());
         }
 
@@ -252,20 +260,20 @@ public class HashTreeImplTest {
 
     @Test
     public void testUpdateTreeWithMissingBlocksInLocal() {
-        int noOfSegDataBlocks = 1 << 10;
-        int noOfChildren = 2;
 
-        HTreeComponents localHTreeComp = createHashTreeAndStorage(noOfSegDataBlocks, noOfChildren);
-        HTreeComponents remoteHTreeComp = createHashTreeAndStorage(noOfSegDataBlocks, noOfChildren);
+        HTreeComponents localHTreeComp = createHashTreeAndStorage(DEFAULT_SEG_DATA_BLOCKS_COUNT,
+                                                                  DEFAULT_NO_OF_CHILDREN);
+        HTreeComponents remoteHTreeComp = createHashTreeAndStorage(DEFAULT_SEG_DATA_BLOCKS_COUNT,
+                                                                   DEFAULT_NO_OF_CHILDREN);
 
-        for(int i = 1; i <= noOfSegDataBlocks; i++) {
+        for(int i = 1; i <= DEFAULT_SEG_DATA_BLOCKS_COUNT; i++) {
             localHTreeComp.storage.put(randomByteArray(), randomByteArray());
         }
 
         localHTreeComp.hTree.updateHashTrees();
         localHTreeComp.hTree.synch(1, remoteHTreeComp.hTree);
 
-        for(int i = 0; i < noOfSegDataBlocks; i++) {
+        for(int i = 0; i < DEFAULT_SEG_DATA_BLOCKS_COUNT; i++) {
             List<SegmentData> segBlock = remoteHTreeComp.hTree.getSegment(DEFAULT_TREE_ID, i);
             for(SegmentData sData: segBlock) {
                 localHTreeComp.storage.remove(sData.getKey());
@@ -284,13 +292,12 @@ public class HashTreeImplTest {
 
     @Test
     public void testUpdateTreeWithMissingBlocksInRemote() {
-        int noOfSegDataBlocks = 1 << 10;
-        int noOfChildren = 2;
+        HTreeComponents localHTreeComp = createHashTreeAndStorage(DEFAULT_SEG_DATA_BLOCKS_COUNT,
+                                                                  DEFAULT_NO_OF_CHILDREN);
+        HTreeComponents remoteHTreeComp = createHashTreeAndStorage(DEFAULT_SEG_DATA_BLOCKS_COUNT,
+                                                                   DEFAULT_NO_OF_CHILDREN);
 
-        HTreeComponents localHTreeComp = createHashTreeAndStorage(noOfSegDataBlocks, noOfChildren);
-        HTreeComponents remoteHTreeComp = createHashTreeAndStorage(noOfSegDataBlocks, noOfChildren);
-
-        for(int i = 1; i <= noOfSegDataBlocks; i++) {
+        for(int i = 1; i <= DEFAULT_SEG_DATA_BLOCKS_COUNT; i++) {
             localHTreeComp.storage.put(randomByteArray(), randomByteArray());
         }
 
@@ -298,7 +305,7 @@ public class HashTreeImplTest {
         localHTreeComp.hTree.synch(1, remoteHTreeComp.hTree);
         remoteHTreeComp.hTree.updateHashTrees();
 
-        for(int i = 0; i < noOfSegDataBlocks; i++) {
+        for(int i = 0; i < DEFAULT_SEG_DATA_BLOCKS_COUNT; i++) {
             List<SegmentData> segBlock = remoteHTreeComp.hTree.getSegment(DEFAULT_TREE_ID, i);
             for(SegmentData sData: segBlock) {
                 remoteHTreeComp.storage.remove(sData.getKey());
@@ -313,20 +320,19 @@ public class HashTreeImplTest {
 
     @Test
     public void testUpdateTreeWithDifferingSegments() {
-        int noOfSegDataBlocks = 1 << 10;
-        int noOfChildren = 2;
+        HTreeComponents localHTreeComp = createHashTreeAndStorage(DEFAULT_SEG_DATA_BLOCKS_COUNT,
+                                                                  DEFAULT_NO_OF_CHILDREN);
+        HTreeComponents remoteHTreeComp = createHashTreeAndStorage(DEFAULT_SEG_DATA_BLOCKS_COUNT,
+                                                                   DEFAULT_NO_OF_CHILDREN);
 
-        HTreeComponents localHTreeComp = createHashTreeAndStorage(noOfSegDataBlocks, noOfChildren);
-        HTreeComponents remoteHTreeComp = createHashTreeAndStorage(noOfSegDataBlocks, noOfChildren);
-
-        for(int i = 1; i <= noOfSegDataBlocks; i++) {
+        for(int i = 1; i <= DEFAULT_SEG_DATA_BLOCKS_COUNT; i++) {
             localHTreeComp.storage.put(randomByteArray(), randomByteArray());
         }
 
         localHTreeComp.hTree.updateHashTrees();
         localHTreeComp.hTree.synch(1, remoteHTreeComp.hTree);
 
-        for(int i = 0; i < noOfSegDataBlocks; i++) {
+        for(int i = 0; i < DEFAULT_SEG_DATA_BLOCKS_COUNT; i++) {
             List<SegmentData> segBlock = remoteHTreeComp.hTree.getSegment(DEFAULT_TREE_ID, i);
             for(SegmentData sData: segBlock) {
                 localHTreeComp.storage.put(sData.getKey(), randomByteArray());

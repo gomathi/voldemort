@@ -26,6 +26,7 @@ import org.apache.log4j.Logger;
 
 import voldemort.annotations.concurrency.Threadsafe;
 import voldemort.utils.ByteArray;
+import voldemort.utils.ByteUtils;
 import voldemort.utils.CollectionPeekingIterator;
 import voldemort.utils.Pair;
 
@@ -343,8 +344,13 @@ public class HashTreeImpl implements HashTree {
         List<Integer> treeIds = treeIdProvider.getAllTreeIds();
         for(int treeId: treeIds) {
             List<Integer> dirtySegmentBuckets = hTStorage.clearAndGetDirtySegments(treeId);
-            List<Integer> dirtyLeafNodes = rebuildLeaves(treeId, dirtySegmentBuckets);
-            rebuildInternalNodes(treeId, dirtyLeafNodes);
+            Map<Integer, ByteArray> dirtyNodeAndDigestMap = rebuildLeaves(treeId,
+                                                                          dirtySegmentBuckets);
+            rebuildInternalNodes(treeId, dirtyNodeAndDigestMap);
+            for(Map.Entry<Integer, ByteArray> dirtyNodeAndDigest: dirtyNodeAndDigestMap.entrySet())
+                hTStorage.putSegmentHash(treeId,
+                                         dirtyNodeAndDigest.getKey(),
+                                         dirtyNodeAndDigest.getValue());
         }
     }
 
@@ -397,17 +403,16 @@ public class HashTreeImpl implements HashTree {
      * Rebuilds the dirty segments, and updates the segment hashes of the
      * leaves.
      * 
-     * @return, the nodes ids of leaves in the tree.
+     * @return, node ids, and uncommitted digest.
      */
-    private List<Integer> rebuildLeaves(int treeId, final List<Integer> dirtySegments) {
-        List<Integer> dirtyNodeIds = new ArrayList<Integer>();
+    private Map<Integer, ByteArray> rebuildLeaves(int treeId, final List<Integer> dirtySegments) {
+        Map<Integer, ByteArray> dirtyNodeIdAndDigestMap = new HashMap<Integer, ByteArray>();
         for(int dirtySegId: dirtySegments) {
             ByteArray digest = digestSegmentData(treeId, dirtySegId);
             int nodeId = getLeafIdFromSegmentId(dirtySegId);
-            hTStorage.putSegmentHash(treeId, nodeId, digest);
-            dirtyNodeIds.add(nodeId);
+            dirtyNodeIdAndDigestMap.put(nodeId, digest);
         }
-        return dirtyNodeIds;
+        return dirtyNodeIdAndDigestMap;
     }
 
     private ByteArray digestSegmentData(int treeId, int segId) {
@@ -423,20 +428,24 @@ public class HashTreeImpl implements HashTree {
     /**
      * Updates the segment hashes iteratively for each level on the tree.
      * 
-     * @param nodeIds
+     * @param nodeIdAndDigestMap
      */
-    private void rebuildInternalNodes(int treeId, final List<Integer> nodeIds) {
+    private void rebuildInternalNodes(int treeId, final Map<Integer, ByteArray> nodeIdAndDigestMap) {
         Set<Integer> parentNodeIds = new TreeSet<Integer>();
+        Set<Integer> nodeIds = new TreeSet<Integer>();
+        nodeIds.addAll(nodeIdAndDigestMap.keySet());
+
         while(!nodeIds.isEmpty()) {
-            for(int nodeId: nodeIds) {
+            for(int nodeId: nodeIds)
                 parentNodeIds.add(getParent(nodeId, this.childrenCountPerParent));
-            }
-            updateInternalNodes(treeId, parentNodeIds);
+
+            rebuildParentNodes(treeId, parentNodeIds, nodeIdAndDigestMap);
 
             nodeIds.clear();
             nodeIds.addAll(parentNodeIds);
             parentNodeIds.clear();
-            if(nodeIds.size() == 1 && nodeIds.get(0) == ROOT_NODE)
+
+            if(nodeIds.contains(ROOT_NODE))
                 break;
         }
     }
@@ -447,17 +456,29 @@ public class HashTreeImpl implements HashTree {
      * 
      * @param parentIds
      */
-    private void updateInternalNodes(int treeId, final Set<Integer> parentIds) {
-        List<SegmentHash> segmentHashes;
+    private void rebuildParentNodes(int treeId,
+                                    final Set<Integer> parentIds,
+                                    Map<Integer, ByteArray> nodeIdAndDigestMap) {
+        List<Integer> children;
+        String hashString;
+        SegmentHash segHash;
         StringBuilder sb = new StringBuilder();
+
         for(int parentId: parentIds) {
-            segmentHashes = hTStorage.getSegmentHashes(treeId,
-                                                       getImmediateChildren(parentId,
-                                                                            this.childrenCountPerParent));
-            for(SegmentHash sh: segmentHashes)
-                sb.append(sh.getHashString() + "\n");
+            children = getImmediateChildren(parentId, this.childrenCountPerParent);
+
+            for(int child: children) {
+                if(nodeIdAndDigestMap.containsKey(child))
+                    hashString = ByteUtils.toHexString(nodeIdAndDigestMap.get(child).get());
+                else {
+                    segHash = hTStorage.getSegmentHash(treeId, child);
+                    hashString = (segHash == null) ? null : segHash.getHashString();
+                }
+                if(hashString != null)
+                    sb.append(hashString + "\n");
+            }
             ByteArray digest = new ByteArray(sha1(sb.toString().getBytes()));
-            hTStorage.putSegmentHash(treeId, parentId, digest);
+            nodeIdAndDigestMap.put(parentId, digest);
             sb.setLength(0);
         }
     }
@@ -608,7 +629,10 @@ public class HashTreeImpl implements HashTree {
                                                       TimeUnit.MILLISECONDS);
             bgTasks.add(bgSyncTask);
 
-            BGStoppableTask bgRebuildTreeTask = new BGRebuildEntireTreeTask(shutdownLatch);
+            BGStoppableTask bgRebuildTreeTask = new BGRebuildEntireTreeTask(HashTreeImpl.this,
+                                                                            hTStorage,
+                                                                            storage,
+                                                                            shutdownLatch);
             scheduledExecutors.scheduleWithFixedDelay(bgRebuildTreeTask,
                                                       0,
                                                       REBUILD_HTREE_TIME_INTERVAL,
