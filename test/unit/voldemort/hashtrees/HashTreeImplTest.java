@@ -213,7 +213,7 @@ public class HashTreeImplTest {
         testTree.hPut(key, value);
         ByteArray digest = new ByteArray(ByteUtils.sha1(value.get()));
 
-        testTree.updateHashTrees();
+        testTree.updateHashTrees(false);
 
         StringBuffer sb = new StringBuffer();
         sb.append(new ByteArray(Bytes.concat(key.get(), digest.get())) + "\n");
@@ -241,11 +241,11 @@ public class HashTreeImplTest {
             localHTreeComp.storage.put(randomByteArray(), randomByteArray());
         }
 
-        localHTreeComp.hTree.updateHashTrees();
+        localHTreeComp.hTree.updateHashTrees(false);
         boolean anyUpdates = localHTreeComp.hTree.synch(1, remoteHTreeComp.hTree);
         Assert.assertTrue(anyUpdates);
 
-        remoteHTreeComp.hTree.updateHashTrees();
+        remoteHTreeComp.hTree.updateHashTrees(false);
         anyUpdates = localHTreeComp.hTree.synch(1, remoteHTreeComp.hTree);
         Assert.assertFalse(anyUpdates);
 
@@ -270,7 +270,7 @@ public class HashTreeImplTest {
             localHTreeComp.storage.put(randomByteArray(), randomByteArray());
         }
 
-        localHTreeComp.hTree.updateHashTrees();
+        localHTreeComp.hTree.updateHashTrees(false);
         localHTreeComp.hTree.synch(1, remoteHTreeComp.hTree);
 
         for(int i = 0; i < DEFAULT_SEG_DATA_BLOCKS_COUNT; i++) {
@@ -278,8 +278,8 @@ public class HashTreeImplTest {
             for(SegmentData sData: segBlock) {
                 localHTreeComp.storage.remove(sData.getKey());
             }
-            localHTreeComp.hTree.updateHashTrees();
-            remoteHTreeComp.hTree.updateHashTrees();
+            localHTreeComp.hTree.updateHashTrees(false);
+            remoteHTreeComp.hTree.updateHashTrees(false);
             localHTreeComp.hTree.synch(1, remoteHTreeComp.hTree);
 
             Assert.assertEquals(localHTreeComp.storage.localStorage,
@@ -301,16 +301,16 @@ public class HashTreeImplTest {
             localHTreeComp.storage.put(randomByteArray(), randomByteArray());
         }
 
-        localHTreeComp.hTree.updateHashTrees();
+        localHTreeComp.hTree.updateHashTrees(false);
         localHTreeComp.hTree.synch(1, remoteHTreeComp.hTree);
-        remoteHTreeComp.hTree.updateHashTrees();
+        remoteHTreeComp.hTree.updateHashTrees(false);
 
         for(int i = 0; i < DEFAULT_SEG_DATA_BLOCKS_COUNT; i++) {
             List<SegmentData> segBlock = remoteHTreeComp.hTree.getSegment(DEFAULT_TREE_ID, i);
             for(SegmentData sData: segBlock) {
                 remoteHTreeComp.storage.remove(sData.getKey());
             }
-            remoteHTreeComp.hTree.updateHashTrees();
+            remoteHTreeComp.hTree.updateHashTrees(false);
             localHTreeComp.hTree.synch(1, remoteHTreeComp.hTree);
 
             Assert.assertEquals(localHTreeComp.storage.localStorage,
@@ -329,7 +329,7 @@ public class HashTreeImplTest {
             localHTreeComp.storage.put(randomByteArray(), randomByteArray());
         }
 
-        localHTreeComp.hTree.updateHashTrees();
+        localHTreeComp.hTree.updateHashTrees(false);
         localHTreeComp.hTree.synch(1, remoteHTreeComp.hTree);
 
         for(int i = 0; i < DEFAULT_SEG_DATA_BLOCKS_COUNT; i++) {
@@ -337,8 +337,8 @@ public class HashTreeImplTest {
             for(SegmentData sData: segBlock) {
                 localHTreeComp.storage.put(sData.getKey(), randomByteArray());
             }
-            localHTreeComp.hTree.updateHashTrees();
-            remoteHTreeComp.hTree.updateHashTrees();
+            localHTreeComp.hTree.updateHashTrees(false);
+            remoteHTreeComp.hTree.updateHashTrees(false);
             localHTreeComp.hTree.synch(1, remoteHTreeComp.hTree);
 
             Assert.assertEquals(localHTreeComp.storage.localStorage,

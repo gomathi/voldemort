@@ -97,9 +97,33 @@ public interface HashTreeStorage {
     List<Integer> clearAndGetDirtySegments(int treeId);
 
     /**
+     * Unsets all dirty segments. Used during the tree rebuild.
+     * 
+     * @param treeId
+     */
+    void clearAllDirtySegments(int treeId);
+
+    /**
      * Deletes the segment hashes, and segment data for the given treeId.
      * 
      * @param treeId
      */
     void deleteTree(int treeId);
+
+    /**
+     * Stores the timestamp at which the complete HashTree was rebuilt. This
+     * method makes sure the given value is higher than the existing timestamp.
+     * 
+     * @param timestamp
+     * @return, a true status indicates successful update, and false indicates
+     *          unsuccessful update.
+     */
+    boolean setLastTreeBuildTimestamp(int treeId, long timestamp);
+
+    /**
+     * Returns the timestamp at which the complete HashTree was rebuilt.
+     * 
+     * @return
+     */
+    long getLastTreeBuildTimestamp(int treeId);
 }

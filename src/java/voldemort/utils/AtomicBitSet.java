@@ -95,6 +95,15 @@ public class AtomicBitSet {
     }
 
     /**
+     * Clears all the bits.
+     * 
+     */
+    public void clear() {
+        for(int i = 0; i < bitsHolder.length(); i++)
+            bitsHolder.set(i, 0);
+    }
+
+    /**
      * Clears the given bitIndex.
      * 
      * @param bitIndex, can not be negative or larger than or equal to the

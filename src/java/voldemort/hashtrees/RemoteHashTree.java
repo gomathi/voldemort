@@ -53,7 +53,7 @@ public class RemoteHashTree implements HashTree {
     }
 
     @Override
-    public void updateHashTrees() {}
+    public void updateHashTrees(boolean rebuild) {}
 
     @Override
     public void deleteTreeNodes(int treeId, Collection<Integer> nodeIds) {}
@@ -67,5 +67,8 @@ public class RemoteHashTree implements HashTree {
     public SegmentData getSegmentData(int treeId, int segId, ByteArray key) {
         return null;
     }
+
+    @Override
+    public void updateHashTree(int treeId, boolean fullRebuild) {}
 
 }

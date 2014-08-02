@@ -57,6 +57,11 @@ import voldemort.utils.Pair;
 @Threadsafe
 public class HashTreeImpl implements HashTree {
 
+    /**
+     * Expected time interval between two consecutive tree full rebuilds.
+     * 
+     */
+    public final static long EXP_INTERVAL_BW_REBUILDS = 25 * 60 * 1000; // in ms
     private final static Logger logger = Logger.getLogger(HashTreeImpl.class);
 
     private final static int ROOT_NODE = 0;
@@ -340,18 +345,42 @@ public class HashTreeImpl implements HashTree {
     }
 
     @Override
-    public void updateHashTrees() {
+    public void updateHashTrees(boolean fullRebuild) {
         List<Integer> treeIds = treeIdProvider.getAllTreeIds();
         for(int treeId: treeIds) {
-            List<Integer> dirtySegmentBuckets = hTStorage.clearAndGetDirtySegments(treeId);
-            Map<Integer, ByteArray> dirtyNodeAndDigestMap = rebuildLeaves(treeId,
-                                                                          dirtySegmentBuckets);
-            rebuildInternalNodes(treeId, dirtyNodeAndDigestMap);
-            for(Map.Entry<Integer, ByteArray> dirtyNodeAndDigest: dirtyNodeAndDigestMap.entrySet())
-                hTStorage.putSegmentHash(treeId,
-                                         dirtyNodeAndDigest.getKey(),
-                                         dirtyNodeAndDigest.getValue());
+            updateHashTree(treeId, fullRebuild);
         }
+    }
+
+    @Override
+    public void updateHashTree(int treeId, boolean fullRebuild) {
+        List<Integer> dirtySegmentBuckets = null;
+        if(fullRebuild) {
+            long currentTs = System.currentTimeMillis();
+            long lastRebuiltTs = hTStorage.getLastTreeBuildTimestamp(treeId);
+            if((lastRebuiltTs - currentTs) < EXP_INTERVAL_BW_REBUILDS) {
+                logger.info("HashTree was rebuilt recently. Not rebuilding again. Skipping the task.");
+                return;
+            }
+            boolean updated = hTStorage.setLastTreeBuildTimestamp(treeId, currentTs);
+            if(!updated) {
+                logger.info("Another task is already running. Skipping the task.");
+                return;
+            }
+            hTStorage.clearAllDirtySegments(treeId);
+        } else
+            dirtySegmentBuckets = hTStorage.clearAndGetDirtySegments(treeId);
+
+        Map<Integer, ByteArray> dirtyNodeAndDigestMap = (fullRebuild) ? (rebuildLeaves(treeId,
+                                                                                       0,
+                                                                                       MAX_NO_OF_BUCKETS))
+                                                                     : (rebuildLeaves(treeId,
+                                                                                      dirtySegmentBuckets));
+        rebuildInternalNodes(treeId, dirtyNodeAndDigestMap);
+        for(Map.Entry<Integer, ByteArray> dirtyNodeAndDigest: dirtyNodeAndDigestMap.entrySet())
+            hTStorage.putSegmentHash(treeId,
+                                     dirtyNodeAndDigest.getKey(),
+                                     dirtyNodeAndDigest.getValue());
     }
 
     @Override
@@ -397,6 +426,24 @@ public class HashTreeImpl implements HashTree {
                 storage.remove(segDataItr.next().getKey());
             }
         }
+    }
+
+    /**
+     * Rebuilds all segments, and updates the segment hashes of the leaves.
+     * 
+     * @param treeId, hash tree id
+     * @param startSegId, inclusive
+     * @param endSegId, exclusive
+     * @return, node ids, and uncommitted digest.
+     */
+    private Map<Integer, ByteArray> rebuildLeaves(int treeId, int fromSegId, int toSegId) {
+        Map<Integer, ByteArray> dirtyNodeIdAndDigestMap = new HashMap<Integer, ByteArray>();
+        for(int dirtySegId = fromSegId; dirtySegId < toSegId; dirtySegId++) {
+            ByteArray digest = digestSegmentData(treeId, dirtySegId);
+            int nodeId = getLeafIdFromSegmentId(dirtySegId);
+            dirtyNodeIdAndDigestMap.put(nodeId, digest);
+        }
+        return dirtyNodeIdAndDigestMap;
     }
 
     /**
@@ -630,8 +677,6 @@ public class HashTreeImpl implements HashTree {
             bgTasks.add(bgSyncTask);
 
             BGStoppableTask bgRebuildTreeTask = new BGRebuildEntireTreeTask(HashTreeImpl.this,
-                                                                            hTStorage,
-                                                                            storage,
                                                                             shutdownLatch);
             scheduledExecutors.scheduleWithFixedDelay(bgRebuildTreeTask,
                                                       0,

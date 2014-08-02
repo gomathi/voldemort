@@ -131,7 +131,17 @@ public interface HashTree {
      * key change. Rather tree is rebuilt at regular intervals. This function
      * provides an option to make a force call to update the entire tree.
      */
-    void updateHashTrees();
+    void updateHashTrees(boolean fullRebuild);
+
+    /**
+     * Updates segment hashes based on the dirty entries.
+     * 
+     * @param treeId
+     * @param fullRebuild, false indicates only update the hash trees based on
+     *        the dirty entries, true indicates complete rebuild of the tree
+     *        irrespective of dirty markers.
+     */
+    void updateHashTree(int treeId, boolean fullRebuild);
 
     /**
      * Deletes tree nodes from the hash tree, and the corresponding segments.

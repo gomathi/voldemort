@@ -8,7 +8,9 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ConcurrentSkipListMap;
+import java.util.concurrent.atomic.AtomicLong;
 
+import voldemort.annotations.concurrency.Threadsafe;
 import voldemort.utils.AtomicBitSet;
 import voldemort.utils.ByteArray;
 
@@ -17,11 +19,13 @@ import voldemort.utils.ByteArray;
  * such hash tree.
  * 
  */
+@Threadsafe
 class IndHashTreeStorageInMemory {
 
     private final ConcurrentMap<Integer, ByteArray> segmentHashes = new ConcurrentSkipListMap<Integer, ByteArray>();
     private final ConcurrentMap<Integer, ConcurrentSkipListMap<ByteArray, ByteArray>> segDataBlocks = new ConcurrentHashMap<Integer, ConcurrentSkipListMap<ByteArray, ByteArray>>();
     private final AtomicBitSet dirtySegments;
+    private final AtomicLong rebuiltTreeTs = new AtomicLong(0);
 
     public IndHashTreeStorageInMemory(int noOfSegDataBlocks) {
         this.dirtySegments = new AtomicBitSet(noOfSegDataBlocks);
@@ -84,7 +88,25 @@ class IndHashTreeStorageInMemory {
         dirtySegments.set(segId);
     }
 
+    public void clearDirtySegments() {
+        dirtySegments.clear();
+    }
+
     public List<Integer> clearAndGetDirtySegments() {
         return dirtySegments.clearAndGetAllSetBits();
+    }
+
+    public boolean setLastTreeBuildTimestamp(long timestamp) {
+        long oldValue = rebuiltTreeTs.get();
+        while(oldValue < timestamp) {
+            if(rebuiltTreeTs.compareAndSet(oldValue, timestamp))
+                return true;
+            oldValue = rebuiltTreeTs.get();
+        }
+        return false;
+    }
+
+    public long getLastTreeBuildTimestamp() {
+        return rebuiltTreeTs.get();
     }
 }

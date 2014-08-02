@@ -78,4 +78,19 @@ public class HashTreeStorageInMemory implements HashTreeStorage {
         return getIndHTree(treeId).getSegmentHash(nodeId);
     }
 
+    @Override
+    public void clearAllDirtySegments(int treeId) {
+        getIndHTree(treeId).clearDirtySegments();
+    }
+
+    @Override
+    public boolean setLastTreeBuildTimestamp(int treeId, long timestamp) {
+        return getIndHTree(treeId).setLastTreeBuildTimestamp(timestamp);
+    }
+
+    @Override
+    public long getLastTreeBuildTimestamp(int treeId) {
+        return getIndHTree(treeId).getLastTreeBuildTimestamp();
+    }
+
 }
