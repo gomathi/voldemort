@@ -22,11 +22,7 @@ public class BGRebuildSegmentTreeTask extends BGStoppableTask {
     public void run() {
         if(enableRunningStatus()) {
             try {
-                long startTime = System.currentTimeMillis();
-                hTree.updateHashTrees(false);
-                long endTime = System.currentTimeMillis();
-                logger.debug("Total time taken to update segment hashes : (in ms)"
-                             + (endTime - startTime));
+                rebuildSegmentTrees();
             } finally {
                 disableRunningStatus();
             }
@@ -34,4 +30,11 @@ public class BGRebuildSegmentTreeTask extends BGStoppableTask {
             logger.debug("Another rebuild task is already running. Skipping this task.");
     }
 
+    private void rebuildSegmentTrees() {
+        logger.info("Updating segment hashes : ");
+        long startTime = System.currentTimeMillis();
+        hTree.updateHashTrees(false);
+        long endTime = System.currentTimeMillis();
+        logger.info("Total time taken to update segment hashes : (in ms)" + (endTime - startTime));
+    }
 }

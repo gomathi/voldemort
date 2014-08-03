@@ -7,7 +7,12 @@ import org.apache.log4j.Logger;
 import voldemort.annotations.concurrency.Threadsafe;
 
 /**
- * This reads all the keys from storage, and rebuilds the complete HTree.
+ * This reads all the keys from storage, and rebuilds the complete HashTree.
+ * 
+ * It is possible that, key values are added/removed directly to/from the
+ * storage. In that case, HashTree will be diverging from the original key
+ * values. So it is necessary that we rebuild the HashTree at regular intervals
+ * to avoid diverging.
  */
 
 @Threadsafe

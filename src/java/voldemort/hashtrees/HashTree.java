@@ -61,6 +61,14 @@ public interface HashTree {
     void sRemove(List<ByteArray> key);
 
     /**
+     * If the HashTree is getting initialized now, then this function returns
+     * false. Otherwise returns true.
+     * 
+     * @return
+     */
+    boolean isReadyForSynch(int treeId);
+
+    /**
      * Updates the other HTree based on the differences with local objects.
      * 
      * This function should be running on primary to synch with other replicas,
@@ -130,6 +138,9 @@ public interface HashTree {
      * Hash tree implementations do not update the segment hashes tree on every
      * key change. Rather tree is rebuilt at regular intervals. This function
      * provides an option to make a force call to update the entire tree.
+     * 
+     * @param fullRebuild, indicates whether to rebuild all segments, or just
+     *        the dirty segments.
      */
     void updateHashTrees(boolean fullRebuild);
 

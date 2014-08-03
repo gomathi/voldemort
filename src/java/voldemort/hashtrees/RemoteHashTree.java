@@ -71,4 +71,9 @@ public class RemoteHashTree implements HashTree {
     @Override
     public void updateHashTree(int treeId, boolean fullRebuild) {}
 
+    @Override
+    public boolean isReadyForSynch(int treeId) {
+        return false;
+    }
+
 }

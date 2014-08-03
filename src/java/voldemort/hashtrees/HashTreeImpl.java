@@ -61,11 +61,6 @@ import voldemort.utils.Pair;
 @Threadsafe
 public class HashTreeImpl implements HashTree {
 
-    /**
-     * Expected time interval between two consecutive tree full rebuilds.
-     * 
-     */
-    public final static long EXP_INTERVAL_BW_REBUILDS = 25 * 60 * 1000; // in ms
     private final static Logger logger = Logger.getLogger(HashTreeImpl.class);
 
     private final static int ROOT_NODE = 0;
@@ -104,8 +99,6 @@ public class HashTreeImpl implements HashTree {
         this.storage = storage;
         this.bgTasksMgr = (executors == null) ? null : new BGTasksManager(executors);
         this.enabledBGTasks = (executors == null) ? false : true;
-        if(enabledBGTasks)
-            bgTasksMgr.startBackgroundTasks();
     }
 
     /**
@@ -201,6 +194,12 @@ public class HashTreeImpl implements HashTree {
 
     @Override
     public boolean synch(int treeId, final HashTree remoteTree) {
+
+        if(!isReadyForSynch(treeId) || !remoteTree.isReadyForSynch(treeId)) {
+            logger.info("HashTree has not been initialized. Not doing the sync. Skipping the task");
+            return false;
+        }
+
         Collection<Integer> leafNodesToCheck = new ArrayList<Integer>();
         Collection<Integer> missingNodesInRemote = new ArrayList<Integer>();
         Collection<Integer> missingNodesInLocal = new ArrayList<Integer>();
@@ -349,21 +348,30 @@ public class HashTreeImpl implements HashTree {
         return hTStorage.getSegment(treeId, segId);
     }
 
-    private boolean acquireSyncLock(int treeId) {
-        syncLocks.putIfAbsent(treeId, new ReentrantLock());
+    private boolean acquireSyncLock(int treeId, boolean waitForLock) {
+        if(!syncLocks.containsKey(treeId)) {
+            ReentrantLock lock = new ReentrantLock();
+            syncLocks.putIfAbsent(treeId, lock);
+        }
         Lock lock = syncLocks.get(treeId);
+        if(waitForLock) {
+            lock.lock();
+            return true;
+        }
         return lock.tryLock();
     }
 
     private void releaseSyncLock(int treeId) {
-        syncLocks.get(treeId).unlock();
+        syncLocks.get(treeId);
     }
 
     @Override
     public void updateHashTrees(boolean fullRebuild) {
         List<Integer> treeIds = treeIdProvider.getAllTreeIds();
         for(int treeId: treeIds) {
-            if(acquireSyncLock(treeId)) {
+            boolean acquiredLock = fullRebuild ? acquireSyncLock(treeId, true)
+                                              : acquireSyncLock(treeId, false);
+            if(acquiredLock) {
                 try {
                     updateHashTree(treeId, fullRebuild);
                 } finally {
@@ -376,14 +384,14 @@ public class HashTreeImpl implements HashTree {
     @Override
     public void updateHashTree(int treeId, boolean fullRebuild) {
         List<Integer> dirtySegmentBuckets = null;
+        long currentTs = 0;
         if(fullRebuild) {
-            long currentTs = System.currentTimeMillis();
+            currentTs = System.currentTimeMillis();
             long lastRebuiltTs = hTStorage.getLastTreeBuildTimestamp(treeId);
-            if((lastRebuiltTs - currentTs) < EXP_INTERVAL_BW_REBUILDS) {
-                logger.info("HashTree was rebuilt recently. Not rebuilding again. Skipping the task.");
+            if((lastRebuiltTs - currentTs) < BGTasksManager.EXP_INTERVAL_BW_REBUILDS) {
+                logger.debug("HashTree was rebuilt recently. Not rebuilding again. Skipping the task.");
                 return;
             }
-            hTStorage.setLastTreeBuildTimestamp(treeId, currentTs);
             hTStorage.clearAllDirtySegments(treeId);
         } else
             dirtySegmentBuckets = hTStorage.clearAndGetDirtySegments(treeId);
@@ -398,6 +406,8 @@ public class HashTreeImpl implements HashTree {
             hTStorage.putSegmentHash(treeId,
                                      dirtyNodeAndDigest.getKey(),
                                      dirtyNodeAndDigest.getValue());
+        if(fullRebuild)
+            hTStorage.setLastTreeBuildTimestamp(treeId, currentTs);
     }
 
     @Override
@@ -615,6 +625,11 @@ public class HashTreeImpl implements HashTree {
                                                            : 1);
     }
 
+    public void startBGTasks() {
+        if(enabledBGTasks)
+            bgTasksMgr.startBackgroundTasks();
+    }
+
     public void shutdown() {
         if(enabledBGTasks) {
             bgTasksMgr.safeShutdown();
@@ -653,10 +668,15 @@ public class HashTreeImpl implements HashTree {
      */
     private class BGTasksManager {
 
-        // In milliseconds
+        // Rebuild segment time interval, not full rebuild, but rebuild of dirty
+        // segments, in milliseconds. Should be scheduled in shorter intervals.
         private final static long REBUILD_SEG_TIME_INTERVAL = 2 * 60 * 1000;
-        private final static long REBUILD_HTREE_TIME_INTERVAL = 30 * 60 * 1000;
+        // Rebuild of the complete tree. Should be scheduled in longer
+        // intervals.
+        private final static long REBUILD_HTREE_TIME_INTERVAL = 7 * 60 * 1000;
         private final static long REMOTE_TREE_SYNCH_INTERVAL = 5 * 60 * 1000;
+        // Expected time interval between two consecutive tree full rebuilds.
+        private final static long EXP_INTERVAL_BW_REBUILDS = 25 * 60 * 1000;
 
         private final ExecutorService executors;
         private final ScheduledExecutorService scheduledExecutors;
@@ -731,7 +751,12 @@ public class HashTreeImpl implements HashTree {
             }
             executors.shutdownNow();
             scheduledExecutors.shutdownNow();
+            logger.info("HashTree has shut down.");
         }
     }
 
+    @Override
+    public boolean isReadyForSynch(int treeId) {
+        return hTStorage.getLastTreeBuildTimestamp(treeId) > 0;
+    }
 }

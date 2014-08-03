@@ -14,18 +14,12 @@ import voldemort.utils.ByteArray;
 public class HashTreePersistentStorage implements HashTreeStorage {
 
     @Override
-    public void putSegmentData(int treeId, int segId, ByteArray key, ByteArray digest) {}
+    public void putSegmentHash(int treeId, int nodeId, ByteArray digest) {}
 
     @Override
-    public void deleteSegmentData(int treeId, int segId, ByteArray key) {}
-
-    @Override
-    public List<SegmentData> getSegment(int treeId, int segId) {
+    public SegmentHash getSegmentHash(int treeId, int nodeId) {
         return null;
     }
-
-    @Override
-    public void putSegmentHash(int treeId, int nodeId, ByteArray digest) {}
 
     @Override
     public List<SegmentHash> getSegmentHashes(int treeId, Collection<Integer> nodeIds) {
@@ -41,7 +35,21 @@ public class HashTreePersistentStorage implements HashTreeStorage {
     }
 
     @Override
+    public void clearAllDirtySegments(int treeId) {}
+
+    @Override
+    public void setLastTreeBuildTimestamp(int treeId, long timestamp) {}
+
+    @Override
+    public long getLastTreeBuildTimestamp(int treeId) {
+        return 0;
+    }
+
+    @Override
     public void deleteTree(int treeId) {}
+
+    @Override
+    public void putSegmentData(int treeId, int segId, ByteArray key, ByteArray digest) {}
 
     @Override
     public SegmentData getSegmentData(int treeId, int segId, ByteArray key) {
@@ -49,19 +57,10 @@ public class HashTreePersistentStorage implements HashTreeStorage {
     }
 
     @Override
-    public SegmentHash getSegmentHash(int treeId, int nodeId) {
+    public void deleteSegmentData(int treeId, int segId, ByteArray key) {}
+
+    @Override
+    public List<SegmentData> getSegment(int treeId, int segId) {
         return null;
     }
-
-    @Override
-    public void setLastTreeBuildTimestamp(int treeId, long timestamp) {}
-
-    @Override
-    public void clearAllDirtySegments(int treeId) {}
-
-    @Override
-    public long getLastTreeBuildTimestamp(int treeId) {
-        return 0;
-    }
-
 }
