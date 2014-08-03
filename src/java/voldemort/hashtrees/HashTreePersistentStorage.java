@@ -54,9 +54,7 @@ public class HashTreePersistentStorage implements HashTreeStorage {
     }
 
     @Override
-    public boolean setLastTreeBuildTimestamp(int treeId, long timestamp) {
-        return false;
-    }
+    public void setLastTreeBuildTimestamp(int treeId, long timestamp) {}
 
     @Override
     public void clearAllDirtySegments(int treeId) {}

@@ -96,14 +96,13 @@ class IndHashTreeStorageInMemory {
         return dirtySegments.clearAndGetAllSetBits();
     }
 
-    public boolean setLastTreeBuildTimestamp(long timestamp) {
+    public void setLastTreeBuildTimestamp(long timestamp) {
         long oldValue = rebuiltTreeTs.get();
         while(oldValue < timestamp) {
             if(rebuiltTreeTs.compareAndSet(oldValue, timestamp))
-                return true;
+                break;
             oldValue = rebuiltTreeTs.get();
         }
-        return false;
     }
 
     public long getLastTreeBuildTimestamp() {

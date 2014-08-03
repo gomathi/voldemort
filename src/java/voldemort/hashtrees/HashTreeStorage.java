@@ -112,13 +112,12 @@ public interface HashTreeStorage {
 
     /**
      * Stores the timestamp at which the complete HashTree was rebuilt. This
-     * method makes sure the given value is higher than the existing timestamp.
+     * method updates the value in storage only if the given value is higher
+     * than the existing timestamp, otherwise a noop.
      * 
      * @param timestamp
-     * @return, a true status indicates successful update, and false indicates
-     *          unsuccessful update.
      */
-    boolean setLastTreeBuildTimestamp(int treeId, long timestamp);
+    void setLastTreeBuildTimestamp(int treeId, long timestamp);
 
     /**
      * Returns the timestamp at which the complete HashTree was rebuilt.

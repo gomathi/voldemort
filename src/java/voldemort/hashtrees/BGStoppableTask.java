@@ -1,6 +1,7 @@
 package voldemort.hashtrees;
 
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.locks.ReentrantLock;
 
 import voldemort.annotations.concurrency.Threadsafe;
 import voldemort.utils.Stoppable;
@@ -22,16 +23,12 @@ import voldemort.utils.Stoppable;
 public abstract class BGStoppableTask implements Runnable, Stoppable {
 
     // all variables are locked by instance of this object.
-    private boolean running = false;
+    private final ReentrantLock runLock = new ReentrantLock();
     private volatile boolean stopRequested = false;
     private final CountDownLatch shutdownLatch;
 
     public BGStoppableTask(CountDownLatch shutdownLatch) {
         this.shutdownLatch = shutdownLatch;
-    }
-
-    public synchronized boolean isRunning() {
-        return running;
     }
 
     /**
@@ -41,16 +38,13 @@ public abstract class BGStoppableTask implements Runnable, Stoppable {
      * @return
      */
     protected synchronized boolean enableRunningStatus() {
-        if(stopRequested || running)
+        if(stopRequested)
             return false;
-        running = true;
-        return true;
+        return runLock.tryLock();
     }
 
     protected synchronized void disableRunningStatus() {
-        if(!running)
-            return;
-        running = false;
+        runLock.unlock();
         if(stopRequested)
             shutdownLatch.countDown();
     }
@@ -64,7 +58,7 @@ public abstract class BGStoppableTask implements Runnable, Stoppable {
         if(stopRequested)
             return;
         stopRequested = true;
-        if(!running)
+        if(!runLock.isLocked())
             shutdownLatch.countDown();
     }
 

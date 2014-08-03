@@ -16,11 +16,15 @@ import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 import org.apache.log4j.Logger;
 
@@ -79,6 +83,7 @@ public class HashTreeImpl implements HashTree {
 
     private final boolean enabledBGTasks;
     private final BGTasksManager bgTasksMgr;
+    private final ConcurrentMap<Integer, ReentrantLock> syncLocks = new ConcurrentHashMap<Integer, ReentrantLock>();
 
     public HashTreeImpl(int noOfSegments,
                         int noOfChildrenPerParent,
@@ -344,11 +349,27 @@ public class HashTreeImpl implements HashTree {
         return hTStorage.getSegment(treeId, segId);
     }
 
+    private boolean acquireSyncLock(int treeId) {
+        syncLocks.putIfAbsent(treeId, new ReentrantLock());
+        Lock lock = syncLocks.get(treeId);
+        return lock.tryLock();
+    }
+
+    private void releaseSyncLock(int treeId) {
+        syncLocks.get(treeId).unlock();
+    }
+
     @Override
     public void updateHashTrees(boolean fullRebuild) {
         List<Integer> treeIds = treeIdProvider.getAllTreeIds();
         for(int treeId: treeIds) {
-            updateHashTree(treeId, fullRebuild);
+            if(acquireSyncLock(treeId)) {
+                try {
+                    updateHashTree(treeId, fullRebuild);
+                } finally {
+                    releaseSyncLock(treeId);
+                }
+            }
         }
     }
 
@@ -362,11 +383,7 @@ public class HashTreeImpl implements HashTree {
                 logger.info("HashTree was rebuilt recently. Not rebuilding again. Skipping the task.");
                 return;
             }
-            boolean updated = hTStorage.setLastTreeBuildTimestamp(treeId, currentTs);
-            if(!updated) {
-                logger.info("Another task is already running. Skipping the task.");
-                return;
-            }
+            hTStorage.setLastTreeBuildTimestamp(treeId, currentTs);
             hTStorage.clearAllDirtySegments(treeId);
         } else
             dirtySegmentBuckets = hTStorage.clearAndGetDirtySegments(treeId);

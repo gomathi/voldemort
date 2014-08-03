@@ -84,8 +84,8 @@ public class HashTreeStorageInMemory implements HashTreeStorage {
     }
 
     @Override
-    public boolean setLastTreeBuildTimestamp(int treeId, long timestamp) {
-        return getIndHTree(treeId).setLastTreeBuildTimestamp(timestamp);
+    public void setLastTreeBuildTimestamp(int treeId, long timestamp) {
+        getIndHTree(treeId).setLastTreeBuildTimestamp(timestamp);
     }
 
     @Override
