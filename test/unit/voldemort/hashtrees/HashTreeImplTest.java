@@ -109,7 +109,7 @@ public class HashTreeImplTest {
     private static final Random RANDOM = new Random(System.currentTimeMillis());
     private static final int ROOT_NODE = 0;
     private static final int DEFAULT_TREE_ID = 1;
-    private static final int DEFAULT_SEG_DATA_BLOCKS_COUNT = 1 << 5;
+    private static final int DEFAULT_SEG_DATA_BLOCKS_COUNT = 1 << 10;
     private static final int DEFAULT_NO_OF_CHILDREN = 2;
 
     private static byte[] randomBytes() {
@@ -119,7 +119,7 @@ public class HashTreeImplTest {
     }
 
     private static ByteArray randomByteArray() {
-        byte[] random = new byte[16];
+        byte[] random = new byte[8];
         RANDOM.nextBytes(random);
         return new ByteArray(random);
     }

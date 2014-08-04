@@ -20,8 +20,15 @@ import voldemort.utils.ByteArray;
 import voldemort.utils.ByteUtils;
 
 /**
- * Uses level db for storing segment data. Uses {@link HashTreeStorageInMemory}
- * for storing segment hashes.
+ * Uses LevelDB for storing segment hashes and segment data. Dirty segment
+ * markers are stored in memory.
+ * 
+ * Stores the following data
+ * 
+ * 1) Metadata info [Like when the tree was built fully last time]. Format is
+ * ['M'|key] -> [value] 2) SegmentData, format is ['S'|treeId|segId|key] ->
+ * [value] 3) SegmentHash, format is ['H'|treeId|nodeId] -> [value]
+ * 
  * 
  */
 
@@ -203,7 +210,7 @@ public class HashTreePersistentStorage implements HashTreeStorage {
         try {
             for(iterator.seek(startKey); iterator.hasNext(); iterator.next()) {
                 ByteArray key = new ByteArray(readSegmentDataKey(iterator.peekNext().getKey()));
-                if(hasEndKey && ByteUtils.compare(endKey, key.get()) == 0)
+                if(hasEndKey && ByteUtils.compare(endKey, iterator.peekNext().getKey()) == 0)
                     break;
                 ByteArray digest = new ByteArray(iterator.peekNext().getValue());
                 result.add(new SegmentData(key, digest));
