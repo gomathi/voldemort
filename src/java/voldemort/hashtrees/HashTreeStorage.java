@@ -101,7 +101,7 @@ public interface HashTreeStorage {
      * 
      * @param treeId
      */
-    void clearAllDirtySegments(int treeId);
+    void clearAllSegments(int treeId);
 
     /**
      * Deletes the segment hashes, and segment data for the given treeId.

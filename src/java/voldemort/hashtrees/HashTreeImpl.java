@@ -392,7 +392,7 @@ public class HashTreeImpl implements HashTree {
                 logger.debug("HashTree was rebuilt recently. Not rebuilding again. Skipping the task.");
                 return;
             }
-            hTStorage.clearAllDirtySegments(treeId);
+            hTStorage.clearAllSegments(treeId);
         } else
             dirtySegmentBuckets = hTStorage.clearAndGetDirtySegments(treeId);
 
@@ -433,15 +433,15 @@ public class HashTreeImpl implements HashTree {
     }
 
     @Override
-    public void addTreeToSyncList(String hostName, HashTree remoteTree) {
+    public void addTreeToSyncList(String hostName, int treeId) {
         if(enabledBGTasks)
-            bgTasksMgr.bgSyncTask.add(hostName, remoteTree);
+            bgTasksMgr.bgSyncTask.add(hostName, treeId);
     }
 
     @Override
-    public void removeTreeFromSyncList(String hostName) {
+    public void removeTreeFromSyncList(String hostName, int treeId) {
         if(enabledBGTasks)
-            bgTasksMgr.bgSyncTask.remove(hostName);
+            bgTasksMgr.bgSyncTask.remove(hostName, treeId);
     }
 
     @Override
@@ -699,7 +699,7 @@ public class HashTreeImpl implements HashTree {
 
             this.bgTasks = new ArrayList<BGStoppableTask>();
             this.bgSegDataUpdater = new BGSegmentDataUpdater(shutdownLatch, HashTreeImpl.this);
-            this.bgSyncTask = new BGSynchTask(shutdownLatch);
+            this.bgSyncTask = new BGSynchTask(shutdownLatch, HashTreeImpl.this);
 
         }
 

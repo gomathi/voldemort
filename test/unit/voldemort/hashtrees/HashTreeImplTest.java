@@ -1,5 +1,6 @@
 package voldemort.hashtrees;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -108,7 +109,7 @@ public class HashTreeImplTest {
     private static final Random RANDOM = new Random(System.currentTimeMillis());
     private static final int ROOT_NODE = 0;
     private static final int DEFAULT_TREE_ID = 1;
-    private static final int DEFAULT_SEG_DATA_BLOCKS_COUNT = 1 << 10;
+    private static final int DEFAULT_SEG_DATA_BLOCKS_COUNT = 1 << 5;
     private static final int DEFAULT_NO_OF_CHILDREN = 2;
 
     private static byte[] randomBytes() {
@@ -126,7 +127,14 @@ public class HashTreeImplTest {
     private static HTreeComponents createHashTreeAndStorage(int noOfSegDataBlocks,
                                                             HashTreeIdProvider treeIdProv,
                                                             SegmentIdProvider segIdPro) {
-        HashTreeStorage hTStorage = new HashTreeStorageInMemory(noOfSegDataBlocks);
+        HashTreeStorage hTStorage;
+        try {
+            hTStorage = new HashTreePersistentStorage("/tmp/test/random.txt" + RANDOM.nextInt(),
+                                                      noOfSegDataBlocks);
+        } catch(IOException e) {
+            // TODO Auto-generated catch block
+            throw new RuntimeException(e);
+        }
         StorageImplTest storage = new StorageImplTest();
         HashTree hTree = new HashTreeImpl(noOfSegDataBlocks,
                                           treeIdProv,
@@ -139,7 +147,14 @@ public class HashTreeImplTest {
     private static HTreeComponents createHashTreeAndStorage(int noOfSegments,
                                                             int noOfChildrenPerParent) {
         HashTreeIdProvider treeIdProvider = new HashTreeIdProviderTest();
-        HashTreeStorage hTStorage = new HashTreeStorageInMemory(noOfSegments);
+        HashTreeStorage hTStorage;
+        try {
+            hTStorage = new HashTreePersistentStorage("/tmp/test/random.txt" + RANDOM.nextInt(),
+                                                      noOfSegments);
+        } catch(IOException e) {
+            // TODO Auto-generated catch block
+            throw new RuntimeException();
+        }
         StorageImplTest storage = new StorageImplTest();
         HashTree hTree = new HashTreeImpl(noOfSegments,
                                           noOfChildrenPerParent,

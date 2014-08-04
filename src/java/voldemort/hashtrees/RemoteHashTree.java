@@ -37,10 +37,10 @@ public class RemoteHashTree implements HashTree {
     }
 
     @Override
-    public void addTreeToSyncList(String hostName, HashTree remoteTree) {}
+    public void addTreeToSyncList(String hostName, int treeId) {}
 
     @Override
-    public void removeTreeFromSyncList(String hostName) {}
+    public void removeTreeFromSyncList(String hostName, int treeId) {}
 
     @Override
     public List<SegmentHash> getSegmentHashes(int treeId, Collection<Integer> nodeIds) {

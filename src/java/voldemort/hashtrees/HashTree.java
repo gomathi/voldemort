@@ -85,16 +85,19 @@ public interface HashTree {
      * to update remote hash trees. This function adds a remote tree to synch
      * list.
      * 
-     * @param remoteTree
+     * @param hostName
+     * @param treeId
+     * 
      */
-    void addTreeToSyncList(String hostName, HashTree remoteTree);
+    void addTreeToSyncList(String hostName, int treeId);
 
     /**
      * Removes the remoteTree from sync list.
      * 
      * @param remoteTree
+     * @param treeId
      */
-    void removeTreeFromSyncList(String hostName);
+    void removeTreeFromSyncList(String hostName, int treeId);
 
     /**
      * Returns the segment hash that is stored on the tree.

@@ -79,7 +79,7 @@ public class HashTreeStorageInMemory implements HashTreeStorage {
     }
 
     @Override
-    public void clearAllDirtySegments(int treeId) {
+    public void clearAllSegments(int treeId) {
         getIndHTree(treeId).clearDirtySegments();
     }
 
