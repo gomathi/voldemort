@@ -1,10 +1,11 @@
 package voldemort.hashtrees;
 
-import java.util.Collection;
+import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Map;
 
-import voldemort.utils.ByteArray;
+import voldemort.hashtrees.thrift.SegmentData;
+import voldemort.hashtrees.thrift.SegmentHash;
 
 /**
  * Defines Hash tree methods. Hash tree provides a way for nodes to synch up
@@ -19,14 +20,14 @@ public interface HashTree {
      * @param key
      * @param value
      */
-    void hPut(ByteArray key, ByteArray value);
+    void hPut(ByteBuffer key, ByteBuffer value);
 
     /**
      * Deletes the key from the hash tree.
      * 
      * @param key
      */
-    void hRemove(ByteArray key);
+    void hRemove(ByteBuffer key);
 
     /**
      * Adds the key,value pair to the storage, not the hash tree. This is used
@@ -35,7 +36,7 @@ public interface HashTree {
      * @param key
      * @param value
      */
-    void sPut(ByteArray key, ByteArray value);
+    void sPut(ByteBuffer key, ByteBuffer value);
 
     /**
      * Adds the (key,value) pair to the original storage. Intended to be used
@@ -44,21 +45,21 @@ public interface HashTree {
      * @param key
      * @param value
      */
-    void sPut(Map<ByteArray, ByteArray> keyValuePairs);
+    void sPut(Map<ByteBuffer, ByteBuffer> keyValuePairs);
 
     /**
      * Removes the key from storage.
      * 
      * @param key
      */
-    void sRemove(ByteArray key);
+    void sRemove(ByteBuffer key);
 
     /**
      * Deletes the keys from the storage. While synching this function is used.
      * 
      * @param key
      */
-    void sRemove(List<ByteArray> key);
+    void sRemove(List<ByteBuffer> key);
 
     /**
      * If the HashTree is getting initialized now, then this function returns
@@ -116,7 +117,7 @@ public interface HashTree {
      * @param nodeIds, internal tree node ids.
      * @return
      */
-    List<SegmentHash> getSegmentHashes(int treeId, Collection<Integer> nodeIds);
+    List<SegmentHash> getSegmentHashes(int treeId, List<Integer> nodeIds);
 
     /**
      * Returns the (key,digest) for the given key in the given segment.
@@ -126,7 +127,7 @@ public interface HashTree {
      * @param key
      * @return
      */
-    SegmentData getSegmentData(int treeId, int segId, ByteArray key);
+    SegmentData getSegmentData(int treeId, int segId, ByteBuffer key);
 
     /**
      * Hash tree data is stored on the leaf blocks. Given a segment id this
@@ -163,5 +164,5 @@ public interface HashTree {
      * @param treeId
      * @param nodeIds
      */
-    void deleteTreeNodes(int treeId, Collection<Integer> nodeIds);
+    void deleteTreeNodes(int treeId, List<Integer> nodeIds);
 }

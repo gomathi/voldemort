@@ -1,12 +1,14 @@
 package voldemort.hashtrees;
 
+import java.nio.ByteBuffer;
 import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
 import voldemort.annotations.concurrency.Threadsafe;
-import voldemort.utils.ByteArray;
+import voldemort.hashtrees.thrift.SegmentData;
+import voldemort.hashtrees.thrift.SegmentHash;
 
 /**
  * In memory implementation of {@link HashTreeStorage}, can be used for testing,
@@ -24,17 +26,19 @@ public class HashTreeStorageInMemory implements HashTreeStorage {
     }
 
     private IndHashTreeStorageInMemory getIndHTree(int treeId) {
-        treeIdAndIndHashTree.putIfAbsent(treeId, new IndHashTreeStorageInMemory(noOfSegDataBlocks));
+        if(!treeIdAndIndHashTree.containsKey(treeId))
+            treeIdAndIndHashTree.putIfAbsent(treeId,
+                                             new IndHashTreeStorageInMemory(noOfSegDataBlocks));
         return treeIdAndIndHashTree.get(treeId);
     }
 
     @Override
-    public void putSegmentData(int treeId, int segId, ByteArray key, ByteArray digest) {
+    public void putSegmentData(int treeId, int segId, ByteBuffer key, ByteBuffer digest) {
         getIndHTree(treeId).putSegmentData(segId, key, digest);
     }
 
     @Override
-    public void deleteSegmentData(int treeId, int segId, ByteArray key) {
+    public void deleteSegmentData(int treeId, int segId, ByteBuffer key) {
         getIndHTree(treeId).deleteSegmentData(segId, key);
     }
 
@@ -44,7 +48,7 @@ public class HashTreeStorageInMemory implements HashTreeStorage {
     }
 
     @Override
-    public void putSegmentHash(int treeId, int nodeId, ByteArray digest) {
+    public void putSegmentHash(int treeId, int nodeId, ByteBuffer digest) {
         getIndHTree(treeId).putSegmentHash(nodeId, digest);
     }
 
@@ -69,7 +73,7 @@ public class HashTreeStorageInMemory implements HashTreeStorage {
     }
 
     @Override
-    public SegmentData getSegmentData(int treeId, int segId, ByteArray key) {
+    public SegmentData getSegmentData(int treeId, int segId, ByteBuffer key) {
         return getIndHTree(treeId).getSegmentData(segId, key);
     }
 

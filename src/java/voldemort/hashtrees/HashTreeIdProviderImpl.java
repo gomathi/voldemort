@@ -1,13 +1,12 @@
 package voldemort.hashtrees;
 
+import java.nio.ByteBuffer;
 import java.util.List;
-
-import voldemort.utils.ByteArray;
 
 public class HashTreeIdProviderImpl implements HashTreeIdProvider {
 
     @Override
-    public int getTreeId(ByteArray key) {
+    public int getTreeId(ByteBuffer key) {
         return 0;
     }
 

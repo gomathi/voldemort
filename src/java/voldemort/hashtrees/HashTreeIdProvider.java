@@ -1,8 +1,7 @@
 package voldemort.hashtrees;
 
+import java.nio.ByteBuffer;
 import java.util.List;
-
-import voldemort.utils.ByteArray;
 
 /**
  * Each node maintains primary partition, and set of secondary
@@ -23,7 +22,7 @@ public interface HashTreeIdProvider {
      * @param key
      * @return
      */
-    int getTreeId(ByteArray key);
+    int getTreeId(ByteBuffer key);
 
     List<Integer> getAllTreeIds();
 

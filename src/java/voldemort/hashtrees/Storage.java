@@ -1,17 +1,17 @@
 package voldemort.hashtrees;
 
+import java.nio.ByteBuffer;
 import java.util.Iterator;
 
-import voldemort.utils.ByteArray;
 import voldemort.utils.Pair;
 
 public interface Storage {
 
-    ByteArray get(ByteArray key);
+    ByteBuffer get(ByteBuffer key);
 
-    void put(ByteArray key, ByteArray value);
+    void put(ByteBuffer key, ByteBuffer value);
 
-    ByteArray remove(ByteArray key);
+    ByteBuffer remove(ByteBuffer key);
 
-    Iterator<Pair<ByteArray, ByteArray>> iterator();
+    Iterator<Pair<ByteBuffer, ByteBuffer>> iterator();
 }

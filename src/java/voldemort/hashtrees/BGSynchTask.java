@@ -50,7 +50,7 @@ public class BGSynchTask extends BGStoppableTask {
 
     private HashTree getHashTree(String hostName) {
         if(!hostNameAndRemoteHTrees.containsKey(hostName)) {
-            hostNameAndRemoteHTrees.putIfAbsent(hostName, new RemoteHashTree());
+            hostNameAndRemoteHTrees.putIfAbsent(hostName, null);
         }
         return hostNameAndRemoteHTrees.get(hostName);
     }

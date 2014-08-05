@@ -15,8 +15,9 @@ import org.iq80.leveldb.DB;
 import org.iq80.leveldb.DBIterator;
 import org.iq80.leveldb.Options;
 
+import voldemort.hashtrees.thrift.SegmentData;
+import voldemort.hashtrees.thrift.SegmentHash;
 import voldemort.utils.AtomicBitSet;
-import voldemort.utils.ByteArray;
 import voldemort.utils.ByteUtils;
 
 /**
@@ -91,13 +92,13 @@ public class HashTreePersistentStorage implements HashTreeStorage {
         return byteKey;
     }
 
-    public static byte[] prepareSegmentDataKey(int treeId, int segId, ByteArray key) {
-        byte[] byteKey = new byte[1 + ByteUtils.SIZE_OF_INT * 2 + (key.get().length)];
+    public static byte[] prepareSegmentDataKey(int treeId, int segId, ByteBuffer key) {
+        byte[] byteKey = new byte[1 + ByteUtils.SIZE_OF_INT * 2 + (key.array().length)];
         ByteBuffer bb = ByteBuffer.wrap(byteKey);
         bb.put(KEY_SEG_DATA_PREFIX);
         bb.putInt(treeId);
         bb.putInt(segId);
-        bb.put(key.get());
+        bb.put(key.array());
         return byteKey;
     }
 
@@ -111,15 +112,15 @@ public class HashTreePersistentStorage implements HashTreeStorage {
     }
 
     @Override
-    public void putSegmentHash(int treeId, int nodeId, ByteArray digest) {
-        levelDb.put(prepareSegmentHashKey(treeId, nodeId), digest.get());
+    public void putSegmentHash(int treeId, int nodeId, ByteBuffer digest) {
+        levelDb.put(prepareSegmentHashKey(treeId, nodeId), digest.array());
     }
 
     @Override
     public SegmentHash getSegmentHash(int treeId, int nodeId) {
         byte[] value = levelDb.get(prepareSegmentHashKey(treeId, nodeId));
         if(value != null)
-            return new SegmentHash(nodeId, new ByteArray(value));
+            return new SegmentHash(nodeId, ByteBuffer.wrap(value));
         return null;
     }
 
@@ -172,22 +173,22 @@ public class HashTreePersistentStorage implements HashTreeStorage {
     public void deleteTree(int treeId) {}
 
     @Override
-    public void putSegmentData(int treeId, int segId, ByteArray key, ByteArray digest) {
+    public void putSegmentData(int treeId, int segId, ByteBuffer key, ByteBuffer digest) {
         byte[] dbKey = prepareSegmentDataKey(treeId, segId, key);
-        levelDb.put(dbKey, digest.get());
+        levelDb.put(dbKey, digest.array());
     }
 
     @Override
-    public SegmentData getSegmentData(int treeId, int segId, ByteArray key) {
+    public SegmentData getSegmentData(int treeId, int segId, ByteBuffer key) {
         byte[] dbKey = prepareSegmentDataKey(treeId, segId, key);
         byte[] value = levelDb.get(dbKey);
         if(value != null)
-            return new SegmentData(key, new ByteArray(value));
+            return new SegmentData(key, ByteBuffer.wrap(value));
         return null;
     }
 
     @Override
-    public void deleteSegmentData(int treeId, int segId, ByteArray key) {
+    public void deleteSegmentData(int treeId, int segId, ByteBuffer key) {
         byte[] dbKey = prepareSegmentDataKey(treeId, segId, key);
         levelDb.delete(dbKey);
     }
@@ -209,10 +210,10 @@ public class HashTreePersistentStorage implements HashTreeStorage {
         DBIterator iterator = levelDb.iterator();
         try {
             for(iterator.seek(startKey); iterator.hasNext(); iterator.next()) {
-                ByteArray key = new ByteArray(readSegmentDataKey(iterator.peekNext().getKey()));
+                ByteBuffer key = ByteBuffer.wrap(readSegmentDataKey(iterator.peekNext().getKey()));
                 if(hasEndKey && ByteUtils.compare(endKey, iterator.peekNext().getKey()) == 0)
                     break;
-                ByteArray digest = new ByteArray(iterator.peekNext().getValue());
+                ByteBuffer digest = ByteBuffer.wrap(iterator.peekNext().getValue());
                 result.add(new SegmentData(key, digest));
 
             }

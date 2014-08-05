@@ -489,6 +489,4 @@ public class ByteUtils {
         newBuffer.position(position);
         return newBuffer;
     }
-
-    public static void main(String[] args) {}
 }

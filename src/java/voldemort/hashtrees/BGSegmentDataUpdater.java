@@ -1,5 +1,6 @@
 package voldemort.hashtrees;
 
+import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
@@ -22,7 +23,7 @@ public class BGSegmentDataUpdater extends BGStoppableTask {
 
     private static final Logger logger = Logger.getLogger(BGSegmentDataUpdater.class);
 
-    private final BlockingQueue<Pair<HTOperation, List<ByteArray>>> que = new ArrayBlockingQueue<Pair<HTOperation, List<ByteArray>>>(Integer.MAX_VALUE);
+    private final BlockingQueue<Pair<HTOperation, List<ByteBuffer>>> que = new ArrayBlockingQueue<Pair<HTOperation, List<ByteBuffer>>>(Integer.MAX_VALUE);
     private final HashTreeImpl hTreeImpl;
 
     public BGSegmentDataUpdater(final CountDownLatch shutdownLatch, final HashTreeImpl hTreeImpl) {
@@ -30,7 +31,7 @@ public class BGSegmentDataUpdater extends BGStoppableTask {
         this.hTreeImpl = hTreeImpl;
     }
 
-    public void enque(Pair<HTOperation, List<ByteArray>> data) {
+    public void enque(Pair<HTOperation, List<ByteBuffer>> data) {
         if(hasStopRequested()) {
             throw new IllegalStateException("Shut down is initiated. Unable to store the data.");
         }
@@ -42,7 +43,7 @@ public class BGSegmentDataUpdater extends BGStoppableTask {
         if(enableRunningStatus()) {
             for(;;) {
                 try {
-                    Pair<HTOperation, List<ByteArray>> pair = que.take();
+                    Pair<HTOperation, List<ByteBuffer>> pair = que.take();
                     switch(pair.getFirst()) {
                         case PUT:
                             hTreeImpl.putInternal(pair.getSecond().get(0), pair.getSecond().get(1));

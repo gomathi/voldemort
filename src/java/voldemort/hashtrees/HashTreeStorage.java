@@ -1,9 +1,11 @@
 package voldemort.hashtrees;
 
+import java.nio.ByteBuffer;
 import java.util.Collection;
 import java.util.List;
 
-import voldemort.utils.ByteArray;
+import voldemort.hashtrees.thrift.SegmentData;
+import voldemort.hashtrees.thrift.SegmentHash;
 
 /**
  * Defines storage interface to be used by higher level HTree.
@@ -19,7 +21,7 @@ public interface HashTreeStorage {
      * @param key
      * @param digest
      */
-    void putSegmentData(int treeId, int segId, ByteArray key, ByteArray digest);
+    void putSegmentData(int treeId, int segId, ByteBuffer key, ByteBuffer digest);
 
     /**
      * Deletes the given segement data from the block.
@@ -28,7 +30,7 @@ public interface HashTreeStorage {
      * @param segId
      * @param key
      */
-    void deleteSegmentData(int treeId, int segId, ByteArray key);
+    void deleteSegmentData(int treeId, int segId, ByteBuffer key);
 
     /**
      * Returns the SegmentData for the given key if available, otherwise returns
@@ -39,7 +41,7 @@ public interface HashTreeStorage {
      * @param key
      * @return
      */
-    SegmentData getSegmentData(int treeId, int segId, ByteArray key);
+    SegmentData getSegmentData(int treeId, int segId, ByteBuffer key);
 
     /**
      * Given a segment id, returns the list of all segment data in the
@@ -59,7 +61,7 @@ public interface HashTreeStorage {
      * @param nodeId, identifier of the node in the hash tree.
      * @param digest
      */
-    void putSegmentHash(int treeId, int nodeId, ByteArray digest);
+    void putSegmentHash(int treeId, int nodeId, ByteBuffer digest);
 
     /**
      * 
