@@ -9,12 +9,17 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.concurrent.CountDownLatch;
 
 import junit.framework.Assert;
 
+import org.apache.thrift.TException;
 import org.junit.Test;
 
 import voldemort.hashtrees.HashTreeImpl.SegmentIdProvider;
+import voldemort.hashtrees.thrift.HashTreeClient;
+import voldemort.hashtrees.thrift.HashTreeServer;
+import voldemort.hashtrees.thrift.HashTreeSyncInterface;
 import voldemort.hashtrees.thrift.SegmentData;
 import voldemort.hashtrees.thrift.SegmentHash;
 import voldemort.utils.ByteUtils;
@@ -158,11 +163,20 @@ public class HashTreeImplTest {
         return new HTreeComponents(hTStorage, storage, hTree);
     }
 
+    private static HashTreeStorage generateInMemoryStore(int noOfSegDataBlocks) {
+        return new HashTreeStorageInMemory(noOfSegDataBlocks);
+    }
+
+    private static HashTreeStorage generatePersistentStore(int noOfSegDataBlocks)
+            throws IOException {
+        return new HashTreePersistentStorage(randomFileName(), noOfSegDataBlocks);
+    }
+
     private static HashTreeStorage[] generateInMemoryAndPersistentStores(int noOfSegDataBlocks)
             throws IOException {
         HashTreeStorage[] stores = new HashTreeStorage[2];
-        stores[0] = new HashTreeStorageInMemory(noOfSegDataBlocks);
-        stores[1] = new HashTreePersistentStorage(randomFileName(), noOfSegDataBlocks);
+        stores[0] = generateInMemoryStore(noOfSegDataBlocks);
+        stores[1] = generatePersistentStore(noOfSegDataBlocks);
         return stores;
     }
 
@@ -263,7 +277,7 @@ public class HashTreeImplTest {
     }
 
     @Test
-    public void testUpdateWithEmptyTree() throws IOException {
+    public void testUpdateWithEmptyTree() throws IOException, TException {
         HashTreeStorage[] stores = generateInMemoryAndPersistentStores(DEFAULT_SEG_DATA_BLOCKS_COUNT);
         HashTreeStorage[] remoteStores = generateInMemoryAndPersistentStores(DEFAULT_SEG_DATA_BLOCKS_COUNT);
 
@@ -299,7 +313,7 @@ public class HashTreeImplTest {
     }
 
     @Test
-    public void testUpdateTreeWithMissingBlocksInLocal() throws IOException {
+    public void testUpdateTreeWithMissingBlocksInLocal() throws IOException, TException {
 
         HashTreeStorage[] stores = generateInMemoryAndPersistentStores(DEFAULT_SEG_DATA_BLOCKS_COUNT);
         HashTreeStorage[] remoteStores = generateInMemoryAndPersistentStores(DEFAULT_SEG_DATA_BLOCKS_COUNT);
@@ -338,7 +352,7 @@ public class HashTreeImplTest {
     }
 
     @Test
-    public void testUpdateTreeWithMissingBlocksInRemote() throws IOException {
+    public void testUpdateTreeWithMissingBlocksInRemote() throws IOException, TException {
 
         HashTreeStorage[] stores = generateInMemoryAndPersistentStores(DEFAULT_SEG_DATA_BLOCKS_COUNT);
         HashTreeStorage[] remoteStores = generateInMemoryAndPersistentStores(DEFAULT_SEG_DATA_BLOCKS_COUNT);
@@ -374,7 +388,7 @@ public class HashTreeImplTest {
     }
 
     @Test
-    public void testUpdateTreeWithDifferingSegments() throws IOException {
+    public void testUpdateTreeWithDifferingSegments() throws IOException, TException {
         HashTreeStorage[] stores = generateInMemoryAndPersistentStores(DEFAULT_SEG_DATA_BLOCKS_COUNT);
         HashTreeStorage[] remoteStores = generateInMemoryAndPersistentStores(DEFAULT_SEG_DATA_BLOCKS_COUNT);
 
@@ -405,6 +419,48 @@ public class HashTreeImplTest {
                 Assert.assertEquals(localHTreeComp.storage.localStorage,
                                     remoteHTreeComp.storage.localStorage);
             }
+        }
+    }
+
+    @Test
+    public void testThriftServerAndClient() throws TException, InterruptedException {
+        HashTreeStorage store = generateInMemoryStore(DEFAULT_SEG_DATA_BLOCKS_COUNT);
+        HashTreeStorage remoteStore = generateInMemoryStore(DEFAULT_SEG_DATA_BLOCKS_COUNT);
+
+        HTreeComponents localHTreeComp = createHashTreeAndStorage(DEFAULT_SEG_DATA_BLOCKS_COUNT,
+                                                                  DEFAULT_NO_OF_CHILDREN,
+                                                                  store);
+        HTreeComponents remoteHTreeComp = createHashTreeAndStorage(DEFAULT_SEG_DATA_BLOCKS_COUNT,
+                                                                   DEFAULT_NO_OF_CHILDREN,
+                                                                   remoteStore);
+
+        HashTreeServer server = new HashTreeServer(new CountDownLatch(1),
+                                                   HashTreeConstants.DEFAULT_HASH_TREE_SERVER_PORT_NO,
+                                                   remoteHTreeComp.hTree);
+        new Thread(server).start();
+
+        Thread.sleep(100);
+
+        HashTreeSyncInterface.Iface client = HashTreeClient.getHashTreeClient("localhost");
+
+        for(int i = 1; i <= DEFAULT_SEG_DATA_BLOCKS_COUNT; i++) {
+            localHTreeComp.storage.put(randomByteBuffer(), randomByteBuffer());
+        }
+
+        localHTreeComp.hTree.updateHashTrees(false);
+        localHTreeComp.hTree.synch(1, client);
+
+        for(int i = 0; i < DEFAULT_SEG_DATA_BLOCKS_COUNT; i++) {
+            List<SegmentData> segBlock = remoteHTreeComp.hTree.getSegment(DEFAULT_TREE_ID, i);
+            for(SegmentData sData: segBlock) {
+                localHTreeComp.storage.put(ByteBuffer.wrap(sData.getKey()), randomByteBuffer());
+            }
+            localHTreeComp.hTree.updateHashTrees(false);
+            remoteHTreeComp.hTree.updateHashTrees(false);
+            localHTreeComp.hTree.synch(1, client);
+
+            Assert.assertEquals(localHTreeComp.storage.localStorage,
+                                remoteHTreeComp.storage.localStorage);
         }
     }
 }

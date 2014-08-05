@@ -1,14 +1,17 @@
 package voldemort.hashtrees;
 
-import java.util.Comparator;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.CountDownLatch;
 
 import org.apache.log4j.Logger;
+import org.apache.thrift.TException;
+import org.apache.thrift.transport.TTransportException;
 
 import voldemort.annotations.concurrency.Threadsafe;
+import voldemort.hashtrees.thrift.HashTreeClient;
+import voldemort.hashtrees.thrift.HashTreeSyncInterface;
 
 /**
  * This task resynchs given set of remote htree objects. This task can be
@@ -19,11 +22,11 @@ import voldemort.annotations.concurrency.Threadsafe;
 public class BGSynchTask extends BGStoppableTask {
 
     private final static Logger logger = Logger.getLogger(BGSynchTask.class);
-    private final ConcurrentMap<String, HashTree> hostNameAndRemoteHTrees = new ConcurrentHashMap<String, HashTree>();
+    private final ConcurrentMap<String, HashTreeSyncInterface.Iface> hostNameAndRemoteHTrees = new ConcurrentHashMap<String, HashTreeSyncInterface.Iface>();
     private final ConcurrentSkipListSet<HostNameAndHashTreeId> hostNameAndTreeIdMap = new ConcurrentSkipListSet<BGSynchTask.HostNameAndHashTreeId>();
     private final HashTree localTree;
 
-    private static class HostNameAndHashTreeId implements Comparator<HostNameAndHashTreeId> {
+    private static class HostNameAndHashTreeId implements Comparable<HostNameAndHashTreeId> {
 
         private final String hostName;
         private final int treeId;
@@ -34,12 +37,17 @@ public class BGSynchTask extends BGStoppableTask {
         }
 
         @Override
-        public int compare(HostNameAndHashTreeId o1, HostNameAndHashTreeId o2) {
-            int compRes = o1.hostName.compareTo(o2.hostName);
+        public int compareTo(HostNameAndHashTreeId that) {
+            int compRes = this.hostName.compareTo(that.hostName);
             if(compRes != 0)
                 return compRes;
-            compRes = o1.treeId - o2.treeId;
+            compRes = this.treeId - that.treeId;
             return compRes;
+        }
+
+        @Override
+        public String toString() {
+            return hostName + ":" + treeId;
         }
     }
 
@@ -48,9 +56,10 @@ public class BGSynchTask extends BGStoppableTask {
         this.localTree = localTree;
     }
 
-    private HashTree getHashTree(String hostName) {
+    private HashTreeSyncInterface.Iface getHashTree(String hostName) throws TTransportException {
         if(!hostNameAndRemoteHTrees.containsKey(hostName)) {
-            hostNameAndRemoteHTrees.putIfAbsent(hostName, null);
+            hostNameAndRemoteHTrees.putIfAbsent(hostName,
+                                                HashTreeClient.getHashTreeClient(hostName));
         }
         return hostNameAndRemoteHTrees.get(hostName);
     }
@@ -74,8 +83,14 @@ public class BGSynchTask extends BGStoppableTask {
             try {
                 logger.info("Synching remote hash trees.");
                 for(HostNameAndHashTreeId syncHostAndTreeId: hostNameAndTreeIdMap) {
-                    HashTree remoteTree = getHashTree(syncHostAndTreeId.hostName);
-                    localTree.synch(syncHostAndTreeId.treeId, remoteTree);
+                    try {
+                        HashTreeSyncInterface.Iface remoteTree = getHashTree(syncHostAndTreeId.hostName);
+                        localTree.synch(syncHostAndTreeId.treeId, remoteTree);
+                    } catch(TException e) {
+                        // TODO Auto-generated catch block
+                        logger.warn("Unable to synch remote hash tree server : "
+                                    + syncHostAndTreeId, e);
+                    }
                 }
                 logger.info("Synching remote hash trees. - Done");
             } finally {

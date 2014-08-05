@@ -32,7 +32,8 @@ import org.apache.thrift.TException;
 
 import scala.actors.threadpool.Arrays;
 import voldemort.annotations.concurrency.Threadsafe;
-import voldemort.hashtrees.thrift.HashTreeService;
+import voldemort.hashtrees.thrift.HashTreeServer;
+import voldemort.hashtrees.thrift.HashTreeSyncInterface;
 import voldemort.hashtrees.thrift.SegmentData;
 import voldemort.hashtrees.thrift.SegmentHash;
 import voldemort.utils.ByteArray;
@@ -65,7 +66,7 @@ import voldemort.utils.Pair;
  * 
  */
 @Threadsafe
-public class HashTreeImpl implements HashTree, HashTreeService.Iface {
+public class HashTreeImpl implements HashTree {
 
     private final static Logger logger = Logger.getLogger(HashTreeImpl.class);
 
@@ -92,6 +93,7 @@ public class HashTreeImpl implements HashTree, HashTreeService.Iface {
                         final SegmentIdProvider segIdProvider,
                         final HashTreeStorage hTStroage,
                         final Storage storage,
+                        final int serverPortNo,
                         final ExecutorService executors) {
         this.segmentsCount = ((noOfSegments > MAX_NO_OF_BUCKETS) || (noOfSegments < 0)) ? MAX_NO_OF_BUCKETS
                                                                                        : roundUpToPowerOf2(noOfSegments);
@@ -103,7 +105,7 @@ public class HashTreeImpl implements HashTree, HashTreeService.Iface {
         this.segIdProvider = segIdProvider;
         this.hTStorage = hTStroage;
         this.storage = storage;
-        this.bgTasksMgr = (executors == null) ? null : new BGTasksManager(executors);
+        this.bgTasksMgr = (executors == null) ? null : new BGTasksManager(executors, serverPortNo);
         this.enabledBGTasks = (executors == null) ? false : true;
     }
 
@@ -127,6 +129,7 @@ public class HashTreeImpl implements HashTree, HashTreeService.Iface {
              new DefaultSegIdProviderImpl(MAX_NO_OF_BUCKETS),
              hTStorage,
              storage,
+             HashTreeConstants.DEFAULT_HASH_TREE_SERVER_PORT_NO,
              executors);
     }
 
@@ -144,7 +147,14 @@ public class HashTreeImpl implements HashTree, HashTreeService.Iface {
                         final SegmentIdProvider segIdProvider,
                         final HashTreeStorage hTStorage,
                         final Storage storage) {
-        this(noOfSegments, FOUR_ARY_TREE, treeIdProvider, segIdProvider, hTStorage, storage, null);
+        this(noOfSegments,
+             FOUR_ARY_TREE,
+             treeIdProvider,
+             segIdProvider,
+             hTStorage,
+             storage,
+             HashTreeConstants.DEFAULT_HASH_TREE_SERVER_PORT_NO,
+             null);
     }
 
     // For unit tests
@@ -159,6 +169,7 @@ public class HashTreeImpl implements HashTree, HashTreeService.Iface {
              new DefaultSegIdProviderImpl(noOfSegments),
              hTStorage,
              storage,
+             HashTreeConstants.DEFAULT_HASH_TREE_SERVER_PORT_NO,
              null);
     }
 
@@ -207,7 +218,8 @@ public class HashTreeImpl implements HashTree, HashTreeService.Iface {
     }
 
     @Override
-    public boolean synch(int treeId, final HashTree remoteTree) {
+    public boolean synch(int treeId, final HashTreeSyncInterface.Iface remoteTree)
+            throws TException {
 
         if(!isReadyForSynch(treeId) || !remoteTree.isReadyForSynch(treeId)) {
             logger.info("HashTree has not been initialized. Not doing the sync. Skipping the task");
@@ -239,10 +251,10 @@ public class HashTreeImpl implements HashTree, HashTreeService.Iface {
     }
 
     private void findDifferences(int treeId,
-                                 HashTree remoteTree,
+                                 HashTreeSyncInterface.Iface remoteTree,
                                  Collection<Integer> nodesToCheck,
                                  Collection<Integer> missingNodesInRemote,
-                                 Collection<Integer> missingNodesInLocal) {
+                                 Collection<Integer> missingNodesInLocal) throws TException {
         CollectionPeekingIterator<SegmentHash> localItr = null, remoteItr = null;
         SegmentHash local, remote;
 
@@ -286,12 +298,15 @@ public class HashTreeImpl implements HashTree, HashTreeService.Iface {
         }
     }
 
-    private void syncSegments(int treeId, Collection<Integer> segIds, HashTree remoteTree) {
+    private void syncSegments(int treeId,
+                              Collection<Integer> segIds,
+                              HashTreeSyncInterface.Iface remoteTree) throws TException {
         for(int segId: segIds)
             syncSegment(treeId, segId, remoteTree);
     }
 
-    private void syncSegment(int treeId, int segId, HashTree remoteTree) {
+    private void syncSegment(int treeId, int segId, HashTreeSyncInterface.Iface remoteTree)
+            throws TException {
         CollectionPeekingIterator<SegmentData> localDataItr = new CollectionPeekingIterator<SegmentData>(getSegment(treeId,
                                                                                                                     segId));
         CollectionPeekingIterator<SegmentData> remoteDataItr = new CollectionPeekingIterator<SegmentData>(remoteTree.getSegment(treeId,
@@ -335,7 +350,8 @@ public class HashTreeImpl implements HashTree, HashTreeService.Iface {
 
     private void updateRemoteTreeWithMissingSegments(int treeId,
                                                      Collection<Integer> segIds,
-                                                     HashTree remoteTree) {
+                                                     HashTreeSyncInterface.Iface remoteTree)
+            throws TException {
         for(int segId: segIds) {
             final Map<ByteBuffer, ByteBuffer> keyValuePairs = new HashMap<ByteBuffer, ByteBuffer>();
             List<SegmentData> sdValues = getSegment(treeId, segId);
@@ -429,19 +445,9 @@ public class HashTreeImpl implements HashTree, HashTreeService.Iface {
     }
 
     @Override
-    public void sPut(final ByteBuffer key, final ByteBuffer value) {
-        storage.put(key, value);
-    }
-
-    @Override
     public void sPut(final Map<ByteBuffer, ByteBuffer> keyValuePairs) {
         for(Map.Entry<ByteBuffer, ByteBuffer> keyValuePair: keyValuePairs.entrySet())
             storage.put(keyValuePair.getKey(), keyValuePair.getValue());
-    }
-
-    @Override
-    public void sRemove(final ByteBuffer key) {
-        storage.remove(key);
     }
 
     @Override
@@ -708,8 +714,9 @@ public class HashTreeImpl implements HashTree, HashTreeService.Iface {
         // is waiting on this latch for all other threads to finish up their
         // work.
         private final CountDownLatch shutdownLatch;
+        private final int serverPortNo;
 
-        public BGTasksManager(final ExecutorService executors) {
+        public BGTasksManager(final ExecutorService executors, int serverPortNo) {
 
             this.executors = executors;
             this.scheduledExecutors = Executors.newScheduledThreadPool(2);
@@ -718,7 +725,7 @@ public class HashTreeImpl implements HashTree, HashTreeService.Iface {
             this.bgTasks = new ArrayList<BGStoppableTask>();
             this.bgSegDataUpdater = new BGSegmentDataUpdater(shutdownLatch, HashTreeImpl.this);
             this.bgSyncTask = new BGSynchTask(shutdownLatch, HashTreeImpl.this);
-
+            this.serverPortNo = serverPortNo;
         }
 
         private void startBackgroundTasks() {
@@ -746,6 +753,10 @@ public class HashTreeImpl implements HashTree, HashTreeService.Iface {
                                                       REBUILD_SEG_TIME_INTERVAL,
                                                       TimeUnit.MILLISECONDS);
             bgTasks.add(bgSegmentTreeTask);
+            HashTreeServer localHashTreeServer = new HashTreeServer(shutdownLatch,
+                                                                    serverPortNo,
+                                                                    HashTreeImpl.this);
+            new Thread(localHashTreeServer).start();
         }
 
         private void stopBackgroundTasks() {

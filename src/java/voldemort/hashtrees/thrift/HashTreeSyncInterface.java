@@ -32,26 +32,104 @@ import java.util.Arrays;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class HashTreeService {
+public class HashTreeSyncInterface {
 
   public interface Iface {
 
     public String ping() throws org.apache.thrift.TException;
 
+    /**
+     * Adds the (key,value) pair to the original storage. Intended to be used
+     * while synch operation.
+     * 
+     * @param keyValuePairs
+     * 
+     * @param keyValuePairs
+     */
     public void sPut(Map<ByteBuffer,ByteBuffer> keyValuePairs) throws org.apache.thrift.TException;
 
+    /**
+     * Deletes the keys from the storage. While synching this function is used.
+     * 
+     * @param keys
+     * 
+     * @param keys
+     */
     public void sRemove(List<ByteBuffer> keys) throws org.apache.thrift.TException;
 
+    /**
+     * Hash tree internal nodes store the hash of their children nodes. Given a
+     * set of internal node ids, this returns the hashes that are stored on the
+     * internal node.
+     * 
+     * @param treeId
+     * @param nodeIds, internal tree node ids.
+     * @return
+     * 
+     * @param treeId
+     * @param nodeIds
+     */
     public List<SegmentHash> getSegmentHashes(int treeId, List<Integer> nodeIds) throws org.apache.thrift.TException;
 
+    /**
+     * Returns the segment hash that is stored on the tree.
+     * 
+     * @param treeId, hash tree id.
+     * @param nodeId, node id
+     * @return
+     * 
+     * @param treeId
+     * @param nodeId
+     */
     public SegmentHash getSegmentHash(int treeId, int nodeId) throws org.apache.thrift.TException;
 
+    /**
+     * Hash tree data is stored on the leaf blocks. Given a segment id this
+     * method is supposed to return (key,hash) pairs.
+     * 
+     * @param treeId
+     * @param segId, id of the segment block.
+     * @return
+     * 
+     * @param treeId
+     * @param segId
+     */
     public List<SegmentData> getSegment(int treeId, int segId) throws org.apache.thrift.TException;
 
+    /**
+     * Returns the (key,digest) for the given key in the given segment.
+     * 
+     * @param treeId, hash tree id
+     * @param segId
+     * @param key
+     * @return
+     * 
+     * @param treeId
+     * @param segId
+     * @param key
+     */
     public SegmentData getSegmentData(int treeId, int segId, ByteBuffer key) throws org.apache.thrift.TException;
 
+    /**
+     * If the HashTree is getting initialized now, then this function returns
+     * false. Otherwise returns true.
+     * 
+     * @param treeId
+     * @return
+     * 
+     * @param treeId
+     */
     public boolean isReadyForSynch(int treeId) throws org.apache.thrift.TException;
 
+    /**
+     * Deletes tree nodes from the hash tree, and the corresponding segments.
+     * 
+     * @param treeId
+     * @param nodeIds
+     * 
+     * @param treeId
+     * @param nodeIds
+     */
     public void deleteTreeNodes(int treeId, List<Integer> nodeIds) throws org.apache.thrift.TException;
 
   }
