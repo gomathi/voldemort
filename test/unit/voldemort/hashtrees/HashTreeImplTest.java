@@ -9,7 +9,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
-import java.util.concurrent.CountDownLatch;
 
 import junit.framework.Assert;
 
@@ -434,9 +433,8 @@ public class HashTreeImplTest {
                                                                    DEFAULT_NO_OF_CHILDREN,
                                                                    remoteStore);
 
-        BGHashTreeServer server = new BGHashTreeServer(new CountDownLatch(1),
-                                                       HashTreeConstants.DEFAULT_HASH_TREE_SERVER_PORT_NO,
-                                                       remoteHTreeComp.hTree);
+        BGHashTreeServer server = new BGHashTreeServer(remoteHTreeComp.hTree,
+                                                       HashTreeConstants.DEFAULT_HASH_TREE_SERVER_PORT_NO);
         new Thread(server).start();
 
         Thread.sleep(100);
