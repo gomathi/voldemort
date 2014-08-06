@@ -17,11 +17,9 @@ import org.apache.thrift.TException;
 import org.junit.Test;
 
 import voldemort.hashtrees.HashTreeImpl.SegmentIdProvider;
-import voldemort.hashtrees.thrift.HashTreeClient;
-import voldemort.hashtrees.thrift.HashTreeServer;
-import voldemort.hashtrees.thrift.HashTreeSyncInterface;
-import voldemort.hashtrees.thrift.SegmentData;
-import voldemort.hashtrees.thrift.SegmentHash;
+import voldemort.hashtrees.thrift.generated.HashTreeSyncInterface;
+import voldemort.hashtrees.thrift.generated.SegmentData;
+import voldemort.hashtrees.thrift.generated.SegmentHash;
 import voldemort.utils.ByteUtils;
 import voldemort.utils.Pair;
 

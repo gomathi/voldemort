@@ -12,8 +12,8 @@ import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.atomic.AtomicLong;
 
 import voldemort.annotations.concurrency.Threadsafe;
-import voldemort.hashtrees.thrift.SegmentData;
-import voldemort.hashtrees.thrift.SegmentHash;
+import voldemort.hashtrees.thrift.generated.SegmentData;
+import voldemort.hashtrees.thrift.generated.SegmentHash;
 import voldemort.utils.AtomicBitSet;
 
 /**

@@ -15,8 +15,8 @@ import org.iq80.leveldb.DB;
 import org.iq80.leveldb.DBIterator;
 import org.iq80.leveldb.Options;
 
-import voldemort.hashtrees.thrift.SegmentData;
-import voldemort.hashtrees.thrift.SegmentHash;
+import voldemort.hashtrees.thrift.generated.SegmentData;
+import voldemort.hashtrees.thrift.generated.SegmentHash;
 import voldemort.utils.AtomicBitSet;
 import voldemort.utils.ByteUtils;
 

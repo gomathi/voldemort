@@ -7,8 +7,8 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
 import voldemort.annotations.concurrency.Threadsafe;
-import voldemort.hashtrees.thrift.SegmentData;
-import voldemort.hashtrees.thrift.SegmentHash;
+import voldemort.hashtrees.thrift.generated.SegmentData;
+import voldemort.hashtrees.thrift.generated.SegmentHash;
 
 /**
  * In memory implementation of {@link HashTreeStorage}, can be used for testing,

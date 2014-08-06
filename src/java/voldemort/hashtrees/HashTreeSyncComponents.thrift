@@ -1,4 +1,4 @@
-namespace java voldemort.hashtrees.thrift
+namespace java voldemort.hashtrees.thrift.generated
 
 /**
 * Contains nodeId and segment hash.
@@ -72,10 +72,6 @@ service HashTreeSyncInterface
 	/**
      * Returns the (key,digest) for the given key in the given segment.
      * 
-     * @param treeId, hash tree id
-     * @param segId
-     * @param key
-     * @return
      */
 	SegmentData getSegmentData(1:i32 treeId, 2:i32 segId, 3:binary key);
 	
@@ -83,16 +79,12 @@ service HashTreeSyncInterface
      * If the HashTree is getting initialized now, then this function returns
      * false. Otherwise returns true.
      * 
-     * @param treeId
-     * @return
      */
 	bool isReadyForSynch(1:i32 treeId);
 	
 	/**
      * Deletes tree nodes from the hash tree, and the corresponding segments.
      * 
-     * @param treeId
-     * @param nodeIds
      */
 	void deleteTreeNodes(1:i32 treeId, 2:list<i32> nodeIds);
 }

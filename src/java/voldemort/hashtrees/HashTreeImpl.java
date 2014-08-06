@@ -32,10 +32,9 @@ import org.apache.thrift.TException;
 
 import scala.actors.threadpool.Arrays;
 import voldemort.annotations.concurrency.Threadsafe;
-import voldemort.hashtrees.thrift.HashTreeServer;
-import voldemort.hashtrees.thrift.HashTreeSyncInterface;
-import voldemort.hashtrees.thrift.SegmentData;
-import voldemort.hashtrees.thrift.SegmentHash;
+import voldemort.hashtrees.thrift.generated.HashTreeSyncInterface;
+import voldemort.hashtrees.thrift.generated.SegmentData;
+import voldemort.hashtrees.thrift.generated.SegmentHash;
 import voldemort.utils.ByteArray;
 import voldemort.utils.ByteUtils;
 import voldemort.utils.CollectionPeekingIterator;

@@ -4,8 +4,8 @@ import java.nio.ByteBuffer;
 import java.util.Collection;
 import java.util.List;
 
-import voldemort.hashtrees.thrift.SegmentData;
-import voldemort.hashtrees.thrift.SegmentHash;
+import voldemort.hashtrees.thrift.generated.SegmentData;
+import voldemort.hashtrees.thrift.generated.SegmentHash;
 
 /**
  * Defines storage interface to be used by higher level HTree.

@@ -4,7 +4,7 @@
  * DO NOT EDIT UNLESS YOU ARE SURE THAT YOU KNOW WHAT YOU ARE DOING
  *  @generated
  */
-package voldemort.hashtrees.thrift;
+package voldemort.hashtrees.thrift.generated;
 
 import org.apache.thrift.scheme.IScheme;
 import org.apache.thrift.scheme.SchemeFactory;
@@ -99,10 +99,6 @@ public class HashTreeSyncInterface {
     /**
      * Returns the (key,digest) for the given key in the given segment.
      * 
-     * @param treeId, hash tree id
-     * @param segId
-     * @param key
-     * @return
      * 
      * @param treeId
      * @param segId
@@ -114,8 +110,6 @@ public class HashTreeSyncInterface {
      * If the HashTree is getting initialized now, then this function returns
      * false. Otherwise returns true.
      * 
-     * @param treeId
-     * @return
      * 
      * @param treeId
      */
@@ -124,8 +118,6 @@ public class HashTreeSyncInterface {
     /**
      * Deletes tree nodes from the hash tree, and the corresponding segments.
      * 
-     * @param treeId
-     * @param nodeIds
      * 
      * @param treeId
      * @param nodeIds

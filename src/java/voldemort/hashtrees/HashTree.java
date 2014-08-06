@@ -4,7 +4,7 @@ import java.nio.ByteBuffer;
 
 import org.apache.thrift.TException;
 
-import voldemort.hashtrees.thrift.HashTreeSyncInterface;
+import voldemort.hashtrees.thrift.generated.HashTreeSyncInterface;
 
 /**
  * Defines Hash tree methods. Hash tree provides a way for nodes to synch up

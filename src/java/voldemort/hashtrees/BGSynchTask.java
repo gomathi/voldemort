@@ -10,8 +10,7 @@ import org.apache.thrift.TException;
 import org.apache.thrift.transport.TTransportException;
 
 import voldemort.annotations.concurrency.Threadsafe;
-import voldemort.hashtrees.thrift.HashTreeClient;
-import voldemort.hashtrees.thrift.HashTreeSyncInterface;
+import voldemort.hashtrees.thrift.generated.HashTreeSyncInterface;
 
 /**
  * This task resynchs given set of remote htree objects. This task can be
@@ -56,7 +55,7 @@ public class BGSynchTask extends BGStoppableTask {
         this.localTree = localTree;
     }
 
-    private HashTreeSyncInterface.Iface getHashTree(String hostName) throws TTransportException {
+    private HashTreeSyncInterface.Iface getHashTreeClient(String hostName) throws TTransportException {
         if(!hostNameAndRemoteHTrees.containsKey(hostName)) {
             hostNameAndRemoteHTrees.putIfAbsent(hostName,
                                                 HashTreeClient.getHashTreeClient(hostName));
@@ -84,7 +83,7 @@ public class BGSynchTask extends BGStoppableTask {
                 logger.info("Synching remote hash trees.");
                 for(HostNameAndHashTreeId syncHostAndTreeId: hostNameAndTreeIdMap) {
                     try {
-                        HashTreeSyncInterface.Iface remoteTree = getHashTree(syncHostAndTreeId.hostName);
+                        HashTreeSyncInterface.Iface remoteTree = getHashTreeClient(syncHostAndTreeId.hostName);
                         localTree.synch(syncHostAndTreeId.treeId, remoteTree);
                     } catch(TException e) {
                         // TODO Auto-generated catch block

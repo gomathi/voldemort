@@ -1,4 +1,4 @@
-package voldemort.hashtrees.thrift;
+package voldemort.hashtrees;
 
 import org.apache.thrift.protocol.TBinaryProtocol;
 import org.apache.thrift.protocol.TProtocol;
@@ -6,7 +6,9 @@ import org.apache.thrift.transport.TSocket;
 import org.apache.thrift.transport.TTransport;
 import org.apache.thrift.transport.TTransportException;
 
-import voldemort.hashtrees.HashTreeConstants;
+import voldemort.hashtrees.thrift.generated.HashTreeSyncInterface;
+import voldemort.hashtrees.thrift.generated.HashTreeSyncInterface.Client;
+import voldemort.hashtrees.thrift.generated.HashTreeSyncInterface.Iface;
 
 /**
  * A hashtree client which talks to a hashtree server in another node.

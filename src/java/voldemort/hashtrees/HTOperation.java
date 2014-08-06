@@ -7,5 +7,6 @@ package voldemort.hashtrees;
  */
 enum HTOperation {
     PUT,
-    REMOVE
+    REMOVE,
+    STOP
 }

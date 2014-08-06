@@ -1,4 +1,4 @@
-package voldemort.hashtrees.thrift;
+package voldemort.hashtrees;
 
 import java.util.concurrent.CountDownLatch;
 
@@ -8,9 +8,9 @@ import org.apache.thrift.server.TThreadPoolServer;
 import org.apache.thrift.transport.TServerSocket;
 import org.apache.thrift.transport.TTransportException;
 
-import voldemort.hashtrees.BGStoppableTask;
-import voldemort.hashtrees.HashTree;
-import voldemort.hashtrees.thrift.HashTreeSyncInterface.Iface;
+import voldemort.hashtrees.thrift.generated.HashTreeSyncInterface;
+import voldemort.hashtrees.thrift.generated.HashTreeSyncInterface.Iface;
+import voldemort.hashtrees.thrift.generated.HashTreeSyncInterface.Processor;
 
 public class HashTreeServer extends BGStoppableTask {
 
