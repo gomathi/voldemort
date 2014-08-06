@@ -11,8 +11,8 @@ import voldemort.hashtrees.thrift.generated.SegmentData;
 import voldemort.hashtrees.thrift.generated.SegmentHash;
 
 /**
- * In memory implementation of {@link HashTreeStorage}, can be used for testing,
- * or in nodes where the partition itself is small enough.
+ * In memory implementation of {@link HashTreeStorage} used only for unit
+ * testing.
  * 
  */
 @Threadsafe

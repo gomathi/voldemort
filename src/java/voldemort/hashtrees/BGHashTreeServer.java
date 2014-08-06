@@ -2,6 +2,7 @@ package voldemort.hashtrees;
 
 import java.util.concurrent.CountDownLatch;
 
+import org.apache.log4j.Logger;
 import org.apache.thrift.server.TServer;
 import org.apache.thrift.server.TThreadPoolServer;
 import org.apache.thrift.transport.TServerSocket;
@@ -17,6 +18,7 @@ import voldemort.hashtrees.thrift.generated.HashTreeSyncInterface.Iface;
  */
 public class BGHashTreeServer extends BGStoppableTask {
 
+    private final static Logger logger = Logger.getLogger(BGHashTreeServer.class);
     private final TServer server;
 
     public BGHashTreeServer(final CountDownLatch shutdownLatch,
@@ -53,9 +55,11 @@ public class BGHashTreeServer extends BGStoppableTask {
 
     private void startServer() {
         server.serve();
+        logger.debug("Hash tree server has started.");
     }
 
     private void stopServer() {
         server.stop();
+        logger.debug("Hash tree server has stopped.");
     }
 }

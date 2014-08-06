@@ -24,8 +24,10 @@ public abstract class BGStoppableTask implements Runnable, Stoppable {
 
     // all variables are locked by instance of this object.
     private final ReentrantLock runLock = new ReentrantLock();
-    private final CountDownLatch shutdownLatch;
+    private volatile CountDownLatch shutdownLatch;
     private volatile boolean stopRequested = false;
+
+    public BGStoppableTask() {}
 
     public BGStoppableTask(CountDownLatch shutdownLatch) {
         this.shutdownLatch = shutdownLatch;
@@ -58,7 +60,7 @@ public abstract class BGStoppableTask implements Runnable, Stoppable {
         if(stopRequested)
             return;
         stopRequested = true;
-        if(!runLock.isLocked())
+        if(!runLock.isLocked() && shutdownLatch != null)
             shutdownLatch.countDown();
     }
 

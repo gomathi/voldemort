@@ -86,7 +86,7 @@ public class HashTreeImpl implements HashTree {
 
     private final boolean enabledBGTasks;
     private final BGTasksManager bgTasksMgr;
-    private final ConcurrentMap<Integer, ReentrantLock> syncLocks = new ConcurrentHashMap<Integer, ReentrantLock>();
+    private final ConcurrentMap<Integer, ReentrantLock> treeLocks = new ConcurrentHashMap<Integer, ReentrantLock>();
 
     public HashTreeImpl(int noOfSegments,
                         int noOfChildrenPerParent,
@@ -383,12 +383,12 @@ public class HashTreeImpl implements HashTree {
         return hTStorage.getSegment(treeId, segId);
     }
 
-    private boolean acquireSyncLock(int treeId, boolean waitForLock) {
-        if(!syncLocks.containsKey(treeId)) {
+    private boolean acquireTreeLock(int treeId, boolean waitForLock) {
+        if(!treeLocks.containsKey(treeId)) {
             ReentrantLock lock = new ReentrantLock();
-            syncLocks.putIfAbsent(treeId, lock);
+            treeLocks.putIfAbsent(treeId, lock);
         }
-        Lock lock = syncLocks.get(treeId);
+        Lock lock = treeLocks.get(treeId);
         if(waitForLock) {
             lock.lock();
             return true;
@@ -396,21 +396,21 @@ public class HashTreeImpl implements HashTree {
         return lock.tryLock();
     }
 
-    private void releaseSyncLock(int treeId) {
-        syncLocks.get(treeId);
+    private void releaseTreeLock(int treeId) {
+        treeLocks.get(treeId);
     }
 
     @Override
     public void updateHashTrees(boolean fullRebuild) {
         List<Integer> treeIds = treeIdProvider.getAllTreeIds();
         for(int treeId: treeIds) {
-            boolean acquiredLock = fullRebuild ? acquireSyncLock(treeId, true)
-                                              : acquireSyncLock(treeId, false);
+            boolean acquiredLock = fullRebuild ? acquireTreeLock(treeId, true)
+                                              : acquireTreeLock(treeId, false);
             if(acquiredLock) {
                 try {
                     updateHashTree(treeId, fullRebuild);
                 } finally {
-                    releaseSyncLock(treeId);
+                    releaseTreeLock(treeId);
                 }
             }
         }
@@ -442,8 +442,7 @@ public class HashTreeImpl implements HashTree {
                                      dirtyNodeAndDigest.getValue());
         if(fullRebuild)
             hTStorage.setLastFullyTreeBuiltTimestamp(treeId, currentTs);
-        else
-            hTStorage.setLastHashTreeUpdatedTimestamp(treeId, currentTs);
+        hTStorage.setLastHashTreeUpdatedTimestamp(treeId, currentTs);
     }
 
     @Override
@@ -792,7 +791,9 @@ public class HashTreeImpl implements HashTree {
 
     @Override
     public boolean isReadyForSynch(int treeId) {
-        return hTStorage.getLastHashTreeUpdatedTimestamp(treeId) > 0;
+        long currentTs = System.currentTimeMillis();
+        long diff = currentTs - hTStorage.getLastHashTreeUpdatedTimestamp(treeId);
+        return diff <= (2 * BGTasksManager.REBUILD_SEG_TIME_INTERVAL);
     }
 
     @Override

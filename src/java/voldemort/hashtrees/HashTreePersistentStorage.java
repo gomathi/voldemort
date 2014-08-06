@@ -35,26 +35,37 @@ import voldemort.utils.ByteUtils;
 
 public class HashTreePersistentStorage implements HashTreeStorage {
 
+    private static final Logger logger = Logger.getLogger(HashTreePersistentStorage.class);
+
     private static final byte[] KEY_LAST_FULLY_TREE_BUILT_TS = "ltfbTs".getBytes();
     private static final byte[] KEY_LAST_TREE_BUILT_TS = "ltbTs".getBytes();
     private static final byte KEY_META_DATA_PREFIX = 'M';
     private static final byte KEY_SEG_HASH_PREFIX = 'H';
     private static final byte KEY_SEG_DATA_PREFIX = 'S';
-    private static final Logger logger = Logger.getLogger(HashTreePersistentStorage.class);
+    private static final byte[] KEY_PREFIX_ARRAY = { KEY_META_DATA_PREFIX, KEY_SEG_DATA_PREFIX,
+            KEY_SEG_HASH_PREFIX };
 
     private final DB dbObj;
     private final int noOfSegDataBlocks;
     private final ConcurrentMap<Integer, AtomicBitSet> treeIdAndDirtySegmentMap = new ConcurrentHashMap<Integer, AtomicBitSet>();
 
-    public HashTreePersistentStorage(String dbFileName, int noOfSegDataBlocks) throws IOException {
-        this.dbObj = createDb(dbFileName);
+    public HashTreePersistentStorage(String dbDir, int noOfSegDataBlocks) throws IOException {
+        this.dbObj = createDb(dbDir);
         this.noOfSegDataBlocks = noOfSegDataBlocks;
     }
 
-    private static DB createDb(String dbFileName) throws IOException {
+    private static boolean createDir(String dirName) {
+        File file = new File(dirName);
+        if(file.exists())
+            return true;
+        return file.mkdirs();
+    }
+
+    private static DB createDb(String dbDir) throws IOException {
+        createDir(dbDir);
         Options options = new Options();
         options.createIfMissing(true);
-        return new JniDBFactory().open(new File(dbFileName), options);
+        return new JniDBFactory().open(new File(dbDir), options);
     }
 
     public void close() {
@@ -72,46 +83,44 @@ public class HashTreePersistentStorage implements HashTreeStorage {
         return treeIdAndDirtySegmentMap.get(treeId);
     }
 
-    public static byte[] readSegmentDataKey(byte[] dbSegDataKey) {
-        int length = dbSegDataKey.length;
-        int from = (ByteUtils.SIZE_OF_INT * 2) + 1;
-        byte[] key = ByteUtils.copy(dbSegDataKey, from, length);
-        return key;
+    private static void prepareKeyPrefix(ByteBuffer keyToFill, byte prefixByte, int... partialKeys) {
+        keyToFill.put(prefixByte);
+        for(int key: partialKeys)
+            keyToFill.putInt(key);
     }
 
-    public static byte[] prepareSegmentHashKey(int treeId, int nodeId) {
+    private static byte[] prepareSegmentHashKey(int treeId, int nodeId) {
         byte[] key = new byte[1 + ByteUtils.SIZE_OF_INT * 2];
         ByteBuffer bb = ByteBuffer.wrap(key);
-        bb.put(KEY_SEG_HASH_PREFIX);
-        bb.putInt(treeId);
-        bb.putInt(nodeId);
+        prepareKeyPrefix(bb, KEY_SEG_HASH_PREFIX, treeId, nodeId);
         return key;
     }
 
-    public static byte[] prepareSegmentDataKeyPrefix(int treeId, int segId) {
+    private static byte[] readSegmentDataKey(byte[] dbSegDataKey) {
+        int from = (ByteUtils.SIZE_OF_INT * 2) + 1;
+        byte[] key = ByteUtils.copy(dbSegDataKey, from, dbSegDataKey.length);
+        return key;
+    }
+
+    private static byte[] prepareSegmentDataKeyPrefix(int treeId, int segId) {
         byte[] byteKey = new byte[1 + ByteUtils.SIZE_OF_INT * 2];
         ByteBuffer bb = ByteBuffer.wrap(byteKey);
-        bb.put(KEY_SEG_DATA_PREFIX);
-        bb.putInt(treeId);
-        bb.putInt(segId);
+        prepareKeyPrefix(bb, KEY_SEG_DATA_PREFIX, treeId, segId);
         return byteKey;
     }
 
-    public static byte[] prepareSegmentDataKey(int treeId, int segId, ByteBuffer key) {
+    private static byte[] prepareSegmentDataKey(int treeId, int segId, ByteBuffer key) {
         byte[] byteKey = new byte[1 + ByteUtils.SIZE_OF_INT * 2 + (key.array().length)];
         ByteBuffer bb = ByteBuffer.wrap(byteKey);
-        bb.put(KEY_SEG_DATA_PREFIX);
-        bb.putInt(treeId);
-        bb.putInt(segId);
+        prepareKeyPrefix(bb, KEY_SEG_DATA_PREFIX, treeId, segId);
         bb.put(key.array());
         return byteKey;
     }
 
-    public static byte[] prepareMetaDataKey(int treeId, byte[] keyName) {
+    private static byte[] prepareMetaDataKey(int treeId, byte[] keyName) {
         byte[] byteKey = new byte[1 + ByteUtils.SIZE_OF_INT + keyName.length];
         ByteBuffer bb = ByteBuffer.wrap(byteKey);
-        bb.put(KEY_META_DATA_PREFIX);
-        bb.putInt(treeId);
+        prepareKeyPrefix(bb, KEY_META_DATA_PREFIX, treeId);
         bb.put(keyName);
         return byteKey;
     }
@@ -196,7 +205,21 @@ public class HashTreePersistentStorage implements HashTreeStorage {
     }
 
     @Override
-    public void deleteTree(int treeId) {}
+    public void deleteTree(int treeId) {
+        DBIterator dbItr;
+        byte[] temp = new byte[1 + ByteUtils.SIZE_OF_INT];
+        for(byte keyPrefix: KEY_PREFIX_ARRAY) {
+            dbItr = dbObj.iterator();
+            ByteBuffer wrap = ByteBuffer.wrap(temp);
+            prepareKeyPrefix(wrap, keyPrefix, treeId);
+            dbItr.seek(wrap.array());
+            for(; dbItr.hasNext(); dbItr.next()) {
+                if(ByteUtils.compare(temp, dbItr.peekNext().getKey(), 0, temp.length) != 0)
+                    break;
+                dbObj.delete(dbItr.peekNext().getKey());
+            }
+        }
+    }
 
     @Override
     public void putSegmentData(int treeId, int segId, ByteBuffer key, ByteBuffer digest) {
@@ -219,29 +242,18 @@ public class HashTreePersistentStorage implements HashTreeStorage {
         dbObj.delete(dbKey);
     }
 
-    private byte[] getFirstKeyWithPrefix(byte[] prefix) {
-        DBIterator itr = dbObj.iterator();
-        itr.seek(prefix);
-        if(itr.hasNext())
-            return itr.next().getKey();
-        return null;
-    }
-
     @Override
     public List<SegmentData> getSegment(int treeId, int segId) {
         List<SegmentData> result = new ArrayList<SegmentData>();
         byte[] startKey = prepareSegmentDataKeyPrefix(treeId, segId);
-        byte[] endKey = getFirstKeyWithPrefix(prepareSegmentDataKeyPrefix(treeId, segId + 1));
-        boolean hasEndKey = (endKey == null) ? false : true;
         DBIterator iterator = dbObj.iterator();
         try {
             for(iterator.seek(startKey); iterator.hasNext(); iterator.next()) {
-                ByteBuffer key = ByteBuffer.wrap(readSegmentDataKey(iterator.peekNext().getKey()));
-                if(hasEndKey && ByteUtils.compare(endKey, iterator.peekNext().getKey()) == 0)
+                if(ByteUtils.compare(startKey, iterator.peekNext().getKey(), 0, startKey.length) != 0)
                     break;
+                ByteBuffer key = ByteBuffer.wrap(readSegmentDataKey(iterator.peekNext().getKey()));
                 ByteBuffer digest = ByteBuffer.wrap(iterator.peekNext().getValue());
                 result.add(new SegmentData(key, digest));
-
             }
         } finally {
             try {
@@ -253,5 +265,4 @@ public class HashTreePersistentStorage implements HashTreeStorage {
         }
         return result;
     }
-
 }

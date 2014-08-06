@@ -130,8 +130,8 @@ public class HashTreeImplTest {
         return ByteBuffer.wrap(random);
     }
 
-    private static String randomFileName() {
-        return "/tmp/test/random.txt" + RANDOM.nextInt();
+    private static String randomDirName() {
+        return "/tmp/test/random" + RANDOM.nextInt();
     }
 
     private static HTreeComponents createHashTreeAndStorage(int noOfSegDataBlocks,
@@ -169,7 +169,7 @@ public class HashTreeImplTest {
 
     private static HashTreeStorage generatePersistentStore(int noOfSegDataBlocks)
             throws IOException {
-        return new HashTreePersistentStorage(randomFileName(), noOfSegDataBlocks);
+        return new HashTreePersistentStorage(randomDirName(), noOfSegDataBlocks);
     }
 
     private static HashTreeStorage[] generateInMemoryAndPersistentStores(int noOfSegDataBlocks)
