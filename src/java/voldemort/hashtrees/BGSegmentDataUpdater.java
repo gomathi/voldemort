@@ -28,7 +28,11 @@ public class BGSegmentDataUpdater extends BGStoppableTask {
     private final BlockingQueue<Pair<HTOperation, List<ByteBuffer>>> que = new ArrayBlockingQueue<Pair<HTOperation, List<ByteBuffer>>>(Integer.MAX_VALUE);
     private final HashTreeImpl hTreeImpl;
 
-    public BGSegmentDataUpdater(final CountDownLatch shutdownLatch, final HashTreeImpl hTreeImpl) {
+    public BGSegmentDataUpdater(final HashTreeImpl hTreeImpl) {
+        this.hTreeImpl = hTreeImpl;
+    }
+
+    public BGSegmentDataUpdater(final HashTreeImpl hTreeImpl, final CountDownLatch shutdownLatch) {
         super(shutdownLatch);
         this.hTreeImpl = hTreeImpl;
     }

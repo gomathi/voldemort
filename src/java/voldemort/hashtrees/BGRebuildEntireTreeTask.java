@@ -21,6 +21,10 @@ public class BGRebuildEntireTreeTask extends BGStoppableTask {
     private final static Logger logger = Logger.getLogger(BGRebuildEntireTreeTask.class);
     private final HashTree hashTree;
 
+    public BGRebuildEntireTreeTask(final HashTree hashtree) {
+        this.hashTree = hashtree;
+    }
+
     public BGRebuildEntireTreeTask(final HashTree hashtree, final CountDownLatch shutdownLatch) {
         super(shutdownLatch);
         this.hashTree = hashtree;

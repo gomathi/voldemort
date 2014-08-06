@@ -50,12 +50,17 @@ public class BGSynchTask extends BGStoppableTask {
         }
     }
 
-    public BGSynchTask(final CountDownLatch shutdownLatch, final HashTree localTree) {
+    public BGSynchTask(final HashTree localTree) {
+        this.localTree = localTree;
+    }
+
+    public BGSynchTask(final HashTree localTree, final CountDownLatch shutdownLatch) {
         super(shutdownLatch);
         this.localTree = localTree;
     }
 
-    private HashTreeSyncInterface.Iface getHashTreeClient(String hostName) throws TTransportException {
+    private HashTreeSyncInterface.Iface getHashTreeClient(String hostName)
+            throws TTransportException {
         if(!hostNameAndRemoteHTrees.containsKey(hostName)) {
             hostNameAndRemoteHTrees.putIfAbsent(hostName,
                                                 HashTreeClientGenerator.getHashTreeClient(hostName));

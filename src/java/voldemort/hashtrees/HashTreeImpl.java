@@ -724,8 +724,8 @@ public class HashTreeImpl implements HashTree {
 
             this.serverPortNo = serverPortNo;
             this.bgTasks = new ArrayList<BGStoppableTask>();
-            this.bgSegDataUpdater = new BGSegmentDataUpdater(shutdownLatch, HashTreeImpl.this);
-            this.bgSyncTask = new BGSynchTask(shutdownLatch, HashTreeImpl.this);
+            this.bgSegDataUpdater = new BGSegmentDataUpdater(HashTreeImpl.this, shutdownLatch);
+            this.bgSyncTask = new BGSynchTask(HashTreeImpl.this, shutdownLatch);
 
             bgTasks.add(bgSegDataUpdater);
             bgTasks.add(bgSyncTask);
@@ -737,9 +737,9 @@ public class HashTreeImpl implements HashTree {
                                                                             shutdownLatch);
             BGStoppableTask bgSegmentTreeTask = new BGRebuildSegmentTreeTask(HashTreeImpl.this,
                                                                              shutdownLatch);
-            BGHashTreeServer bgHashTreeServer = new BGHashTreeServer(shutdownLatch,
+            BGHashTreeServer bgHashTreeServer = new BGHashTreeServer(HashTreeImpl.this,
                                                                      serverPortNo,
-                                                                     HashTreeImpl.this);
+                                                                     shutdownLatch);
             bgTasks.add(bgRebuildTreeTask);
             bgTasks.add(bgSegmentTreeTask);
             bgTasks.add(bgHashTreeServer);

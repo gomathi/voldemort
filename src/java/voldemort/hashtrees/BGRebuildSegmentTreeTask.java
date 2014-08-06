@@ -13,6 +13,10 @@ public class BGRebuildSegmentTreeTask extends BGStoppableTask {
     private static final Logger logger = Logger.getLogger(BGRebuildSegmentTreeTask.class);
     private final HashTree hTree;
 
+    public BGRebuildSegmentTreeTask(final HashTree hTree) {
+        this.hTree = hTree;
+    }
+
     public BGRebuildSegmentTreeTask(final HashTree hTree, final CountDownLatch shutdownLatch) {
         super(shutdownLatch);
         this.hTree = hTree;

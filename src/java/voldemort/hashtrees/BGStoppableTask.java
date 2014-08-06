@@ -29,7 +29,7 @@ public abstract class BGStoppableTask implements Runnable, Stoppable {
 
     public BGStoppableTask() {}
 
-    public BGStoppableTask(CountDownLatch shutdownLatch) {
+    public BGStoppableTask(final CountDownLatch shutdownLatch) {
         this.shutdownLatch = shutdownLatch;
     }
 

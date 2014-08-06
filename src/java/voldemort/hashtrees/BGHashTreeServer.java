@@ -21,9 +21,14 @@ public class BGHashTreeServer extends BGStoppableTask {
     private final static Logger logger = Logger.getLogger(BGHashTreeServer.class);
     private final TServer server;
 
-    public BGHashTreeServer(final CountDownLatch shutdownLatch,
+    public BGHashTreeServer(final HashTree localHashTree, final int serverPortNo)
+                                                                                 throws TTransportException {
+        this.server = createServer(serverPortNo, localHashTree);
+    }
+
+    public BGHashTreeServer(final HashTree localHashTree,
                             final int serverPortNo,
-                            final HashTree localHashTree) throws TTransportException {
+                            final CountDownLatch shutdownLatch) throws TTransportException {
         super(shutdownLatch);
         this.server = createServer(serverPortNo, localHashTree);
     }
