@@ -23,7 +23,7 @@ public class BGSegmentDataUpdater extends BGStoppableTask {
 
     private static final Logger logger = Logger.getLogger(BGSegmentDataUpdater.class);
     private static final Pair<HTOperation, List<ByteBuffer>> STOP_MARKER = new Pair<HTOperation, List<ByteBuffer>>(HTOperation.STOP,
-                                                                                                                       null);
+                                                                                                                   null);
 
     private final BlockingQueue<Pair<HTOperation, List<ByteBuffer>>> que = new ArrayBlockingQueue<Pair<HTOperation, List<ByteBuffer>>>(Integer.MAX_VALUE);
     private final HashTreeImpl hTreeImpl;
@@ -34,7 +34,7 @@ public class BGSegmentDataUpdater extends BGStoppableTask {
     }
 
     public void enque(Pair<HTOperation, List<ByteBuffer>> data) {
-        if(hasStopRequested() && data.getFirst() != HTOperation.REMOVE) {
+        if(hasStopRequested() && data.getFirst() != HTOperation.STOP) {
             throw new IllegalStateException("Shut down is initiated. Unable to store the data.");
         }
         que.add(data);

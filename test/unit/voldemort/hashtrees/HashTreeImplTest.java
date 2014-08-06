@@ -144,6 +144,7 @@ public class HashTreeImplTest {
                                           segIdPro,
                                           hTStorage,
                                           storage);
+        hTree.updateHashTrees(false);
         return new HTreeComponents(hTStorage, storage, hTree);
     }
 
@@ -158,6 +159,7 @@ public class HashTreeImplTest {
                                           hTStorage,
                                           storage);
         storage.setHashTree(hTree);
+        hTree.updateHashTrees(false);
         return new HTreeComponents(hTStorage, storage, hTree);
     }
 
@@ -344,8 +346,8 @@ public class HashTreeImplTest {
                                     remoteHTreeComp.storage.localStorage);
             }
 
-            Assert.assertTrue(localHTreeComp.storage.localStorage.size() == 0);
-            Assert.assertTrue(remoteHTreeComp.storage.localStorage.size() == 0);
+            Assert.assertEquals(0, localHTreeComp.storage.localStorage.size());
+            Assert.assertEquals(0, remoteHTreeComp.storage.localStorage.size());
         }
     }
 
@@ -432,14 +434,14 @@ public class HashTreeImplTest {
                                                                    DEFAULT_NO_OF_CHILDREN,
                                                                    remoteStore);
 
-        HashTreeServer server = new HashTreeServer(new CountDownLatch(1),
-                                                   HashTreeConstants.DEFAULT_HASH_TREE_SERVER_PORT_NO,
-                                                   remoteHTreeComp.hTree);
+        BGHashTreeServer server = new BGHashTreeServer(new CountDownLatch(1),
+                                                       HashTreeConstants.DEFAULT_HASH_TREE_SERVER_PORT_NO,
+                                                       remoteHTreeComp.hTree);
         new Thread(server).start();
 
         Thread.sleep(100);
 
-        HashTreeSyncInterface.Iface client = HashTreeClient.getHashTreeClient("localhost");
+        HashTreeSyncInterface.Iface client = HashTreeClientGenerator.getHashTreeClient("localhost");
 
         for(int i = 1; i <= DEFAULT_SEG_DATA_BLOCKS_COUNT; i++) {
             localHTreeComp.storage.put(randomByteBuffer(), randomByteBuffer());

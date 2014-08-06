@@ -17,8 +17,8 @@ import voldemort.hashtrees.thrift.generated.SegmentHash;
 import voldemort.utils.AtomicBitSet;
 
 /**
- * Hash tree can host multiple similar hash trees. This stores the data for one
- * such hash tree.
+ * Hash tree can host multiple similar hash trees. This is mainly used for unit
+ * testing.
  * 
  */
 @Threadsafe
@@ -27,6 +27,7 @@ class IndHashTreeStorageInMemory {
     private final ConcurrentMap<Integer, ByteBuffer> segmentHashes = new ConcurrentSkipListMap<Integer, ByteBuffer>();
     private final ConcurrentMap<Integer, ConcurrentSkipListMap<ByteBuffer, ByteBuffer>> segDataBlocks = new ConcurrentHashMap<Integer, ConcurrentSkipListMap<ByteBuffer, ByteBuffer>>();
     private final AtomicBitSet dirtySegments;
+    private final AtomicLong fullyRebuiltTreeTs = new AtomicLong(0);
     private final AtomicLong rebuiltTreeTs = new AtomicLong(0);
 
     public IndHashTreeStorageInMemory(int noOfSegDataBlocks) {
@@ -99,19 +100,29 @@ class IndHashTreeStorageInMemory {
         return dirtySegments.clearAndGetAllSetBits();
     }
 
-    public void setLastTreeBuildTimestamp(long timestamp) {
-        long oldValue = rebuiltTreeTs.get();
-        while(oldValue < timestamp) {
-            if(rebuiltTreeTs.compareAndSet(oldValue, timestamp))
+    private static void setValueIfNewValueIsGreater(AtomicLong val, long value) {
+        long oldValue = val.get();
+        while(oldValue < value) {
+            if(val.compareAndSet(oldValue, value))
                 break;
-            oldValue = rebuiltTreeTs.get();
+            oldValue = val.get();
         }
     }
 
-    public long getLastTreeBuildTimestamp() {
-        long value = rebuiltTreeTs.get();
-        if(value != 0)
-            return value;
-        return 1;
+    public void setLastFullyRebuiltTimestamp(long timestamp) {
+        setValueIfNewValueIsGreater(fullyRebuiltTreeTs, timestamp);
+    }
+
+    public long getLastTreeFullyRebuiltTimestamp() {
+        long value = fullyRebuiltTreeTs.get();
+        return value;
+    }
+
+    public void setLastHashTreeUpdatedTimestamp(long timestamp) {
+        setValueIfNewValueIsGreater(rebuiltTreeTs, timestamp);
+    }
+
+    public long getLastHashTreeUpdatedTimestamp() {
+        return rebuiltTreeTs.get();
     }
 }

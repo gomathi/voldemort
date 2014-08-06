@@ -119,12 +119,29 @@ public interface HashTreeStorage {
      * 
      * @param timestamp
      */
-    void setLastTreeBuildTimestamp(int treeId, long timestamp);
+    void setLastFullyTreeBuiltTimestamp(int treeId, long timestamp);
 
     /**
      * Returns the timestamp at which the complete HashTree was rebuilt.
      * 
      * @return
      */
-    long getLastTreeBuildTimestamp(int treeId);
+    long getLastFullyTreeReBuiltTimestamp(int treeId);
+
+    /**
+     * Sets the timestamp at which segment hashes were updated, not the entire
+     * tree.
+     * 
+     * @param treeId
+     * @param timestamp
+     */
+    void setLastHashTreeUpdatedTimestamp(int treeId, long timestamp);
+
+    /**
+     * Retrieves the timestamp at which segment hashes were updated.
+     * 
+     * @param treeId
+     * @return
+     */
+    long getLastHashTreeUpdatedTimestamp(int treeId);
 }

@@ -7,15 +7,13 @@ import org.apache.thrift.transport.TTransport;
 import org.apache.thrift.transport.TTransportException;
 
 import voldemort.hashtrees.thrift.generated.HashTreeSyncInterface;
-import voldemort.hashtrees.thrift.generated.HashTreeSyncInterface.Client;
-import voldemort.hashtrees.thrift.generated.HashTreeSyncInterface.Iface;
 
 /**
  * A hashtree client which talks to a hashtree server in another node.
  * 
  */
 
-public class HashTreeClient {
+public class HashTreeClientGenerator {
 
     public static HashTreeSyncInterface.Iface getHashTreeClient(String serverName)
             throws TTransportException {

@@ -58,7 +58,7 @@ public class BGSynchTask extends BGStoppableTask {
     private HashTreeSyncInterface.Iface getHashTreeClient(String hostName) throws TTransportException {
         if(!hostNameAndRemoteHTrees.containsKey(hostName)) {
             hostNameAndRemoteHTrees.putIfAbsent(hostName,
-                                                HashTreeClient.getHashTreeClient(hostName));
+                                                HashTreeClientGenerator.getHashTreeClient(hostName));
         }
         return hostNameAndRemoteHTrees.get(hostName);
     }

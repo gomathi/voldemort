@@ -15,6 +15,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
+import java.util.Random;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
@@ -29,6 +30,7 @@ import java.util.concurrent.locks.ReentrantLock;
 
 import org.apache.log4j.Logger;
 import org.apache.thrift.TException;
+import org.apache.thrift.transport.TTransportException;
 
 import scala.actors.threadpool.Arrays;
 import voldemort.annotations.concurrency.Threadsafe;
@@ -417,10 +419,9 @@ public class HashTreeImpl implements HashTree {
     @Override
     public void updateHashTree(int treeId, boolean fullRebuild) {
         List<Integer> dirtySegmentBuckets = null;
-        long currentTs = 0;
+        long currentTs = System.currentTimeMillis();
         if(fullRebuild) {
-            currentTs = System.currentTimeMillis();
-            long lastRebuiltTs = hTStorage.getLastTreeBuildTimestamp(treeId);
+            long lastRebuiltTs = hTStorage.getLastFullyTreeReBuiltTimestamp(treeId);
             if((lastRebuiltTs - currentTs) < BGTasksManager.EXP_INTERVAL_BW_REBUILDS) {
                 logger.debug("HashTree was rebuilt recently. Not rebuilding again. Skipping the task.");
                 return;
@@ -440,7 +441,9 @@ public class HashTreeImpl implements HashTree {
                                      dirtyNodeAndDigest.getKey(),
                                      dirtyNodeAndDigest.getValue());
         if(fullRebuild)
-            hTStorage.setLastTreeBuildTimestamp(treeId, currentTs);
+            hTStorage.setLastFullyTreeBuiltTimestamp(treeId, currentTs);
+        else
+            hTStorage.setLastHashTreeUpdatedTimestamp(treeId, currentTs);
     }
 
     @Override
@@ -648,7 +651,7 @@ public class HashTreeImpl implements HashTree {
                                                            : 1);
     }
 
-    public void startBGTasks() {
+    public void startBGTasks() throws TTransportException {
         if(enabledBGTasks)
             bgTasksMgr.startBackgroundTasks();
     }
@@ -712,50 +715,54 @@ public class HashTreeImpl implements HashTree {
         // operation
         // is waiting on this latch for all other threads to finish up their
         // work.
-        private final CountDownLatch shutdownLatch;
+        private volatile CountDownLatch shutdownLatch;
         private final int serverPortNo;
 
         public BGTasksManager(final ExecutorService executors, int serverPortNo) {
 
             this.executors = executors;
             this.scheduledExecutors = Executors.newScheduledThreadPool(2);
-            this.shutdownLatch = new CountDownLatch(3);
 
+            this.serverPortNo = serverPortNo;
             this.bgTasks = new ArrayList<BGStoppableTask>();
             this.bgSegDataUpdater = new BGSegmentDataUpdater(shutdownLatch, HashTreeImpl.this);
             this.bgSyncTask = new BGSynchTask(shutdownLatch, HashTreeImpl.this);
-            this.serverPortNo = serverPortNo;
+
+            bgTasks.add(bgSegDataUpdater);
+            bgTasks.add(bgSyncTask);
         }
 
-        private void startBackgroundTasks() {
+        private void startBackgroundTasks() throws TTransportException {
+
+            BGStoppableTask bgRebuildTreeTask = new BGRebuildEntireTreeTask(HashTreeImpl.this,
+                                                                            shutdownLatch);
+            BGStoppableTask bgSegmentTreeTask = new BGRebuildSegmentTreeTask(HashTreeImpl.this,
+                                                                             shutdownLatch);
+            BGHashTreeServer bgHashTreeServer = new BGHashTreeServer(shutdownLatch,
+                                                                     serverPortNo,
+                                                                     HashTreeImpl.this);
+            bgTasks.add(bgRebuildTreeTask);
+            bgTasks.add(bgSegmentTreeTask);
+            bgTasks.add(bgHashTreeServer);
+
+            shutdownLatch = new CountDownLatch(bgTasks.size());
+
             new Thread(bgSegDataUpdater).start();
-            bgTasks.add(bgSegDataUpdater);
+            new Thread(bgHashTreeServer).start();
 
             scheduledExecutors.scheduleWithFixedDelay(bgSyncTask,
                                                       0,
                                                       REMOTE_TREE_SYNCH_INTERVAL,
                                                       TimeUnit.MILLISECONDS);
-            bgTasks.add(bgSyncTask);
-
-            BGStoppableTask bgRebuildTreeTask = new BGRebuildEntireTreeTask(HashTreeImpl.this,
-                                                                            shutdownLatch);
             scheduledExecutors.scheduleWithFixedDelay(bgRebuildTreeTask,
                                                       0,
                                                       REBUILD_HTREE_TIME_INTERVAL,
                                                       TimeUnit.MILLISECONDS);
-            bgTasks.add(bgRebuildTreeTask);
 
-            BGStoppableTask bgSegmentTreeTask = new BGRebuildSegmentTreeTask(HashTreeImpl.this,
-                                                                             shutdownLatch);
             scheduledExecutors.scheduleWithFixedDelay(bgSegmentTreeTask,
-                                                      0,
+                                                      new Random().nextInt(1000),
                                                       REBUILD_SEG_TIME_INTERVAL,
                                                       TimeUnit.MILLISECONDS);
-            bgTasks.add(bgSegmentTreeTask);
-            HashTreeServer localHashTreeServer = new HashTreeServer(shutdownLatch,
-                                                                    serverPortNo,
-                                                                    HashTreeImpl.this);
-            new Thread(localHashTreeServer).start();
         }
 
         private void stopBackgroundTasks() {
@@ -785,7 +792,7 @@ public class HashTreeImpl implements HashTree {
 
     @Override
     public boolean isReadyForSynch(int treeId) {
-        return hTStorage.getLastTreeBuildTimestamp(treeId) > 0;
+        return hTStorage.getLastHashTreeUpdatedTimestamp(treeId) > 0;
     }
 
     @Override
