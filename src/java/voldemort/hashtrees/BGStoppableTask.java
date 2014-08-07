@@ -10,8 +10,8 @@ import voldemort.utils.Stoppable;
  * A stoppable abstract class which can be scheduled through executors. This
  * abstract class makes sure only one task can run at any time. The
  * implementations are expected to provide code for {@link #run()} method. Also
- * the callers of stop method, can use the latch {@link #shutdownLatch} to wait
- * for the complete stop of this task.
+ * the callers of stop method, can use the latch {@link #stopListenerLatch} to
+ * wait for the complete stop of this task.
  * 
  * Implementations need to get true value from {@link #enableRunningStatus()}
  * before doing the actual task in {@link #run()} method. Otherwise, should not
@@ -24,14 +24,8 @@ public abstract class BGStoppableTask implements Runnable, Stoppable {
 
     // all variables are locked by instance of this object.
     private final ReentrantLock runLock = new ReentrantLock();
-    private volatile CountDownLatch shutdownLatch;
+    private volatile CountDownLatch stopListenerLatch;
     private volatile boolean stopRequested = false;
-
-    public BGStoppableTask() {}
-
-    public BGStoppableTask(final CountDownLatch shutdownLatch) {
-        this.shutdownLatch = shutdownLatch;
-    }
 
     /**
      * If a task is already running or stop has been requested, this will return
@@ -48,7 +42,7 @@ public abstract class BGStoppableTask implements Runnable, Stoppable {
     protected synchronized void disableRunningStatus() {
         runLock.unlock();
         if(stopRequested)
-            shutdownLatch.countDown();
+            stopListenerLatch.countDown();
     }
 
     protected boolean hasStopRequested() {
@@ -60,11 +54,23 @@ public abstract class BGStoppableTask implements Runnable, Stoppable {
         if(stopRequested)
             return;
         stopRequested = true;
-        if(!runLock.isLocked() && shutdownLatch != null)
-            shutdownLatch.countDown();
+        if(!runLock.isLocked() && stopListenerLatch != null)
+            stopListenerLatch.countDown();
+    }
+
+    public synchronized void stop(final CountDownLatch stopListenerLatch) {
+        this.stopListenerLatch = stopListenerLatch;
+        stop();
     }
 
     @Override
     public abstract void run();
 
+    /**
+     * This is to reset to initialized state, once a task is stopped.
+     */
+    public synchronized void reset() {
+        stopRequested = false;
+        stopListenerLatch = null;
+    }
 }

@@ -14,10 +14,6 @@ public class BGStoppableTaskTest {
         volatile boolean ran = false;
         volatile boolean finished = false;
 
-        public ExtendedBGStoppableTask(CountDownLatch shutdownLatch) {
-            super(shutdownLatch);
-        }
-
         @Override
         public void run() {
             started = true;
@@ -36,8 +32,8 @@ public class BGStoppableTaskTest {
     public void testStoppableTask() throws InterruptedException {
 
         CountDownLatch latch = new CountDownLatch(1);
-        ExtendedBGStoppableTask task = new ExtendedBGStoppableTask(latch);
-        task.stop();
+        ExtendedBGStoppableTask task = new ExtendedBGStoppableTask();
+        task.stop(latch);
 
         new Thread(task).start();
         while(!task.started)
@@ -46,12 +42,12 @@ public class BGStoppableTaskTest {
         Assert.assertFalse(task.ran);
 
         latch = new CountDownLatch(1);
-        task = new ExtendedBGStoppableTask(latch);
+        task = new ExtendedBGStoppableTask();
 
         new Thread(task).start();
         while(!task.started)
             Thread.sleep(50);
-        task.stop();
+        task.stop(latch);
         latch.await();
         Assert.assertTrue(task.finished);
         Assert.assertTrue(task.ran);

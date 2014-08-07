@@ -4,7 +4,6 @@ import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.CountDownLatch;
 
 import org.apache.log4j.Logger;
 
@@ -29,11 +28,6 @@ public class BGSegmentDataUpdater extends BGStoppableTask {
     private final HashTreeImpl hTreeImpl;
 
     public BGSegmentDataUpdater(final HashTreeImpl hTreeImpl) {
-        this.hTreeImpl = hTreeImpl;
-    }
-
-    public BGSegmentDataUpdater(final HashTreeImpl hTreeImpl, final CountDownLatch shutdownLatch) {
-        super(shutdownLatch);
         this.hTreeImpl = hTreeImpl;
     }
 

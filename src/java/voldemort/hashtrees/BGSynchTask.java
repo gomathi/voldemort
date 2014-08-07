@@ -3,7 +3,6 @@ package voldemort.hashtrees;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ConcurrentSkipListSet;
-import java.util.concurrent.CountDownLatch;
 
 import org.apache.log4j.Logger;
 import org.apache.thrift.TException;
@@ -51,11 +50,6 @@ public class BGSynchTask extends BGStoppableTask {
     }
 
     public BGSynchTask(final HashTree localTree) {
-        this.localTree = localTree;
-    }
-
-    public BGSynchTask(final HashTree localTree, final CountDownLatch shutdownLatch) {
-        super(shutdownLatch);
         this.localTree = localTree;
     }
 

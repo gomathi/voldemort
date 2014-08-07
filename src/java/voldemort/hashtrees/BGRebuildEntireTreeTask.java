@@ -1,7 +1,5 @@
 package voldemort.hashtrees;
 
-import java.util.concurrent.CountDownLatch;
-
 import org.apache.log4j.Logger;
 
 import voldemort.annotations.concurrency.Threadsafe;
@@ -22,11 +20,6 @@ public class BGRebuildEntireTreeTask extends BGStoppableTask {
     private final HashTree hashTree;
 
     public BGRebuildEntireTreeTask(final HashTree hashtree) {
-        this.hashTree = hashtree;
-    }
-
-    public BGRebuildEntireTreeTask(final HashTree hashtree, final CountDownLatch shutdownLatch) {
-        super(shutdownLatch);
         this.hashTree = hashtree;
     }
 

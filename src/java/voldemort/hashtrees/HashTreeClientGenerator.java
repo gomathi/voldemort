@@ -15,14 +15,16 @@ import voldemort.hashtrees.thrift.generated.HashTreeSyncInterface;
 
 public class HashTreeClientGenerator {
 
+    public static HashTreeSyncInterface.Iface getHashTreeClient(String serverName, int portNo)
+            throws TTransportException {
+        TTransport transport = new TSocket(serverName, portNo);
+        transport.open();
+        TProtocol protocol = new TBinaryProtocol(transport);
+        return new HashTreeSyncInterface.Client(protocol);
+    }
+
     public static HashTreeSyncInterface.Iface getHashTreeClient(String serverName)
             throws TTransportException {
-        TTransport transport = new TSocket(serverName,
-                                           HashTreeConstants.DEFAULT_HASH_TREE_SERVER_PORT_NO);
-        transport.open();
-
-        TProtocol protocol = new TBinaryProtocol(transport);
-
-        return new HashTreeSyncInterface.Client(protocol);
+        return getHashTreeClient(serverName, HashTreeConstants.DEFAULT_HASH_TREE_SERVER_PORT_NO);
     }
 }

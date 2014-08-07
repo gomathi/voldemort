@@ -9,6 +9,7 @@ import static voldemort.utils.TreeUtils.height;
 import java.nio.ByteBuffer;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -32,7 +33,6 @@ import org.apache.log4j.Logger;
 import org.apache.thrift.TException;
 import org.apache.thrift.transport.TTransportException;
 
-import scala.actors.threadpool.Arrays;
 import voldemort.annotations.concurrency.Threadsafe;
 import voldemort.hashtrees.thrift.generated.HashTreeSyncInterface;
 import voldemort.hashtrees.thrift.generated.SegmentData;
@@ -661,6 +661,16 @@ public class HashTreeImpl implements HashTree {
         }
     }
 
+    public void enableSync() {
+        if(enabledBGTasks)
+            this.bgTasksMgr.enableSynch();
+    }
+
+    public void disableSync() {
+        if(enabledBGTasks)
+            this.bgTasksMgr.disableSynch();
+    }
+
     /**
      * Defines the function to return the segId given the key.
      * 
@@ -709,12 +719,6 @@ public class HashTreeImpl implements HashTree {
         private final List<BGStoppableTask> bgTasks;
         private final BGSegmentDataUpdater bgSegDataUpdater;
         private final BGSynchTask bgSyncTask;
-
-        // A latch that is used internally while shutting down. Shutdown
-        // operation
-        // is waiting on this latch for all other threads to finish up their
-        // work.
-        private volatile CountDownLatch shutdownLatch;
         private final int serverPortNo;
 
         public BGTasksManager(final ExecutorService executors, int serverPortNo) {
@@ -724,8 +728,8 @@ public class HashTreeImpl implements HashTree {
 
             this.serverPortNo = serverPortNo;
             this.bgTasks = new ArrayList<BGStoppableTask>();
-            this.bgSegDataUpdater = new BGSegmentDataUpdater(HashTreeImpl.this, shutdownLatch);
-            this.bgSyncTask = new BGSynchTask(HashTreeImpl.this, shutdownLatch);
+            this.bgSegDataUpdater = new BGSegmentDataUpdater(HashTreeImpl.this);
+            this.bgSyncTask = new BGSynchTask(HashTreeImpl.this);
 
             bgTasks.add(bgSegDataUpdater);
             bgTasks.add(bgSyncTask);
@@ -733,18 +737,13 @@ public class HashTreeImpl implements HashTree {
 
         private void startBackgroundTasks() throws TTransportException {
 
-            BGStoppableTask bgRebuildTreeTask = new BGRebuildEntireTreeTask(HashTreeImpl.this,
-                                                                            shutdownLatch);
-            BGStoppableTask bgSegmentTreeTask = new BGRebuildSegmentTreeTask(HashTreeImpl.this,
-                                                                             shutdownLatch);
+            BGStoppableTask bgRebuildTreeTask = new BGRebuildEntireTreeTask(HashTreeImpl.this);
+            BGStoppableTask bgSegmentTreeTask = new BGRebuildSegmentTreeTask(HashTreeImpl.this);
             BGHashTreeServer bgHashTreeServer = new BGHashTreeServer(HashTreeImpl.this,
-                                                                     serverPortNo,
-                                                                     shutdownLatch);
+                                                                     serverPortNo);
             bgTasks.add(bgRebuildTreeTask);
             bgTasks.add(bgSegmentTreeTask);
             bgTasks.add(bgHashTreeServer);
-
-            shutdownLatch = new CountDownLatch(bgTasks.size());
 
             new Thread(bgSegDataUpdater).start();
             new Thread(bgHashTreeServer).start();
@@ -764,9 +763,19 @@ public class HashTreeImpl implements HashTree {
                                                       TimeUnit.MILLISECONDS);
         }
 
-        private void stopBackgroundTasks() {
+        private synchronized void enableSynch() {
+            bgSyncTask.stop();
+        }
+
+        private synchronized void disableSynch() {
+            bgSyncTask.reset();
+        }
+
+        private synchronized CountDownLatch stopBackgroundTasks() {
+            CountDownLatch shutdownLatch = new CountDownLatch(bgTasks.size());
             for(BGStoppableTask task: bgTasks)
-                task.stop();
+                task.stop(shutdownLatch);
+            return shutdownLatch;
         }
 
         /**
@@ -774,7 +783,7 @@ public class HashTreeImpl implements HashTree {
          * on this object.
          */
         public void safeShutdown() {
-            stopBackgroundTasks();
+            CountDownLatch shutdownLatch = stopBackgroundTasks();
             logger.info("Waiting for the shut down of background threads.");
             try {
                 shutdownLatch.await();

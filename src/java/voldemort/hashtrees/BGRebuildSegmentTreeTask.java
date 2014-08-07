@@ -1,24 +1,19 @@
 package voldemort.hashtrees;
 
-import java.util.concurrent.CountDownLatch;
-
+import org.apache.http.annotation.ThreadSafe;
 import org.apache.log4j.Logger;
 
 /**
  * This updates just the segment hashes on the tree.
  * 
  */
+@ThreadSafe
 public class BGRebuildSegmentTreeTask extends BGStoppableTask {
 
     private static final Logger logger = Logger.getLogger(BGRebuildSegmentTreeTask.class);
     private final HashTree hTree;
 
     public BGRebuildSegmentTreeTask(final HashTree hTree) {
-        this.hTree = hTree;
-    }
-
-    public BGRebuildSegmentTreeTask(final HashTree hTree, final CountDownLatch shutdownLatch) {
-        super(shutdownLatch);
         this.hTree = hTree;
     }
 

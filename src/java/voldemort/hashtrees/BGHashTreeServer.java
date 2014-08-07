@@ -1,13 +1,12 @@
 package voldemort.hashtrees;
 
-import java.util.concurrent.CountDownLatch;
-
 import org.apache.log4j.Logger;
 import org.apache.thrift.server.TServer;
 import org.apache.thrift.server.TThreadPoolServer;
 import org.apache.thrift.transport.TServerSocket;
 import org.apache.thrift.transport.TTransportException;
 
+import voldemort.annotations.concurrency.Threadsafe;
 import voldemort.hashtrees.thrift.generated.HashTreeSyncInterface;
 import voldemort.hashtrees.thrift.generated.HashTreeSyncInterface.Iface;
 
@@ -16,6 +15,7 @@ import voldemort.hashtrees.thrift.generated.HashTreeSyncInterface.Iface;
  * update the HashTree on this node.
  * 
  */
+@Threadsafe
 public class BGHashTreeServer extends BGStoppableTask {
 
     private final static Logger logger = Logger.getLogger(BGHashTreeServer.class);
@@ -23,13 +23,6 @@ public class BGHashTreeServer extends BGStoppableTask {
 
     public BGHashTreeServer(final HashTree localHashTree, final int serverPortNo)
                                                                                  throws TTransportException {
-        this.server = createServer(serverPortNo, localHashTree);
-    }
-
-    public BGHashTreeServer(final HashTree localHashTree,
-                            final int serverPortNo,
-                            final CountDownLatch shutdownLatch) throws TTransportException {
-        super(shutdownLatch);
         this.server = createServer(serverPortNo, localHashTree);
     }
 
