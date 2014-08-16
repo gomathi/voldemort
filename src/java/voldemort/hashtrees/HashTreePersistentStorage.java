@@ -50,7 +50,7 @@ import voldemort.utils.ByteUtils;
 
 public class HashTreePersistentStorage implements HashTreeStorage {
 
-    private static final Logger logger = Logger.getLogger(HashTreePersistentStorage.class);
+    private static final Logger LOG = Logger.getLogger(HashTreePersistentStorage.class);
 
     private static final byte[] KEY_LAST_FULLY_TREE_BUILT_TS = "ltfbTs".getBytes();
     private static final byte[] KEY_LAST_TREE_BUILT_TS = "ltbTs".getBytes();
@@ -88,7 +88,7 @@ public class HashTreePersistentStorage implements HashTreeStorage {
             dbObj.close();
         } catch(IOException e) {
             // TODO Auto-generated catch block
-            logger.warn("Exception occurred while closing leveldb connection.");
+            LOG.warn("Exception occurred while closing leveldb connection.");
         }
     }
 
@@ -275,7 +275,7 @@ public class HashTreePersistentStorage implements HashTreeStorage {
                 iterator.close();
             } catch(IOException e) {
                 // TODO Auto-generated catch block
-                logger.warn("Exception occurred while closing the DBIterator.", e);
+                LOG.warn("Exception occurred while closing the DBIterator.", e);
             }
         }
         return result;

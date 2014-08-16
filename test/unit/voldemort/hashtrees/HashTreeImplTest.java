@@ -30,7 +30,6 @@ import junit.framework.Assert;
 import org.apache.thrift.TException;
 import org.junit.Test;
 
-import voldemort.hashtrees.HashTreeImpl.SegmentIdProvider;
 import voldemort.hashtrees.thrift.generated.HashTreeSyncInterface;
 import voldemort.hashtrees.thrift.generated.SegmentData;
 import voldemort.hashtrees.thrift.generated.SegmentHash;

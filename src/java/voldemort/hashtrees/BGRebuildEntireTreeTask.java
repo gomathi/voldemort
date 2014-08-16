@@ -31,7 +31,7 @@ import voldemort.annotations.concurrency.Threadsafe;
 @Threadsafe
 public class BGRebuildEntireTreeTask extends BGStoppableTask {
 
-    private final static Logger logger = Logger.getLogger(BGRebuildEntireTreeTask.class);
+    private final static Logger LOG = Logger.getLogger(BGRebuildEntireTreeTask.class);
     private final HashTree hashTree;
 
     public BGRebuildEntireTreeTask(final HashTree hashtree) {
@@ -47,15 +47,15 @@ public class BGRebuildEntireTreeTask extends BGStoppableTask {
                 disableRunningStatus();
             }
         } else
-            logger.info("A task for rebuilding hash tree is already running or stop has been requested. Skipping the current task.");
+            LOG.info("A task for rebuilding hash tree is already running or stop has been requested. Skipping the current task.");
     }
 
     private void rebuildHashTree() {
-        logger.info("Rebuilding HTree");
+        LOG.info("Rebuilding HTree");
         long startTime = System.currentTimeMillis();
         hashTree.updateHashTrees(true);
         long endTime = System.currentTimeMillis();
-        logger.info("Total time took for rebuilding htree (in ms) : " + (endTime - startTime));
-        logger.info("Rebuilding HTree - Done");
+        LOG.info("Total time took for rebuilding htree (in ms) : " + (endTime - startTime));
+        LOG.info("Rebuilding HTree - Done");
     }
 }

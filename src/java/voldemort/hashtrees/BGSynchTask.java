@@ -34,7 +34,7 @@ import voldemort.hashtrees.thrift.generated.HashTreeSyncInterface;
 @Threadsafe
 public class BGSynchTask extends BGStoppableTask {
 
-    private final static Logger logger = Logger.getLogger(BGSynchTask.class);
+    private final static Logger LOG = Logger.getLogger(BGSynchTask.class);
     private final ConcurrentMap<String, HashTreeSyncInterface.Iface> hostNameAndRemoteHTrees = new ConcurrentHashMap<String, HashTreeSyncInterface.Iface>();
     private final ConcurrentSkipListSet<HostNameAndHashTreeId> hostNameAndTreeIdMap = new ConcurrentSkipListSet<BGSynchTask.HostNameAndHashTreeId>();
     private final HashTree localTree;
@@ -80,13 +80,13 @@ public class BGSynchTask extends BGStoppableTask {
     public void add(final String hostName, int treeId) {
         HostNameAndHashTreeId value = new HostNameAndHashTreeId(hostName, treeId);
         hostNameAndTreeIdMap.add(value);
-        logger.debug("Host " + hostName + " and treeId :" + treeId
+        LOG.debug("Host " + hostName + " and treeId :" + treeId
                      + " has been added from sync list.");
     }
 
     public void remove(final String hostName, int treeId) {
         hostNameAndTreeIdMap.remove(new HostNameAndHashTreeId(hostName, treeId));
-        logger.debug("Host " + hostName + " and treeId :" + treeId
+        LOG.debug("Host " + hostName + " and treeId :" + treeId
                      + " has been removed from sync list.");
     }
 
@@ -94,18 +94,18 @@ public class BGSynchTask extends BGStoppableTask {
     public void run() {
         if(enableRunningStatus()) {
             try {
-                logger.info("Synching remote hash trees.");
+                LOG.info("Synching remote hash trees.");
                 for(HostNameAndHashTreeId syncHostAndTreeId: hostNameAndTreeIdMap) {
                     try {
                         HashTreeSyncInterface.Iface remoteTree = getHashTreeClient(syncHostAndTreeId.hostName);
                         localTree.synch(syncHostAndTreeId.treeId, remoteTree);
                     } catch(TException e) {
                         // TODO Auto-generated catch block
-                        logger.warn("Unable to synch remote hash tree server : "
+                        LOG.warn("Unable to synch remote hash tree server : "
                                     + syncHostAndTreeId, e);
                     }
                 }
-                logger.info("Synching remote hash trees. - Done");
+                LOG.info("Synching remote hash trees. - Done");
             } finally {
                 disableRunningStatus();
             }

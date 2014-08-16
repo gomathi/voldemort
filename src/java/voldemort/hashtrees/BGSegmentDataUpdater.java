@@ -36,15 +36,15 @@ import voldemort.utils.Pair;
 @Threadsafe
 public class BGSegmentDataUpdater extends BGStoppableTask {
 
-    private static final Logger logger = Logger.getLogger(BGSegmentDataUpdater.class);
+    private static final Logger LOG = Logger.getLogger(BGSegmentDataUpdater.class);
     private static final Pair<HTOperation, List<ByteBuffer>> STOP_MARKER = new Pair<HTOperation, List<ByteBuffer>>(HTOperation.STOP,
                                                                                                                    null);
 
     private final BlockingQueue<Pair<HTOperation, List<ByteBuffer>>> que = new ArrayBlockingQueue<Pair<HTOperation, List<ByteBuffer>>>(Integer.MAX_VALUE);
     private final HashTreeImpl hTreeImpl;
 
-    public BGSegmentDataUpdater(final HashTreeImpl hTreeImpl) {
-        this.hTreeImpl = hTreeImpl;
+    public BGSegmentDataUpdater(final HashTree hTreeImpl) {
+        this.hTreeImpl = (HashTreeImpl) hTreeImpl;
     }
 
     public void enque(Pair<HTOperation, List<ByteBuffer>> data) {
@@ -85,7 +85,7 @@ public class BGSegmentDataUpdater extends BGStoppableTask {
                     }
                 } catch(InterruptedException e) {
                     // TODO Auto-generated catch block
-                    logger.error("Interrupted while waiting for removing an element from the queue. Exiting");
+                    LOG.error("Interrupted while waiting for removing an element from the queue. Exiting");
                     return;
                 } finally {
                     if(hasStopRequested() && que.isEmpty()) {

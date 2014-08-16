@@ -35,7 +35,7 @@ import voldemort.hashtrees.thrift.generated.HashTreeSyncInterface.Iface;
 @Threadsafe
 public class BGHashTreeServer extends BGStoppableTask {
 
-    private final static Logger logger = Logger.getLogger(BGHashTreeServer.class);
+    private final static Logger LOG = Logger.getLogger(BGHashTreeServer.class);
     private final TServer server;
 
     public BGHashTreeServer(final HashTree localHashTree, final int serverPortNo)
@@ -76,11 +76,11 @@ public class BGHashTreeServer extends BGStoppableTask {
 
     private void startServer() {
         server.serve();
-        logger.debug("Hash tree server has started.");
+        LOG.debug("Hash tree server has started.");
     }
 
     private void stopServer() {
         server.stop();
-        logger.debug("Hash tree server has stopped.");
+        LOG.debug("Hash tree server has stopped.");
     }
 }

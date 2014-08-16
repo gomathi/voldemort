@@ -25,7 +25,7 @@ import org.apache.log4j.Logger;
 @ThreadSafe
 public class BGRebuildSegmentTreeTask extends BGStoppableTask {
 
-    private static final Logger logger = Logger.getLogger(BGRebuildSegmentTreeTask.class);
+    private static final Logger LOG = Logger.getLogger(BGRebuildSegmentTreeTask.class);
     private final HashTree hTree;
 
     public BGRebuildSegmentTreeTask(final HashTree hTree) {
@@ -41,14 +41,14 @@ public class BGRebuildSegmentTreeTask extends BGStoppableTask {
                 disableRunningStatus();
             }
         } else
-            logger.debug("Another rebuild task is already running. Skipping this task.");
+            LOG.debug("Another rebuild task is already running. Skipping this task.");
     }
 
     private void rebuildSegmentTrees() {
-        logger.info("Updating segment hashes : ");
+        LOG.info("Updating segment hashes : ");
         long startTime = System.currentTimeMillis();
         hTree.updateHashTrees(false);
         long endTime = System.currentTimeMillis();
-        logger.info("Total time taken to update segment hashes : (in ms)" + (endTime - startTime));
+        LOG.info("Total time taken to update segment hashes : (in ms)" + (endTime - startTime));
     }
 }
