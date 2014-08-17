@@ -20,7 +20,7 @@ package voldemort.hashtrees;
  * version of {@link HashTreeImpl} hPut and hRemove methods.
  * 
  */
-enum HTOperation {
+public enum HTOperation {
     PUT,
     REMOVE,
     STOP

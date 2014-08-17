@@ -13,7 +13,7 @@
  * License for the specific language governing permissions and limitations under
  * the License.
  */
-package voldemort.hashtrees;
+package voldemort.hashtrees.tasks;
 
 import java.util.concurrent.CountDownLatch;
 
@@ -24,6 +24,7 @@ import org.apache.thrift.transport.TServerSocket;
 import org.apache.thrift.transport.TTransportException;
 
 import voldemort.annotations.concurrency.Threadsafe;
+import voldemort.hashtrees.HashTree;
 import voldemort.hashtrees.thrift.generated.HashTreeSyncInterface;
 import voldemort.hashtrees.thrift.generated.HashTreeSyncInterface.Iface;
 

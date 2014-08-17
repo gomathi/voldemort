@@ -1,4 +1,4 @@
-package voldemort.hashtrees;
+package voldemort.hashtrees.tasks;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -12,6 +12,8 @@ import java.util.concurrent.TimeUnit;
 import org.apache.log4j.Logger;
 import org.apache.thrift.transport.TTransportException;
 
+import voldemort.hashtrees.HashTree;
+
 /**
  * Manages all the background threads like rebuilding segment hashes, rebuilding
  * segment trees and non blocking segment data updater thread.
@@ -20,22 +22,21 @@ import org.apache.thrift.transport.TTransportException;
 public class BGTasksManager {
 
     private final static Logger LOG = Logger.getLogger(BGTasksManager.class);
+
     // Rebuild segment time interval, not full rebuild, but rebuild of dirty
     // segments, in milliseconds. Should be scheduled in shorter intervals.
     public final static long REBUILD_SEG_TIME_INTERVAL = 2 * 60 * 1000;
-    // Rebuild of the complete tree. Should be scheduled in longer
-    // intervals.
-    public final static long REBUILD_HTREE_TIME_INTERVAL = 7 * 60 * 1000;
-    public final static long REMOTE_TREE_SYNCH_INTERVAL = 5 * 60 * 1000;
     // Expected time interval between two consecutive tree full rebuilds.
-    public final static long EXP_INTERVAL_BW_REBUILDS = 25 * 60 * 1000;
+    public final static long REBUILD_FULL_TREE_TIME_INTERVAL = 25 * 60 * 1000;
+    public final static long REMOTE_TREE_SYNCH_INTERVAL = 5 * 60 * 1000;
 
     private final ExecutorService executors;
     private final ScheduledExecutorService scheduledExecutors;
-    // Background tasks.
+
     private final List<BGStoppableTask> bgTasks;
     public final BGSegmentDataUpdater bgSegDataUpdater;
     public final BGSynchTask bgSyncTask;
+
     private final int serverPortNo;
     private final HashTree hashTree;
     private volatile boolean tasksRunning;
@@ -75,7 +76,7 @@ public class BGTasksManager {
                                                   TimeUnit.MILLISECONDS);
         scheduledExecutors.scheduleWithFixedDelay(bgRebuildTreeTask,
                                                   0,
-                                                  REBUILD_HTREE_TIME_INTERVAL,
+                                                  REBUILD_FULL_TREE_TIME_INTERVAL,
                                                   TimeUnit.MILLISECONDS);
 
         scheduledExecutors.scheduleWithFixedDelay(bgSegmentTreeTask,
@@ -113,7 +114,6 @@ public class BGTasksManager {
             shutdownLatch.await();
             LOG.info("Segment data updater has been shut down.");
         } catch(InterruptedException e) {
-            // TODO Auto-generated catch block
             LOG.warn("Interrupted while waiting for the shut down of background threads.");
         }
         executors.shutdownNow();

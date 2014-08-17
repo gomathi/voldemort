@@ -88,6 +88,15 @@ public class VoldemortConfig implements Serializable {
     private static final String DEFAULT_FILE_FETCHER_CLASS = null;
     private static final String REST_HDFS_FETCHER_CLASS = "voldemort.server.protocol.hadoop.RestHadoopFetcher";
 
+    // HashTree constants
+    // Rebuild of the complete tree. Should be scheduled in longer
+    // intervals.
+    public final static long REBUILD_SEG_TIME_INTERVAL = 2 * 60 * 1000;
+    public final static long REBUILD_HTREE_TIME_INTERVAL = 7 * 60 * 1000;
+    public final static long REMOTE_TREE_SYNCH_INTERVAL = 5 * 60 * 1000;
+    // Expected time interval between two consecutive tree full rebuilds.
+    public final static long EXP_INTERVAL_BW_REBUILDS = 25 * 60 * 1000;
+
     private int nodeId;
     private String voldemortHome;
     private String dataDirectory;
@@ -261,6 +270,11 @@ public class VoldemortConfig implements Serializable {
     private int repairJobMaxKeysScannedPerSec;
     private int pruneJobMaxKeysScannedPerSec;
     private int slopPurgeJobMaxKeysScannedPerSec;
+
+    private long rebuildSegTimeInterval;
+    private long rebuildHTreeTimeInterval;
+    private long remoteTreeSynchInterval;
+    private long intervalBWRebuilds;
 
     public VoldemortConfig(Properties props) {
         this(new Props(props));
@@ -569,6 +583,12 @@ public class VoldemortConfig implements Serializable {
                                                          Integer.MAX_VALUE);
         this.slopPurgeJobMaxKeysScannedPerSec = props.getInt("slop.purgejob.max.keys.scanned.per.sec",
                                                              10000);
+        this.rebuildHTreeTimeInterval = props.getLong("htree.rebuildfull.timeinterval",
+                                                      REBUILD_HTREE_TIME_INTERVAL);
+        this.rebuildSegTimeInterval = props.getLong("htree.rebuildsegment.timeinterval",
+                                                    REBUILD_SEG_TIME_INTERVAL);
+        this.remoteTreeSynchInterval = props.getLong("htree.synchtimeinterval",
+                                                     REMOTE_TREE_SYNCH_INTERVAL);
 
         validateParams();
     }

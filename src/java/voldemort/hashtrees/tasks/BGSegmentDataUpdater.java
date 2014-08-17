@@ -13,7 +13,7 @@
  * License for the specific language governing permissions and limitations under
  * the License.
  */
-package voldemort.hashtrees;
+package voldemort.hashtrees.tasks;
 
 import java.nio.ByteBuffer;
 import java.util.List;
@@ -24,6 +24,9 @@ import java.util.concurrent.CountDownLatch;
 import org.apache.log4j.Logger;
 
 import voldemort.annotations.concurrency.Threadsafe;
+import voldemort.hashtrees.HTOperation;
+import voldemort.hashtrees.HashTree;
+import voldemort.hashtrees.HashTreeImpl;
 import voldemort.utils.ByteArray;
 import voldemort.utils.Pair;
 
@@ -84,7 +87,6 @@ public class BGSegmentDataUpdater extends BGStoppableTask {
                             break;
                     }
                 } catch(InterruptedException e) {
-                    // TODO Auto-generated catch block
                     LOG.error("Interrupted while waiting for removing an element from the queue. Exiting");
                     return;
                 } finally {

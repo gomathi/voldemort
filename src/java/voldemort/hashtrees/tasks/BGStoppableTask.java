@@ -13,7 +13,7 @@
  * License for the specific language governing permissions and limitations under
  * the License.
  */
-package voldemort.hashtrees;
+package voldemort.hashtrees.tasks;
 
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.locks.ReentrantLock;

@@ -21,6 +21,7 @@ import static voldemort.utils.TreeUtils.getNoOfNodes;
 import static voldemort.utils.TreeUtils.getParent;
 import static voldemort.utils.TreeUtils.height;
 
+import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -44,6 +45,12 @@ import org.apache.thrift.TException;
 import org.apache.thrift.transport.TTransportException;
 
 import voldemort.annotations.concurrency.Threadsafe;
+import voldemort.hashtrees.storage.HashTreePersistentStorage;
+import voldemort.hashtrees.storage.HashTreeStorage;
+import voldemort.hashtrees.storage.HashTreeStorageInMemory;
+import voldemort.hashtrees.storage.Storage;
+import voldemort.hashtrees.storage.StorageImpl;
+import voldemort.hashtrees.tasks.BGTasksManager;
 import voldemort.hashtrees.thrift.generated.HashTreeSyncInterface;
 import voldemort.hashtrees.thrift.generated.SegmentData;
 import voldemort.hashtrees.thrift.generated.SegmentHash;
@@ -80,12 +87,14 @@ import voldemort.utils.Pair;
 public class HashTreeImpl implements HashTree {
 
     private final static Logger LOG = Logger.getLogger(HashTreeImpl.class);
+    private final static char COMMA_DELIMETER = ',';
+    private final static char NEW_LINE_DELIMETER = '\n';
 
     private final static int ROOT_NODE = 0;
     private final static int MAX_NO_OF_BUCKETS = 1 << 30;
-    private final static int FOUR_ARY_TREE = 4;
+    private final static int BINARY_TREE = 2;
 
-    private final int childrenCountPerParent;
+    private final int noOfChildren;
     private final int internalNodesCount;
     private final int segmentsCount;
 
@@ -99,72 +108,38 @@ public class HashTreeImpl implements HashTree {
     private final ConcurrentMap<Integer, ReentrantLock> treeLocks = new ConcurrentHashMap<Integer, ReentrantLock>();
 
     public HashTreeImpl(int noOfSegments,
-                        int noOfChildrenPerParent,
                         final HashTreeIdProvider treeIdProvider,
                         final SegmentIdProvider segIdProvider,
                         final HashTreeStorage hTStroage,
                         final Storage storage) {
+        this.noOfChildren = BINARY_TREE;
         this.segmentsCount = ((noOfSegments > MAX_NO_OF_BUCKETS) || (noOfSegments < 0)) ? MAX_NO_OF_BUCKETS
                                                                                        : roundUpToPowerOf2(noOfSegments);
-        this.childrenCountPerParent = noOfChildrenPerParent;
-        this.internalNodesCount = getNoOfNodes((height(this.segmentsCount,
-                                                       this.childrenCountPerParent) - 1),
-                                               this.childrenCountPerParent);
+        this.internalNodesCount = getNoOfNodes((height(this.segmentsCount, noOfChildren) - 1),
+                                               noOfChildren);
         this.treeIdProvider = treeIdProvider;
         this.segIdProvider = segIdProvider;
         this.hTStorage = hTStroage;
         this.storage = storage;
     }
 
-    /**
-     * Launches the HashTree with nonblocking puts and removes, also
-     * additionally launches background threads to update segments, rebuild the
-     * entire tree, and to synch remote hashtrees at regular intervals.
-     * 
-     * @param hTStorage
-     * @param treeIdProvider
-     * @param storage
-     * @param executors
-     */
-    public HashTreeImpl(final HashTreeIdProvider treeIdProvider,
-                        final HashTreeStorage hTStorage,
-                        final Storage storage) {
-        this(MAX_NO_OF_BUCKETS,
-             FOUR_ARY_TREE,
-             treeIdProvider,
-             new DefaultSegIdProviderImpl(MAX_NO_OF_BUCKETS),
-             hTStorage,
-             storage);
-    }
-
-    /**
-     * Launches the HashTree, with no background threads to update the hash
-     * tree. This is mainly used for unit tests.
-     * 
-     * @param hTStorage
-     * @param treeIdProvider
-     * @param segIdProvider
-     * @param storage
-     */
-    public HashTreeImpl(int noOfSegments,
-                        final HashTreeIdProvider treeIdProvider,
-                        final SegmentIdProvider segIdProvider,
-                        final HashTreeStorage hTStorage,
-                        final Storage storage) {
-        this(noOfSegments, FOUR_ARY_TREE, treeIdProvider, segIdProvider, hTStorage, storage);
-    }
-
-    // For unit tests
-    public HashTreeImpl(int noOfSegments,
-                        int noOfChildrenPerParent,
-                        final HashTreeIdProvider treeIdProvider,
-                        final HashTreeStorage hTStorage,
-                        final Storage storage) {
+    public HashTreeImpl(int noOfSegments, String dbDir) throws IOException {
         this(noOfSegments,
-             noOfChildrenPerParent,
+             new HashTreeIdProviderImpl(),
+             new DefaultSegIdProviderImpl(noOfSegments),
+             new HashTreePersistentStorage(dbDir, noOfSegments),
+             new StorageImpl());
+    }
+
+    // Used by unit test.
+    public HashTreeImpl(int noOfSegments,
+                        HashTreeIdProvider treeIdProvider,
+                        HashTreeStorage htStorage,
+                        Storage storage) {
+        this(noOfSegments,
              treeIdProvider,
              new DefaultSegIdProviderImpl(noOfSegments),
-             hTStorage,
+             htStorage,
              storage);
     }
 
@@ -191,24 +166,34 @@ public class HashTreeImpl implements HashTree {
             removeInternal(key);
     }
 
-    void putInternal(final ByteBuffer key, final ByteBuffer value) {
+    public void putInternal(final ByteBuffer key, final ByteBuffer value) {
         int segId = segIdProvider.getSegmentId(key);
         ByteBuffer digest = ByteBuffer.wrap(sha1(value.array()));
         hTStorage.putSegmentData(treeIdProvider.getTreeId(key), segId, key, digest);
         hTStorage.setDirtySegment(treeIdProvider.getTreeId(key), segId);
     }
 
-    void removeInternal(final ByteBuffer key) {
+    public void removeInternal(final ByteBuffer key) {
         int segId = segIdProvider.getSegmentId(key);
         hTStorage.deleteSegmentData(treeIdProvider.getTreeId(key), segId, key);
         hTStorage.setDirtySegment(treeIdProvider.getTreeId(key), segId);
     }
 
+    /**
+     * Concatenates the given ByteBuffer values by first converting them to the
+     * equivalent hex strings, and then concatenated by adding the comma
+     * delimiter.
+     * 
+     * @param values
+     * @return
+     */
     public static String getHexString(ByteBuffer... values) {
         StringBuffer sb = new StringBuffer();
-        for(ByteBuffer value: values) {
-            sb.append(ByteUtils.toHexString(value.array()));
+        for(int i = 0; i < values.length - 1; i++) {
+            sb.append(ByteUtils.toHexString(values[i].array()) + COMMA_DELIMETER);
         }
+        if(values.length > 0)
+            sb.append(ByteUtils.toHexString(values[values.length - 1].array()));
         return sb.toString();
     }
 
@@ -270,8 +255,7 @@ public class HashTreeImpl implements HashTree {
                         if(isLeafNode(local.getNodeId()))
                             nodesToCheck.add(local.getNodeId());
                         else
-                            pQueue.addAll(getImmediateChildren(local.getNodeId(),
-                                                               this.childrenCountPerParent));
+                            pQueue.addAll(getImmediateChildren(local.getNodeId(), noOfChildren));
 
                     }
                     localItr.next();
@@ -391,7 +375,7 @@ public class HashTreeImpl implements HashTree {
     }
 
     private void releaseTreeLock(int treeId) {
-        treeLocks.get(treeId);
+        treeLocks.get(treeId).unlock();
     }
 
     @Override
@@ -416,19 +400,14 @@ public class HashTreeImpl implements HashTree {
         long currentTs = System.currentTimeMillis();
         if(fullRebuild) {
             long lastRebuiltTs = hTStorage.getLastFullyTreeReBuiltTimestamp(treeId);
-            if((lastRebuiltTs - currentTs) < BGTasksManager.EXP_INTERVAL_BW_REBUILDS) {
+            if((currentTs - lastRebuiltTs) < BGTasksManager.REBUILD_FULL_TREE_TIME_INTERVAL) {
                 LOG.debug("HashTree was rebuilt recently. Not rebuilding again. Skipping the task.");
                 return;
             }
-            hTStorage.clearAllSegments(treeId);
-        } else
-            dirtySegmentBuckets = hTStorage.clearAndGetDirtySegments(treeId);
+        }
+        dirtySegmentBuckets = hTStorage.clearAndGetDirtySegments(treeId);
 
-        Map<Integer, ByteBuffer> dirtyNodeAndDigestMap = (fullRebuild) ? (rebuildLeaves(treeId,
-                                                                                        0,
-                                                                                        MAX_NO_OF_BUCKETS))
-                                                                      : (rebuildLeaves(treeId,
-                                                                                       dirtySegmentBuckets));
+        Map<Integer, ByteBuffer> dirtyNodeAndDigestMap = rebuildLeaves(treeId, dirtySegmentBuckets);
         rebuildInternalNodes(treeId, dirtyNodeAndDigestMap);
         for(Map.Entry<Integer, ByteBuffer> dirtyNodeAndDigest: dirtyNodeAndDigestMap.entrySet())
             hTStorage.putSegmentHash(treeId,
@@ -475,24 +454,6 @@ public class HashTreeImpl implements HashTree {
     }
 
     /**
-     * Rebuilds all segments, and updates the segment hashes of the leaves.
-     * 
-     * @param treeId, hash tree id
-     * @param startSegId, inclusive
-     * @param endSegId, exclusive
-     * @return, node ids, and uncommitted digest.
-     */
-    private Map<Integer, ByteBuffer> rebuildLeaves(int treeId, int fromSegId, int toSegId) {
-        Map<Integer, ByteBuffer> dirtyNodeIdAndDigestMap = new HashMap<Integer, ByteBuffer>();
-        for(int dirtySegId = fromSegId; dirtySegId < toSegId; dirtySegId++) {
-            ByteBuffer digest = digestSegmentData(treeId, dirtySegId);
-            int nodeId = getLeafIdFromSegmentId(dirtySegId);
-            dirtyNodeIdAndDigestMap.put(nodeId, digest);
-        }
-        return dirtyNodeIdAndDigestMap;
-    }
-
-    /**
      * Rebuilds the dirty segments, and updates the segment hashes of the
      * leaves.
      * 
@@ -508,14 +469,33 @@ public class HashTreeImpl implements HashTree {
         return dirtyNodeIdAndDigestMap;
     }
 
+    /**
+     * 
+     * @param segDataList
+     * @return
+     */
+    public static ByteBuffer digestByteBuffers(List<ByteBuffer> bbList) {
+        List<String> hexStrings = new ArrayList<String>();
+        for(ByteBuffer bb: bbList)
+            hexStrings.add(ByteUtils.toHexString(bb.array()));
+        return digestHexStrings(hexStrings);
+    }
+
+    public static ByteBuffer digestHexStrings(List<String> hexStrings) {
+        StringBuilder sb = new StringBuilder();
+        for(String hexString: hexStrings)
+            sb.append(hexString + NEW_LINE_DELIMETER);
+        return ByteBuffer.wrap(sha1(sb.toString().getBytes()));
+    }
+
     private ByteBuffer digestSegmentData(int treeId, int segId) {
         List<SegmentData> dirtySegmentData = hTStorage.getSegment(treeId, segId);
+        List<String> hexStrings = new ArrayList<String>();
 
-        StringBuilder sb = new StringBuilder();
         for(SegmentData sd: dirtySegmentData)
-            sb.append(getHexString(sd.key, sd.digest) + "\n");
+            hexStrings.add(getHexString(sd.key, sd.digest));
 
-        return ByteBuffer.wrap(sha1(sb.toString().getBytes()));
+        return digestHexStrings(hexStrings);
     }
 
     /**
@@ -530,7 +510,7 @@ public class HashTreeImpl implements HashTree {
 
         while(!nodeIds.isEmpty()) {
             for(int nodeId: nodeIds)
-                parentNodeIds.add(getParent(nodeId, this.childrenCountPerParent));
+                parentNodeIds.add(getParent(nodeId, noOfChildren));
 
             rebuildParentNodes(treeId, parentNodeIds, nodeIdAndDigestMap);
 
@@ -553,26 +533,26 @@ public class HashTreeImpl implements HashTree {
                                     final Set<Integer> parentIds,
                                     Map<Integer, ByteBuffer> nodeIdAndDigestMap) {
         List<Integer> children;
-        String hashString;
+        List<ByteBuffer> segHashes = new ArrayList<ByteBuffer>(noOfChildren);
+        ByteBuffer segHashBB;
         SegmentHash segHash;
-        StringBuilder sb = new StringBuilder();
 
         for(int parentId: parentIds) {
-            children = getImmediateChildren(parentId, this.childrenCountPerParent);
+            children = getImmediateChildren(parentId, noOfChildren);
 
             for(int child: children) {
                 if(nodeIdAndDigestMap.containsKey(child))
-                    hashString = getHexString(nodeIdAndDigestMap.get(child));
+                    segHashBB = nodeIdAndDigestMap.get(child);
                 else {
                     segHash = hTStorage.getSegmentHash(treeId, child);
-                    hashString = (segHash == null) ? null : getHexString(segHash.hash);
+                    segHashBB = (segHash == null) ? null : segHash.hash;
                 }
-                if(hashString != null)
-                    sb.append(hashString + "\n");
+                if(segHashBB != null)
+                    segHashes.add(segHashBB);
             }
-            ByteBuffer digest = ByteBuffer.wrap(sha1(sb.toString().getBytes()));
+            ByteBuffer digest = digestByteBuffers(segHashes);
             nodeIdAndDigestMap.put(parentId, digest);
-            sb.setLength(0);
+            segHashes.clear();
         }
     }
 
@@ -616,7 +596,7 @@ public class HashTreeImpl implements HashTree {
         pQueue.add(nodeId);
         while(pQueue.peek() < internalNodesCount) {
             int cNodeId = pQueue.remove();
-            pQueue.addAll(getImmediateChildren(cNodeId, childrenCountPerParent));
+            pQueue.addAll(getImmediateChildren(cNodeId, noOfChildren));
         }
         return pQueue;
     }
@@ -673,8 +653,8 @@ public class HashTreeImpl implements HashTree {
     @Override
     public boolean isReadyForSynch(int treeId) {
         long currentTs = System.currentTimeMillis();
-        long diff = currentTs - hTStorage.getLastHashTreeUpdatedTimestamp(treeId);
-        return diff <= (2 * BGTasksManager.REBUILD_SEG_TIME_INTERVAL);
+        long diff = currentTs - hTStorage.getLastFullyTreeReBuiltTimestamp(treeId);
+        return diff <= (2 * BGTasksManager.REBUILD_FULL_TREE_TIME_INTERVAL);
     }
 
     @Override

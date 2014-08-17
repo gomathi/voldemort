@@ -13,11 +13,12 @@
  * License for the specific language governing permissions and limitations under
  * the License.
  */
-package voldemort.hashtrees;
+package voldemort.hashtrees.tasks;
 
 import org.apache.log4j.Logger;
 
 import voldemort.annotations.concurrency.Threadsafe;
+import voldemort.hashtrees.HashTree;
 
 /**
  * This reads all the keys from storage, and rebuilds the complete HashTree.
