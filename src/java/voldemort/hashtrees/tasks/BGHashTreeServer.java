@@ -44,12 +44,15 @@ public class BGHashTreeServer extends BGStoppableTask {
 
     @Override
     public void run() {
+        if(server.isServing())
+            return;
         startServer();
     }
 
     @Override
     public void stop() {
-        stopServer();
+        if(server.isServing())
+            stopServer();
         super.stop();
     }
 
