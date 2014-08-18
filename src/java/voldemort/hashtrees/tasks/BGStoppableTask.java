@@ -56,7 +56,7 @@ public abstract class BGStoppableTask implements Runnable, Stoppable {
 
     protected synchronized void disableRunningStatus() {
         runLock.unlock();
-        if(stopRequested)
+        if(stopRequested && stopListenerLatch != null)
             stopListenerLatch.countDown();
     }
 
