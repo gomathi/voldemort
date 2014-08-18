@@ -2,7 +2,6 @@ package voldemort.hashtrees.tasks;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Random;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -25,10 +24,11 @@ public class BGTasksManager {
 
     // Rebuild segment time interval, not full rebuild, but rebuild of dirty
     // segments, in milliseconds. Should be scheduled in shorter intervals.
-    public final static long REBUILD_SEG_TIME_INTERVAL = 2 * 60 * 1000;
+    public final static long DEFAULT_REBUILD_SEG_TIME_INTERVAL = 2 * 60 * 1000;
     // Expected time interval between two consecutive tree full rebuilds.
-    public final static long REBUILD_FULL_TREE_TIME_INTERVAL = 25 * 60 * 1000;
-    public final static long REMOTE_TREE_SYNCH_INTERVAL = 5 * 60 * 1000;
+    public final static long DEFAULT_FULL_TREE_TIME_INTERVAL = 25 * 60 * 1000;
+    public final static long DEFAULT_TREE_SYNCH_INTERVAL = 5 * 60 * 1000;
+    public final static long DEFAULT_INITIAL_DELAY = 0;
 
     private final ExecutorService executors;
     private final ScheduledExecutorService scheduledExecutors;
@@ -41,13 +41,37 @@ public class BGTasksManager {
     private final HashTree hashTree;
     private volatile boolean tasksRunning;
 
-    public BGTasksManager(final HashTree hashTree, final ExecutorService executors, int serverPortNo) {
+    private final long rebuildSegTimeInterval;
+    private final long rebuildFullTreeTimeInterval;
+    private final long remoteTreeSynchInterval;
+    private final long initialDelay;
 
+    public BGTasksManager(final HashTree hashTree, final ExecutorService executors, int serverPortNo) {
+        this(hashTree,
+             executors,
+             serverPortNo,
+             DEFAULT_INITIAL_DELAY,
+             DEFAULT_REBUILD_SEG_TIME_INTERVAL,
+             DEFAULT_FULL_TREE_TIME_INTERVAL,
+             DEFAULT_TREE_SYNCH_INTERVAL);
+    }
+
+    public BGTasksManager(final HashTree hashTree,
+                          final ExecutorService executors,
+                          int serverPortNo,
+                          long initialDelay,
+                          long rebuildFullTreeTimeInterval,
+                          long rebuildSegTimeInterval,
+                          long remoteTreeSynchInterval) {
         this.hashTree = hashTree;
         this.executors = executors;
         this.scheduledExecutors = Executors.newScheduledThreadPool(2);
 
         this.serverPortNo = serverPortNo;
+        this.initialDelay = initialDelay;
+        this.rebuildFullTreeTimeInterval = rebuildFullTreeTimeInterval;
+        this.rebuildSegTimeInterval = rebuildSegTimeInterval;
+        this.remoteTreeSynchInterval = remoteTreeSynchInterval;
         this.bgTasks = new ArrayList<BGStoppableTask>();
         this.bgSegDataUpdater = new BGSegmentDataUpdater(hashTree);
         this.bgSyncTask = new BGSynchTask(hashTree);
@@ -71,21 +95,25 @@ public class BGTasksManager {
         new Thread(bgHashTreeServer).start();
 
         scheduledExecutors.scheduleWithFixedDelay(bgSyncTask,
-                                                  0,
-                                                  REMOTE_TREE_SYNCH_INTERVAL,
+                                                  initialDelay,
+                                                  remoteTreeSynchInterval,
                                                   TimeUnit.MILLISECONDS);
         scheduledExecutors.scheduleWithFixedDelay(bgRebuildTreeTask,
-                                                  0,
-                                                  REBUILD_FULL_TREE_TIME_INTERVAL,
+                                                  initialDelay,
+                                                  rebuildFullTreeTimeInterval,
                                                   TimeUnit.MILLISECONDS);
 
         scheduledExecutors.scheduleWithFixedDelay(bgSegmentTreeTask,
-                                                  new Random().nextInt(1000),
-                                                  REBUILD_SEG_TIME_INTERVAL,
+                                                  initialDelay,
+                                                  rebuildSegTimeInterval,
                                                   TimeUnit.MILLISECONDS);
 
         tasksRunning = true;
         LOG.info("HashTree background tasks have been initiated.");
+    }
+
+    public long getRebuildFullTreeTimeInterval() {
+        return rebuildFullTreeTimeInterval;
     }
 
     public synchronized void enableSynch() {

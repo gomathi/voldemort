@@ -15,11 +15,16 @@
  */
 package voldemort.hashtrees;
 
-import static voldemort.hashtrees.HashTreeImplTestUtils.createHashTreeAndStorage;
+import static voldemort.hashtrees.HashTreeImplTestUtils.DEFAULT_SEG_DATA_BLOCKS_COUNT;
+import static voldemort.hashtrees.HashTreeImplTestUtils.DEFAULT_TREE_ID;
+import static voldemort.hashtrees.HashTreeImplTestUtils.ROOT_NODE;
+import static voldemort.hashtrees.HashTreeImplTestUtils.createHashTree;
 import static voldemort.hashtrees.HashTreeImplTestUtils.generateInMemoryAndPersistentStores;
 import static voldemort.hashtrees.HashTreeImplTestUtils.generateInMemoryStore;
 import static voldemort.hashtrees.HashTreeImplTestUtils.randomByteBuffer;
 import static voldemort.hashtrees.HashTreeImplTestUtils.randomBytes;
+import static voldemort.hashtrees.HashTreeImplTestUtils.segIdProvider;
+import static voldemort.hashtrees.HashTreeImplTestUtils.treeIdProvider;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -32,8 +37,6 @@ import org.apache.thrift.TException;
 import org.junit.Test;
 
 import voldemort.hashtrees.HashTreeImplTestUtils.HTreeComponents;
-import voldemort.hashtrees.HashTreeImplTestUtils.HashTreeIdProviderTest;
-import voldemort.hashtrees.HashTreeImplTestUtils.SegIdProviderTest;
 import voldemort.hashtrees.storage.HashTreeStorage;
 import voldemort.hashtrees.tasks.BGHashTreeServer;
 import voldemort.hashtrees.thrift.generated.HashTreeSyncInterface;
@@ -43,12 +46,6 @@ import voldemort.utils.ByteUtils;
 
 public class HashTreeImplTest {
 
-    private static final SegIdProviderTest segIdProvider = new SegIdProviderTest();
-    private static final HashTreeIdProviderTest treeIdProvider = new HashTreeIdProviderTest();
-    private static final int ROOT_NODE = 0;
-    private static final int DEFAULT_TREE_ID = 1;
-    private static final int DEFAULT_SEG_DATA_BLOCKS_COUNT = 1 << 10;
-
     @Test
     public void testPut() throws IOException {
 
@@ -57,10 +54,10 @@ public class HashTreeImplTest {
 
         for(HashTreeStorage store: stores) {
 
-            HTreeComponents components = createHashTreeAndStorage(noOfSegDataBlocks,
-                                                                  treeIdProvider,
-                                                                  segIdProvider,
-                                                                  store);
+            HTreeComponents components = createHashTree(noOfSegDataBlocks,
+                                                        treeIdProvider,
+                                                        segIdProvider,
+                                                        store);
             HashTree testTree = components.hTree;
             HashTreeStorage testTreeStorage = components.hTStorage;
 
@@ -87,10 +84,10 @@ public class HashTreeImplTest {
         HashTreeStorage[] stores = generateInMemoryAndPersistentStores(noOfSegDataBlocks);
 
         for(HashTreeStorage store: stores) {
-            HTreeComponents components = createHashTreeAndStorage(noOfSegDataBlocks,
-                                                                  treeIdProvider,
-                                                                  segIdProvider,
-                                                                  store);
+            HTreeComponents components = createHashTree(noOfSegDataBlocks,
+                                                        treeIdProvider,
+                                                        segIdProvider,
+                                                        store);
             HashTree testTree = components.hTree;
             HashTreeStorage testTreeStorage = components.hTStorage;
 
@@ -115,10 +112,10 @@ public class HashTreeImplTest {
         HashTreeStorage[] stores = generateInMemoryAndPersistentStores(noOfSegDataBlocks);
 
         for(HashTreeStorage store: stores) {
-            HTreeComponents components = createHashTreeAndStorage(noOfSegDataBlocks,
-                                                                  treeIdProvider,
-                                                                  segIdProvider,
-                                                                  store);
+            HTreeComponents components = createHashTree(noOfSegDataBlocks,
+                                                        treeIdProvider,
+                                                        segIdProvider,
+                                                        store);
             HashTree testTree = components.hTree;
             HashTreeStorage testTreeStorage = components.hTStorage;
 
@@ -151,10 +148,10 @@ public class HashTreeImplTest {
         HashTreeStorage[] remoteStores = generateInMemoryAndPersistentStores(DEFAULT_SEG_DATA_BLOCKS_COUNT);
 
         for(int j = 0; j <= 1; j++) {
-            HTreeComponents localHTreeComp = createHashTreeAndStorage(DEFAULT_SEG_DATA_BLOCKS_COUNT,
-                                                                      stores[j]);
-            HTreeComponents remoteHTreeComp = createHashTreeAndStorage(DEFAULT_SEG_DATA_BLOCKS_COUNT,
-                                                                       remoteStores[j]);
+            HTreeComponents localHTreeComp = createHashTree(DEFAULT_SEG_DATA_BLOCKS_COUNT,
+                                                            stores[j]);
+            HTreeComponents remoteHTreeComp = createHashTree(DEFAULT_SEG_DATA_BLOCKS_COUNT,
+                                                             remoteStores[j]);
 
             for(int i = 1; i <= DEFAULT_SEG_DATA_BLOCKS_COUNT; i++) {
                 localHTreeComp.storage.put(randomByteBuffer(), randomByteBuffer());
@@ -186,10 +183,10 @@ public class HashTreeImplTest {
         HashTreeStorage[] remoteStores = generateInMemoryAndPersistentStores(DEFAULT_SEG_DATA_BLOCKS_COUNT);
 
         for(int j = 0; j <= 1; j++) {
-            HTreeComponents localHTreeComp = createHashTreeAndStorage(DEFAULT_SEG_DATA_BLOCKS_COUNT,
-                                                                      stores[j]);
-            HTreeComponents remoteHTreeComp = createHashTreeAndStorage(DEFAULT_SEG_DATA_BLOCKS_COUNT,
-                                                                       remoteStores[j]);
+            HTreeComponents localHTreeComp = createHashTree(DEFAULT_SEG_DATA_BLOCKS_COUNT,
+                                                            stores[j]);
+            HTreeComponents remoteHTreeComp = createHashTree(DEFAULT_SEG_DATA_BLOCKS_COUNT,
+                                                             remoteStores[j]);
 
             for(int i = 1; i <= DEFAULT_SEG_DATA_BLOCKS_COUNT; i++) {
                 localHTreeComp.storage.put(randomByteBuffer(), randomByteBuffer());
@@ -223,10 +220,10 @@ public class HashTreeImplTest {
         HashTreeStorage[] remoteStores = generateInMemoryAndPersistentStores(DEFAULT_SEG_DATA_BLOCKS_COUNT);
 
         for(int j = 0; j <= 1; j++) {
-            HTreeComponents localHTreeComp = createHashTreeAndStorage(DEFAULT_SEG_DATA_BLOCKS_COUNT,
-                                                                      stores[j]);
-            HTreeComponents remoteHTreeComp = createHashTreeAndStorage(DEFAULT_SEG_DATA_BLOCKS_COUNT,
-                                                                       remoteStores[j]);
+            HTreeComponents localHTreeComp = createHashTree(DEFAULT_SEG_DATA_BLOCKS_COUNT,
+                                                            stores[j]);
+            HTreeComponents remoteHTreeComp = createHashTree(DEFAULT_SEG_DATA_BLOCKS_COUNT,
+                                                             remoteStores[j]);
 
             for(int i = 1; i <= DEFAULT_SEG_DATA_BLOCKS_COUNT; i++) {
                 localHTreeComp.storage.put(randomByteBuffer(), randomByteBuffer());
@@ -256,10 +253,10 @@ public class HashTreeImplTest {
         HashTreeStorage[] remoteStores = generateInMemoryAndPersistentStores(DEFAULT_SEG_DATA_BLOCKS_COUNT);
 
         for(int j = 0; j <= 1; j++) {
-            HTreeComponents localHTreeComp = createHashTreeAndStorage(DEFAULT_SEG_DATA_BLOCKS_COUNT,
-                                                                      stores[j]);
-            HTreeComponents remoteHTreeComp = createHashTreeAndStorage(DEFAULT_SEG_DATA_BLOCKS_COUNT,
-                                                                       remoteStores[j]);
+            HTreeComponents localHTreeComp = createHashTree(DEFAULT_SEG_DATA_BLOCKS_COUNT,
+                                                            stores[j]);
+            HTreeComponents remoteHTreeComp = createHashTree(DEFAULT_SEG_DATA_BLOCKS_COUNT,
+                                                             remoteStores[j]);
 
             for(int i = 1; i <= DEFAULT_SEG_DATA_BLOCKS_COUNT; i++) {
                 localHTreeComp.storage.put(randomByteBuffer(), randomByteBuffer());
@@ -288,10 +285,8 @@ public class HashTreeImplTest {
         HashTreeStorage store = generateInMemoryStore(DEFAULT_SEG_DATA_BLOCKS_COUNT);
         HashTreeStorage remoteStore = generateInMemoryStore(DEFAULT_SEG_DATA_BLOCKS_COUNT);
 
-        HTreeComponents localHTreeComp = createHashTreeAndStorage(DEFAULT_SEG_DATA_BLOCKS_COUNT,
-                                                                  store);
-        HTreeComponents remoteHTreeComp = createHashTreeAndStorage(DEFAULT_SEG_DATA_BLOCKS_COUNT,
-                                                                   remoteStore);
+        HTreeComponents localHTreeComp = createHashTree(DEFAULT_SEG_DATA_BLOCKS_COUNT, store);
+        HTreeComponents remoteHTreeComp = createHashTree(DEFAULT_SEG_DATA_BLOCKS_COUNT, remoteStore);
 
         BGHashTreeServer server = new BGHashTreeServer(remoteHTreeComp.hTree,
                                                        HashTreeConstants.DEFAULT_HASH_TREE_SERVER_PORT_NO);

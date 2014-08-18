@@ -97,6 +97,7 @@ public class HashTreeImpl implements HashTree {
     private final int noOfChildren;
     private final int internalNodesCount;
     private final int segmentsCount;
+    private volatile long rebuildFullTreeTimeInterval;
 
     private final HashTreeStorage hTStorage;
     private final HashTreeIdProvider treeIdProvider;
@@ -105,6 +106,7 @@ public class HashTreeImpl implements HashTree {
 
     private volatile boolean enabledBGTasks;
     private volatile BGTasksManager bgTasksMgr;
+
     private final ConcurrentMap<Integer, ReentrantLock> treeLocks = new ConcurrentHashMap<Integer, ReentrantLock>();
 
     public HashTreeImpl(int noOfSegments,
@@ -121,6 +123,7 @@ public class HashTreeImpl implements HashTree {
         this.segIdProvider = segIdProvider;
         this.hTStorage = hTStroage;
         this.storage = storage;
+        this.rebuildFullTreeTimeInterval = BGTasksManager.DEFAULT_FULL_TREE_TIME_INTERVAL;
     }
 
     public HashTreeImpl(int noOfSegments, String dbDir) throws IOException {
@@ -177,24 +180,6 @@ public class HashTreeImpl implements HashTree {
         int segId = segIdProvider.getSegmentId(key);
         hTStorage.deleteSegmentData(treeIdProvider.getTreeId(key), segId, key);
         hTStorage.setDirtySegment(treeIdProvider.getTreeId(key), segId);
-    }
-
-    /**
-     * Concatenates the given ByteBuffer values by first converting them to the
-     * equivalent hex strings, and then concatenated by adding the comma
-     * delimiter.
-     * 
-     * @param values
-     * @return
-     */
-    public static String getHexString(ByteBuffer... values) {
-        StringBuffer sb = new StringBuffer();
-        for(int i = 0; i < values.length - 1; i++) {
-            sb.append(ByteUtils.toHexString(values[i].array()) + COMMA_DELIMETER);
-        }
-        if(values.length > 0)
-            sb.append(ByteUtils.toHexString(values[values.length - 1].array()));
-        return sb.toString();
     }
 
     @Override
@@ -396,16 +381,8 @@ public class HashTreeImpl implements HashTree {
 
     @Override
     public void updateHashTree(int treeId, boolean fullRebuild) {
-        List<Integer> dirtySegmentBuckets = null;
         long currentTs = System.currentTimeMillis();
-        if(fullRebuild) {
-            long lastRebuiltTs = hTStorage.getLastFullyTreeReBuiltTimestamp(treeId);
-            if((currentTs - lastRebuiltTs) < BGTasksManager.REBUILD_FULL_TREE_TIME_INTERVAL) {
-                LOG.debug("HashTree was rebuilt recently. Not rebuilding again. Skipping the task.");
-                return;
-            }
-        }
-        dirtySegmentBuckets = hTStorage.clearAndGetDirtySegments(treeId);
+        List<Integer> dirtySegmentBuckets = hTStorage.clearAndGetDirtySegments(treeId);
 
         Map<Integer, ByteBuffer> dirtyNodeAndDigestMap = rebuildLeaves(treeId, dirtySegmentBuckets);
         rebuildInternalNodes(treeId, dirtyNodeAndDigestMap);
@@ -470,6 +447,34 @@ public class HashTreeImpl implements HashTree {
     }
 
     /**
+     * Concatenates the given ByteBuffer values by first converting them to the
+     * equivalent hex strings, and then concatenated by adding the comma
+     * delimiter.
+     * 
+     * @param values
+     * @return
+     */
+    public static String getHexString(ByteBuffer... values) {
+        StringBuffer sb = new StringBuffer();
+        for(int i = 0; i < values.length - 1; i++) {
+            sb.append(ByteUtils.toHexString(values[i].array()) + COMMA_DELIMETER);
+        }
+        if(values.length > 0)
+            sb.append(ByteUtils.toHexString(values[values.length - 1].array()));
+        return sb.toString();
+    }
+
+    private ByteBuffer digestSegmentData(int treeId, int segId) {
+        List<SegmentData> dirtySegmentData = hTStorage.getSegment(treeId, segId);
+        List<String> hexStrings = new ArrayList<String>();
+
+        for(SegmentData sd: dirtySegmentData)
+            hexStrings.add(getHexString(sd.key, sd.digest));
+
+        return digestHexStrings(hexStrings);
+    }
+
+    /**
      * 
      * @param segDataList
      * @return
@@ -486,16 +491,6 @@ public class HashTreeImpl implements HashTree {
         for(String hexString: hexStrings)
             sb.append(hexString + NEW_LINE_DELIMETER);
         return ByteBuffer.wrap(sha1(sb.toString().getBytes()));
-    }
-
-    private ByteBuffer digestSegmentData(int treeId, int segId) {
-        List<SegmentData> dirtySegmentData = hTStorage.getSegment(treeId, segId);
-        List<String> hexStrings = new ArrayList<String>();
-
-        for(SegmentData sd: dirtySegmentData)
-            hexStrings.add(getHexString(sd.key, sd.digest));
-
-        return digestHexStrings(hexStrings);
     }
 
     /**
@@ -630,8 +625,14 @@ public class HashTreeImpl implements HashTree {
             throw new IllegalStateException("Background tasks initiated already.");
 
         bgTasksMgr = new BGTasksManager(this, executors, serverPortNo);
-        if(enabledBGTasks)
-            bgTasksMgr.startBackgroundTasks();
+        startBGTasks(bgTasksMgr);
+    }
+
+    public void startBGTasks(final BGTasksManager bgTasksMgr) throws TTransportException {
+        this.bgTasksMgr = bgTasksMgr;
+        bgTasksMgr.startBackgroundTasks();
+        enabledBGTasks = true;
+        rebuildFullTreeTimeInterval = bgTasksMgr.getRebuildFullTreeTimeInterval();
     }
 
     public void shutdown() {
@@ -654,7 +655,7 @@ public class HashTreeImpl implements HashTree {
     public boolean isReadyForSynch(int treeId) {
         long currentTs = System.currentTimeMillis();
         long diff = currentTs - hTStorage.getLastFullyTreeReBuiltTimestamp(treeId);
-        return diff <= (2 * BGTasksManager.REBUILD_FULL_TREE_TIME_INTERVAL);
+        return diff <= (2 * rebuildFullTreeTimeInterval);
     }
 
     @Override

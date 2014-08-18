@@ -18,7 +18,13 @@ import voldemort.utils.Pair;
 
 public class HashTreeImplTestUtils {
 
-    private static final Random RANDOM = new Random(System.currentTimeMillis());
+    public static final Random RANDOM = new Random(System.currentTimeMillis());
+    public static final SegIdProviderTest segIdProvider = new SegIdProviderTest();
+    public static final HashTreeIdProviderTest treeIdProvider = new HashTreeIdProviderTest();
+    public static final int ROOT_NODE = 0;
+    public static final int DEFAULT_TREE_ID = 1;
+    public static final int DEFAULT_SEG_DATA_BLOCKS_COUNT = 1 << 10;
+    public static final int DEFAULT_HTREE_SERVER_PORT_NO = 11111;
 
     public static class SegIdProviderTest implements SegmentIdProvider {
 
@@ -119,10 +125,10 @@ public class HashTreeImplTestUtils {
         return "/tmp/test/random" + RANDOM.nextInt();
     }
 
-    public static HTreeComponents createHashTreeAndStorage(int noOfSegDataBlocks,
-                                                           final HashTreeIdProvider treeIdProv,
-                                                           final SegmentIdProvider segIdPro,
-                                                           final HashTreeStorage hTStorage) {
+    public static HTreeComponents createHashTree(int noOfSegDataBlocks,
+                                                 final HashTreeIdProvider treeIdProv,
+                                                 final SegmentIdProvider segIdPro,
+                                                 final HashTreeStorage hTStorage) {
         StorageImplTest storage = new StorageImplTest();
         HashTree hTree = new HashTreeImpl(noOfSegDataBlocks,
                                           treeIdProv,
@@ -133,8 +139,7 @@ public class HashTreeImplTestUtils {
         return new HTreeComponents(hTStorage, storage, hTree);
     }
 
-    public static HTreeComponents createHashTreeAndStorage(int noOfSegments,
-                                                           final HashTreeStorage hTStorage) {
+    public static HTreeComponents createHashTree(int noOfSegments, final HashTreeStorage hTStorage) {
         HashTreeIdProvider treeIdProvider = new HashTreeIdProviderTest();
         StorageImplTest storage = new StorageImplTest();
         HashTree hTree = new HashTreeImpl(noOfSegments, treeIdProvider, hTStorage, storage);

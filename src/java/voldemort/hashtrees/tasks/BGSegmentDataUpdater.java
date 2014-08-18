@@ -40,10 +40,11 @@ import voldemort.utils.Pair;
 public class BGSegmentDataUpdater extends BGStoppableTask {
 
     private static final Logger LOG = Logger.getLogger(BGSegmentDataUpdater.class);
+    private static final int DEFAULT_QUE_SIZE = 10000;
     private static final Pair<HTOperation, List<ByteBuffer>> STOP_MARKER = new Pair<HTOperation, List<ByteBuffer>>(HTOperation.STOP,
                                                                                                                    null);
 
-    private final BlockingQueue<Pair<HTOperation, List<ByteBuffer>>> que = new ArrayBlockingQueue<Pair<HTOperation, List<ByteBuffer>>>(Integer.MAX_VALUE);
+    private final BlockingQueue<Pair<HTOperation, List<ByteBuffer>>> que = new ArrayBlockingQueue<Pair<HTOperation, List<ByteBuffer>>>(DEFAULT_QUE_SIZE);
     private final HashTreeImpl hTreeImpl;
 
     public BGSegmentDataUpdater(final HashTree hTreeImpl) {
@@ -54,7 +55,9 @@ public class BGSegmentDataUpdater extends BGStoppableTask {
         if(hasStopRequested() && data.getFirst() != HTOperation.STOP) {
             throw new IllegalStateException("Shut down is initiated. Unable to store the data.");
         }
-        que.add(data);
+        boolean status = que.offer(data);
+        if(!status)
+            LOG.warn("Segement data queue is full. Unable to add data to the queue.");
     }
 
     @Override
