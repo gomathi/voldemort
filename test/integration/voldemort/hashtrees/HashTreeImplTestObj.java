@@ -64,7 +64,9 @@ public class HashTreeImplTestObj extends HashTreeImpl {
 
     @Override
     public boolean isReadyForSynch(int treeId) {
-        return super.isReadyForSynch(treeId);
+        boolean result = super.isReadyForSynch(treeId);
+        events.add(HashTreeImplEvent.SYNCH_INITIATED);
+        return result;
     }
 
     @Override

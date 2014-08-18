@@ -3,14 +3,8 @@ package voldemort.hashtrees;
 import static voldemort.hashtrees.HashTreeImplTestUtils.DEFAULT_HTREE_SERVER_PORT_NO;
 import static voldemort.hashtrees.HashTreeImplTestUtils.DEFAULT_SEG_DATA_BLOCKS_COUNT;
 import static voldemort.hashtrees.HashTreeImplTestUtils.DEFAULT_TREE_ID;
-import static voldemort.hashtrees.HashTreeImplTestUtils.ROOT_NODE;
-import static voldemort.hashtrees.HashTreeImplTestUtils.createHashTree;
-import static voldemort.hashtrees.HashTreeImplTestUtils.generateInMemoryAndPersistentStores;
 import static voldemort.hashtrees.HashTreeImplTestUtils.generateInMemoryStore;
-import static voldemort.hashtrees.HashTreeImplTestUtils.randomByteBuffer;
 
-import java.io.IOException;
-import java.util.Arrays;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Executors;
@@ -22,12 +16,10 @@ import org.apache.thrift.TException;
 import org.apache.thrift.transport.TTransportException;
 import org.junit.Test;
 
-import voldemort.hashtrees.HashTreeImplTestUtils.HTreeComponents;
 import voldemort.hashtrees.HashTreeImplTestUtils.StorageImplTest;
 import voldemort.hashtrees.storage.HashTreeStorage;
 import voldemort.hashtrees.storage.Storage;
 import voldemort.hashtrees.tasks.BGTasksManager;
-import voldemort.hashtrees.thrift.generated.SegmentHash;
 
 public class HashTreeImplIntegerationTest {
 
@@ -93,37 +85,45 @@ public class HashTreeImplIntegerationTest {
     }
 
     @Test
-    public void testSynch() throws IOException, TException {
-        HashTreeStorage[] stores = generateInMemoryAndPersistentStores(DEFAULT_SEG_DATA_BLOCKS_COUNT);
-        HashTreeStorage[] remoteStores = generateInMemoryAndPersistentStores(DEFAULT_SEG_DATA_BLOCKS_COUNT);
+    public void testSynch() throws TException, InterruptedException {
+        HashTreeStorage localHTStorage = generateInMemoryStore(DEFAULT_SEG_DATA_BLOCKS_COUNT);
+        HashTreeStorage remoteHTStorage = generateInMemoryStore(DEFAULT_SEG_DATA_BLOCKS_COUNT);
+        BlockingQueue<HashTreeImplEvent> localEvents = new ArrayBlockingQueue<HashTreeImplEvent>(10);
+        BlockingQueue<HashTreeImplEvent> remoteEvents = new ArrayBlockingQueue<HashTreeImplEvent>(10);
+        Storage localStorage = new StorageImplTest();
+        Storage remoteStorage = new StorageImplTest();
+        HashTreeImplTestObj localHTree = new HashTreeImplTestObj(DEFAULT_SEG_DATA_BLOCKS_COUNT,
+                                                                 localHTStorage,
+                                                                 localStorage,
+                                                                 localEvents);
+        BGTasksManager localBGTasks = new BGTasksManager(localHTree,
+                                                         Executors.newFixedThreadPool(10),
+                                                         DEFAULT_HTREE_SERVER_PORT_NO,
+                                                         1000,
+                                                         30000,
+                                                         30000,
+                                                         1000);
+        HashTreeImplTestObj remoteHTree = new HashTreeImplTestObj(DEFAULT_SEG_DATA_BLOCKS_COUNT,
+                                                                  remoteHTStorage,
+                                                                  remoteStorage,
+                                                                  remoteEvents);
+        BGTasksManager remoteBGTasks = new BGTasksManager(remoteHTree,
+                                                          Executors.newFixedThreadPool(10),
+                                                          22222,
+                                                          1000,
+                                                          30000,
+                                                          30000,
+                                                          1000);
 
-        for(int j = 0; j <= 1; j++) {
-            HTreeComponents localHTreeComp = createHashTree(DEFAULT_SEG_DATA_BLOCKS_COUNT,
-                                                            stores[j]);
-            HTreeComponents remoteHTreeComp = createHashTree(DEFAULT_SEG_DATA_BLOCKS_COUNT,
-                                                             remoteStores[j]);
+        localHTree.startBGTasks(localBGTasks);
+        localHTree.addTreeAndPortNoForSync("localhost", 22222);
+        localHTree.addTreeToSyncList("localhost", DEFAULT_TREE_ID);
 
-            for(int i = 1; i <= DEFAULT_SEG_DATA_BLOCKS_COUNT; i++) {
-                localHTreeComp.storage.put(randomByteBuffer(), randomByteBuffer());
-            }
-
-            localHTreeComp.hTree.updateHashTrees(false);
-            boolean anyUpdates = localHTreeComp.hTree.synch(1, remoteHTreeComp.hTree);
-            Assert.assertTrue(anyUpdates);
-
-            remoteHTreeComp.hTree.updateHashTrees(false);
-            anyUpdates = localHTreeComp.hTree.synch(1, remoteHTreeComp.hTree);
-            Assert.assertFalse(anyUpdates);
-
-            SegmentHash localRootHash = localHTreeComp.hTree.getSegmentHash(DEFAULT_TREE_ID,
-                                                                            ROOT_NODE);
-            Assert.assertNotNull(localRootHash);
-            SegmentHash remoteRootHash = remoteHTreeComp.hTree.getSegmentHash(DEFAULT_TREE_ID,
-                                                                              ROOT_NODE);
-            Assert.assertNotNull(remoteRootHash);
-
-            Assert.assertTrue(Arrays.equals(localRootHash.getHash(), remoteRootHash.getHash()));
-        }
+        remoteHTree.startBGTasks(remoteBGTasks);
+        waitForTheEvent(localEvents, HashTreeImplEvent.SYNCH, 10000);
+        waitForTheEvent(remoteEvents, HashTreeImplEvent.SYNCH_INITIATED, 10000);
+        localHTree.shutdown();
+        remoteHTree.shutdown();
     }
 
 }

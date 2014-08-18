@@ -662,4 +662,10 @@ public class HashTreeImpl implements HashTree {
     public String ping() throws TException {
         return "ping";
     }
+
+    @Override
+    public void addTreeAndPortNoForSync(String hostName, int portNo) {
+        if(enabledBGTasks)
+            bgTasksMgr.bgSyncTask.addHostNameAndPortNo(hostName, portNo);
+    }
 }

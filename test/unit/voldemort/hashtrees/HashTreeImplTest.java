@@ -294,14 +294,14 @@ public class HashTreeImplTest {
 
         Thread.sleep(100);
 
-        HashTreeSyncInterface.Iface client = HashTreeClientGenerator.getHashTreeClient("localhost");
+        HashTreeSyncInterface.Iface thriftClient = HashTreeClientGenerator.getHashTreeClient("localhost");
 
         for(int i = 1; i <= DEFAULT_SEG_DATA_BLOCKS_COUNT; i++) {
             localHTreeComp.storage.put(randomByteBuffer(), randomByteBuffer());
         }
 
         localHTreeComp.hTree.updateHashTrees(false);
-        localHTreeComp.hTree.synch(1, client);
+        localHTreeComp.hTree.synch(1, thriftClient);
 
         for(int i = 0; i < DEFAULT_SEG_DATA_BLOCKS_COUNT; i++) {
             List<SegmentData> segBlock = remoteHTreeComp.hTree.getSegment(DEFAULT_TREE_ID, i);
@@ -310,7 +310,7 @@ public class HashTreeImplTest {
             }
             localHTreeComp.hTree.updateHashTrees(false);
             remoteHTreeComp.hTree.updateHashTrees(false);
-            localHTreeComp.hTree.synch(1, client);
+            localHTreeComp.hTree.synch(1, thriftClient);
 
             Assert.assertEquals(localHTreeComp.storage.localStorage,
                                 remoteHTreeComp.storage.localStorage);

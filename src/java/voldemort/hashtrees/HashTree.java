@@ -56,6 +56,14 @@ public interface HashTree extends HashTreeSyncInterface.Iface {
     boolean synch(int treeId, HashTreeSyncInterface.Iface remoteTree) throws TException;
 
     /**
+     * Sets the remote hostname and port no.
+     * 
+     * @param hostName
+     * @param portNo is used while syncing with the remote hashtree.
+     */
+    void addTreeAndPortNoForSync(String hostName, int portNo);
+
+    /**
      * Implementation is expected to run a background task at regular intervals
      * to update remote hash trees. This function adds a remote tree to synch
      * list.

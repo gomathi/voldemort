@@ -37,6 +37,7 @@ import voldemort.hashtrees.thrift.generated.HashTreeSyncInterface;
 public class BGSynchTask extends BGStoppableTask {
 
     private final static Logger LOG = Logger.getLogger(BGSynchTask.class);
+    private final ConcurrentMap<String, Integer> hostNameAndRemotePortNo = new ConcurrentHashMap<String, Integer>();
     private final ConcurrentMap<String, HashTreeSyncInterface.Iface> hostNameAndRemoteHTrees = new ConcurrentHashMap<String, HashTreeSyncInterface.Iface>();
     private final ConcurrentSkipListSet<HostNameAndHashTreeId> hostNameAndTreeIdMap = new ConcurrentSkipListSet<BGSynchTask.HostNameAndHashTreeId>();
     private final HashTree localTree;
@@ -73,23 +74,33 @@ public class BGSynchTask extends BGStoppableTask {
     private HashTreeSyncInterface.Iface getHashTreeClient(String hostName)
             throws TTransportException {
         if(!hostNameAndRemoteHTrees.containsKey(hostName)) {
-            hostNameAndRemoteHTrees.putIfAbsent(hostName,
-                                                HashTreeClientGenerator.getHashTreeClient(hostName));
+            Integer portNoObj = hostNameAndRemotePortNo.get(hostName);
+            if(portNoObj == null)
+                hostNameAndRemoteHTrees.putIfAbsent(hostName,
+                                                    HashTreeClientGenerator.getHashTreeClient(hostName));
+            else {
+                hostNameAndRemoteHTrees.put(hostName,
+                                            HashTreeClientGenerator.getHashTreeClient(hostName,
+                                                                                      portNoObj));
+            }
         }
         return hostNameAndRemoteHTrees.get(hostName);
+    }
+
+    public void addHostNameAndPortNo(final String hostName, int portNo) {
+        hostNameAndRemotePortNo.put(hostName, portNo);
     }
 
     public void add(final String hostName, int treeId) {
         HostNameAndHashTreeId value = new HostNameAndHashTreeId(hostName, treeId);
         hostNameAndTreeIdMap.add(value);
-        LOG.debug("Host " + hostName + " and treeId :" + treeId
-                     + " has been added from sync list.");
+        LOG.debug("Host " + hostName + " and treeId :" + treeId + " has been added from sync list.");
     }
 
     public void remove(final String hostName, int treeId) {
         hostNameAndTreeIdMap.remove(new HostNameAndHashTreeId(hostName, treeId));
         LOG.debug("Host " + hostName + " and treeId :" + treeId
-                     + " has been removed from sync list.");
+                  + " has been removed from sync list.");
     }
 
     @Override
@@ -103,8 +114,8 @@ public class BGSynchTask extends BGStoppableTask {
                         localTree.synch(syncHostAndTreeId.treeId, remoteTree);
                     } catch(TException e) {
                         // TODO Auto-generated catch block
-                        LOG.warn("Unable to synch remote hash tree server : "
-                                    + syncHostAndTreeId, e);
+                        LOG.warn("Unable to synch remote hash tree server : " + syncHostAndTreeId,
+                                 e);
                     }
                 }
                 LOG.info("Synching remote hash trees. - Done");
