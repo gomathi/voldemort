@@ -75,14 +75,10 @@ public class BGSynchTask extends BGStoppableTask {
             throws TTransportException {
         if(!hostNameAndRemoteHTrees.containsKey(hostName)) {
             Integer portNoObj = hostNameAndRemotePortNo.get(hostName);
-            if(portNoObj == null)
-                hostNameAndRemoteHTrees.putIfAbsent(hostName,
-                                                    HashTreeClientGenerator.getHashTreeClient(hostName));
-            else {
-                hostNameAndRemoteHTrees.put(hostName,
-                                            HashTreeClientGenerator.getHashTreeClient(hostName,
-                                                                                      portNoObj));
-            }
+            hostNameAndRemoteHTrees.putIfAbsent(hostName,
+                                                portNoObj == null ? HashTreeClientGenerator.getHashTreeClient(hostName)
+                                                                 : HashTreeClientGenerator.getHashTreeClient(hostName,
+                                                                                                             portNoObj));
         }
         return hostNameAndRemoteHTrees.get(hostName);
     }
@@ -116,6 +112,10 @@ public class BGSynchTask extends BGStoppableTask {
                         // TODO Auto-generated catch block
                         LOG.warn("Unable to synch remote hash tree server : " + syncHostAndTreeId,
                                  e);
+                    }
+                    if(hasStopRequested()) {
+                        LOG.info("Not proceeding with further synch tasks as stop has been requested.");
+                        return;
                     }
                 }
                 LOG.info("Synching remote hash trees. - Done");

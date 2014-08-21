@@ -4,10 +4,10 @@ import static voldemort.hashtrees.HashTreeImplTestUtils.DEFAULT_HTREE_SERVER_POR
 import static voldemort.hashtrees.HashTreeImplTestUtils.DEFAULT_SEG_DATA_BLOCKS_COUNT;
 import static voldemort.hashtrees.HashTreeImplTestUtils.DEFAULT_TREE_ID;
 import static voldemort.hashtrees.HashTreeImplTestUtils.generateInMemoryStore;
+import static voldemort.hashtrees.HashTreeImplTestUtils.treeIdProvider;
 
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 import junit.framework.Assert;
@@ -52,8 +52,9 @@ public class HashTreeImplIntegerationTest {
                                                             storage,
                                                             events);
         BGTasksManager bgTasks = new BGTasksManager(hTree,
-                                                    Executors.newFixedThreadPool(10),
+                                                    treeIdProvider,
                                                     DEFAULT_HTREE_SERVER_PORT_NO,
+                                                    5,
                                                     1000,
                                                     300000,
                                                     1000,
@@ -73,8 +74,9 @@ public class HashTreeImplIntegerationTest {
                                                             storage,
                                                             events);
         BGTasksManager bgTasks = new BGTasksManager(hTree,
-                                                    Executors.newFixedThreadPool(10),
+                                                    treeIdProvider,
                                                     DEFAULT_HTREE_SERVER_PORT_NO,
+                                                    5,
                                                     1000,
                                                     1000,
                                                     30000,
@@ -97,8 +99,9 @@ public class HashTreeImplIntegerationTest {
                                                                  localStorage,
                                                                  localEvents);
         BGTasksManager localBGTasks = new BGTasksManager(localHTree,
-                                                         Executors.newFixedThreadPool(10),
+                                                         treeIdProvider,
                                                          DEFAULT_HTREE_SERVER_PORT_NO,
+                                                         5,
                                                          1000,
                                                          30000,
                                                          30000,
@@ -108,8 +111,9 @@ public class HashTreeImplIntegerationTest {
                                                                   remoteStorage,
                                                                   remoteEvents);
         BGTasksManager remoteBGTasks = new BGTasksManager(remoteHTree,
-                                                          Executors.newFixedThreadPool(10),
+                                                          treeIdProvider,
                                                           22222,
+                                                          5,
                                                           1000,
                                                           30000,
                                                           30000,
@@ -125,5 +129,4 @@ public class HashTreeImplIntegerationTest {
         localHTree.shutdown();
         remoteHTree.shutdown();
     }
-
 }

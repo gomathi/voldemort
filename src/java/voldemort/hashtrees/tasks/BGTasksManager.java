@@ -12,26 +12,28 @@ import org.apache.log4j.Logger;
 import org.apache.thrift.transport.TTransportException;
 
 import voldemort.hashtrees.HashTree;
+import voldemort.hashtrees.HashTreeIdProvider;
 
 /**
  * Manages all the background threads like rebuilding segment hashes, rebuilding
- * segment trees and non blocking segment data updater thread.
+ * segment trees and non-blocking segment data updater thread.
  * 
  */
 public class BGTasksManager {
 
     private final static Logger LOG = Logger.getLogger(BGTasksManager.class);
 
-    // Rebuild segment time interval, not full rebuild, but rebuild of dirty
+    // Rebuild segment time interval, not full rebuild, rebuild of just dirty
     // segments, in milliseconds. Should be scheduled in shorter intervals.
-    public final static long DEFAULT_REBUILD_SEG_TIME_INTERVAL = 2 * 60 * 1000;
+    public final static long DEFAULT_REBUILD_SEG_TIME_INTERVAL = 10 * 60 * 1000;
     // Expected time interval between two consecutive tree full rebuilds.
-    public final static long DEFAULT_FULL_TREE_TIME_INTERVAL = 25 * 60 * 1000;
+    public final static long DEFAULT_FULL_TREE_TIME_INTERVAL = 30 * 60 * 1000;
     public final static long DEFAULT_TREE_SYNCH_INTERVAL = 5 * 60 * 1000;
     public final static long DEFAULT_INITIAL_DELAY = 0;
 
-    private final ExecutorService executors;
+    private final ExecutorService fixedExecutors;
     private final ScheduledExecutorService scheduledExecutors;
+    private final HashTreeIdProvider treeIdProvider;
 
     private final List<BGStoppableTask> bgTasks;
     public final BGSegmentDataUpdater bgSegDataUpdater;
@@ -46,10 +48,14 @@ public class BGTasksManager {
     private final long remoteTreeSynchInterval;
     private final long initialDelay;
 
-    public BGTasksManager(final HashTree hashTree, final ExecutorService executors, int serverPortNo) {
+    public BGTasksManager(final HashTree hashTree,
+                          final HashTreeIdProvider treeIdProvider,
+                          int serverPortNo,
+                          int noOfBGThreads) {
         this(hashTree,
-             executors,
+             treeIdProvider,
              serverPortNo,
+             noOfBGThreads,
              DEFAULT_INITIAL_DELAY,
              DEFAULT_REBUILD_SEG_TIME_INTERVAL,
              DEFAULT_FULL_TREE_TIME_INTERVAL,
@@ -57,15 +63,17 @@ public class BGTasksManager {
     }
 
     public BGTasksManager(final HashTree hashTree,
-                          final ExecutorService executors,
+                          final HashTreeIdProvider treeIdProvider,
                           int serverPortNo,
+                          int noOfBGThreads,
                           long initialDelay,
                           long rebuildFullTreeTimeInterval,
                           long rebuildSegTimeInterval,
                           long remoteTreeSynchInterval) {
         this.hashTree = hashTree;
-        this.executors = executors;
-        this.scheduledExecutors = Executors.newScheduledThreadPool(2);
+        this.fixedExecutors = Executors.newFixedThreadPool(noOfBGThreads);
+        this.treeIdProvider = treeIdProvider;
+        this.scheduledExecutors = Executors.newScheduledThreadPool(3);
 
         this.serverPortNo = serverPortNo;
         this.initialDelay = initialDelay;
@@ -84,8 +92,16 @@ public class BGTasksManager {
         if(tasksRunning)
             throw new IllegalStateException("Tasks are already running.");
 
-        BGStoppableTask bgRebuildTreeTask = new BGRebuildEntireTreeTask(hashTree);
-        BGStoppableTask bgSegmentTreeTask = new BGRebuildSegmentTreeTask(hashTree);
+        BGStoppableTask bgRebuildTreeTask = new BGRebuildTreeTask(hashTree,
+                                                                  treeIdProvider,
+                                                                  fixedExecutors,
+                                                                  (2 * rebuildFullTreeTimeInterval),
+                                                                  true);
+        BGStoppableTask bgSegmentTreeTask = new BGRebuildTreeTask(hashTree,
+                                                                  treeIdProvider,
+                                                                  fixedExecutors,
+                                                                  (2 * rebuildSegTimeInterval),
+                                                                  false);
         BGHashTreeServer bgHashTreeServer = new BGHashTreeServer(hashTree, serverPortNo);
         bgTasks.add(bgRebuildTreeTask);
         bgTasks.add(bgSegmentTreeTask);
@@ -144,7 +160,7 @@ public class BGTasksManager {
         } catch(InterruptedException e) {
             LOG.warn("Interrupted while waiting for the shut down of background threads.");
         }
-        executors.shutdownNow();
+        fixedExecutors.shutdownNow();
         scheduledExecutors.shutdownNow();
         tasksRunning = false;
         LOG.info("HashTree background tasks has been stopped.");

@@ -36,7 +36,6 @@ import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -366,33 +365,33 @@ public class HashTreeImpl implements HashTree {
     @Override
     public void updateHashTrees(boolean fullRebuild) {
         List<Integer> treeIds = treeIdProvider.getAllTreeIds();
-        for(int treeId: treeIds) {
-            boolean acquiredLock = fullRebuild ? acquireTreeLock(treeId, true)
-                                              : acquireTreeLock(treeId, false);
-            if(acquiredLock) {
-                try {
-                    updateHashTree(treeId, fullRebuild);
-                } finally {
-                    releaseTreeLock(treeId);
-                }
-            }
-        }
+        for(int treeId: treeIds)
+            updateHashTree(treeId, fullRebuild);
     }
 
     @Override
     public void updateHashTree(int treeId, boolean fullRebuild) {
-        long currentTs = System.currentTimeMillis();
-        List<Integer> dirtySegmentBuckets = hTStorage.clearAndGetDirtySegments(treeId);
+        boolean acquiredLock = fullRebuild ? acquireTreeLock(treeId, true)
+                                          : acquireTreeLock(treeId, false);
+        if(acquiredLock) {
+            try {
+                long currentTs = System.currentTimeMillis();
+                List<Integer> dirtySegmentBuckets = hTStorage.clearAndGetDirtySegments(treeId);
 
-        Map<Integer, ByteBuffer> dirtyNodeAndDigestMap = rebuildLeaves(treeId, dirtySegmentBuckets);
-        rebuildInternalNodes(treeId, dirtyNodeAndDigestMap);
-        for(Map.Entry<Integer, ByteBuffer> dirtyNodeAndDigest: dirtyNodeAndDigestMap.entrySet())
-            hTStorage.putSegmentHash(treeId,
-                                     dirtyNodeAndDigest.getKey(),
-                                     dirtyNodeAndDigest.getValue());
-        if(fullRebuild)
-            hTStorage.setLastFullyTreeBuiltTimestamp(treeId, currentTs);
-        hTStorage.setLastHashTreeUpdatedTimestamp(treeId, currentTs);
+                Map<Integer, ByteBuffer> dirtyNodeAndDigestMap = rebuildLeaves(treeId,
+                                                                               dirtySegmentBuckets);
+                rebuildInternalNodes(treeId, dirtyNodeAndDigestMap);
+                for(Map.Entry<Integer, ByteBuffer> dirtyNodeAndDigest: dirtyNodeAndDigestMap.entrySet())
+                    hTStorage.putSegmentHash(treeId,
+                                             dirtyNodeAndDigest.getKey(),
+                                             dirtyNodeAndDigest.getValue());
+                if(fullRebuild)
+                    hTStorage.setLastFullyTreeBuiltTimestamp(treeId, currentTs);
+                hTStorage.setLastHashTreeUpdatedTimestamp(treeId, currentTs);
+            } finally {
+                releaseTreeLock(treeId);
+            }
+        }
     }
 
     @Override
@@ -619,15 +618,22 @@ public class HashTreeImpl implements HashTree {
                                                            : 1);
     }
 
-    public void startBGTasks(final ExecutorService executors, int serverPortNo)
-            throws TTransportException {
+    /**
+     * 
+     * @param serverPortNo
+     * @param noOfBGThreads for better throughput, the value should be a maximum
+     *        of 3x or greater than or equal to 2x. x is no of hash trees.
+     * @throws TTransportException
+     */
+    public void startBGTasks(int serverPortNo, int noOfBGThreads) throws TTransportException {
         if(bgTasksMgr != null)
             throw new IllegalStateException("Background tasks initiated already.");
 
-        bgTasksMgr = new BGTasksManager(this, executors, serverPortNo);
+        bgTasksMgr = new BGTasksManager(this, treeIdProvider, serverPortNo, noOfBGThreads);
         startBGTasks(bgTasksMgr);
     }
 
+    // Used by unit test.
     public void startBGTasks(final BGTasksManager bgTasksMgr) throws TTransportException {
         this.bgTasksMgr = bgTasksMgr;
         bgTasksMgr.startBackgroundTasks();
