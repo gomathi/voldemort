@@ -321,7 +321,7 @@ public class HashTreePersistentStorage implements HashTreeStorage {
     }
 
     @Override
-    public void putVersionedDataAddition(int treeId, ByteBuffer key, ByteBuffer value) {
+    public void putVersionedDataToAdditionList(int treeId, ByteBuffer key, ByteBuffer value) {
         byte[] keyArr = key.array();
         byte[] fullKey = new byte[2 + ByteUtils.SIZE_OF_INT + ByteUtils.SIZE_OF_LONG
                                   + keyArr.length];
@@ -334,7 +334,7 @@ public class HashTreePersistentStorage implements HashTreeStorage {
     }
 
     @Override
-    public void putVersionedDataRemoval(int treeId, ByteBuffer key) {
+    public void putVersionedDataToRemovalList(int treeId, ByteBuffer key) {
         byte[] keyArr = key.array();
         byte[] fullKey = new byte[2 + ByteUtils.SIZE_OF_INT + ByteUtils.SIZE_OF_LONG
                                   + keyArr.length];
@@ -383,7 +383,7 @@ public class HashTreePersistentStorage implements HashTreeStorage {
         byte dataMarker = rowKey[offset];
         boolean addedOrRemoved = (dataMarker == ADDITION_MARKER) ? true : false;
         offset++;
-        int length = rowKey.length - offset + 1;
+        int length = rowKey.length - offset;
         byte[] dataKey = new byte[length];
         System.arraycopy(rowKey, offset, dataKey, 0, length);
 
@@ -430,6 +430,7 @@ public class HashTreePersistentStorage implements HashTreeStorage {
                     if(vData.isAddedOrRemoved())
                         vData.setValue(rowValue);
                     queue.add(vData);
+                    iterator.next();
                 }
             }
 

@@ -320,10 +320,17 @@ public class HashTreeManager implements Runnable, HashTreeLocalSyncManager {
                                                                                   second));
     }
 
+    public void hRemove(final ByteBuffer key) {
+        List<ByteBuffer> second = new ArrayList<ByteBuffer>(1);
+        second.add(key);
+        bgTasksMgr.bgSegDataUpdater.enque(new Pair<HTOperation, List<ByteBuffer>>(HTOperation.REMOVE,
+                                                                                  second));
+    }
+
     public void hPut(List<ByteBuffer> input) throws Exception {
         hashTree.hPut(input.get(0), input.get(1));
         if(enableVersionedData)
-            htStorage.putVersionedDataAddition(treeIdProvider.getTreeId(input.get(0)),
+            htStorage.putVersionedDataToAdditionList(treeIdProvider.getTreeId(input.get(0)),
                                                input.get(0),
                                                input.get(1));
     }
@@ -331,13 +338,6 @@ public class HashTreeManager implements Runnable, HashTreeLocalSyncManager {
     public void hRemove(List<ByteBuffer> input) throws Exception {
         hashTree.hRemove(input.get(0));
         if(enableVersionedData)
-            htStorage.putVersionedDataRemoval(treeIdProvider.getTreeId(input.get(0)), input.get(0));
-    }
-
-    public void hRemove(final ByteBuffer key) {
-        List<ByteBuffer> second = new ArrayList<ByteBuffer>(1);
-        second.add(key);
-        bgTasksMgr.bgSegDataUpdater.enque(new Pair<HTOperation, List<ByteBuffer>>(HTOperation.REMOVE,
-                                                                                  second));
+            htStorage.putVersionedDataToRemovalList(treeIdProvider.getTreeId(input.get(0)), input.get(0));
     }
 }

@@ -18,6 +18,8 @@ package voldemort.hashtrees;
 import java.io.File;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Random;
 
@@ -28,16 +30,19 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
+import scala.actors.threadpool.Arrays;
 import voldemort.hashtrees.storage.HashTreePersistentStorage;
 import voldemort.hashtrees.thrift.generated.SegmentData;
 import voldemort.hashtrees.thrift.generated.SegmentHash;
+import voldemort.hashtrees.thrift.generated.VersionedData;
+import voldemort.utils.Pair;
 
 public class HashTreePersistentStorageTest {
 
     private String dbDir;
+    private int defaultTreeId = 1;
+    private int defaultSegId = 0;
     private HashTreePersistentStorage dbObj;
-    private int treeId = 1;
-    private int segId = 0;
 
     @Before
     public void init() throws Exception {
@@ -59,17 +64,17 @@ public class HashTreePersistentStorageTest {
         ByteBuffer key = ByteBuffer.wrap("key1".getBytes());
         ByteBuffer digest = ByteBuffer.wrap("digest1".getBytes());
 
-        dbObj.putSegmentData(treeId, segId, key, digest);
+        dbObj.putSegmentData(defaultTreeId, defaultSegId, key, digest);
 
-        SegmentData sd = dbObj.getSegmentData(treeId, segId, key);
+        SegmentData sd = dbObj.getSegmentData(defaultTreeId, defaultSegId, key);
         Assert.assertNotNull(sd);
         Assert.assertEquals(digest, sd.digest);
 
-        dbObj.deleteSegmentData(treeId, segId, key);
-        sd = dbObj.getSegmentData(treeId, segId, key);
+        dbObj.deleteSegmentData(defaultTreeId, defaultSegId, key);
+        sd = dbObj.getSegmentData(defaultTreeId, defaultSegId, key);
         Assert.assertNull(sd);
 
-        dbObj.deleteTree(treeId);
+        dbObj.deleteTree(defaultTreeId);
     }
 
     @Test
@@ -80,23 +85,23 @@ public class HashTreePersistentStorageTest {
             sd = new SegmentData(ByteBuffer.wrap(("test" + i).getBytes()),
                                  ByteBuffer.wrap(("value" + i).getBytes()));
             list.add(sd);
-            dbObj.putSegmentData(treeId, segId, sd.key, sd.digest);
+            dbObj.putSegmentData(defaultTreeId, defaultSegId, sd.key, sd.digest);
         }
 
-        List<SegmentData> actualResult = dbObj.getSegment(treeId, segId);
+        List<SegmentData> actualResult = dbObj.getSegment(defaultTreeId, defaultSegId);
         Assert.assertNotNull(actualResult);
         Assert.assertTrue(actualResult.size() != 0);
         Assert.assertEquals(list, actualResult);
 
-        dbObj.deleteTree(treeId);
+        dbObj.deleteTree(defaultTreeId);
     }
 
     @Test
     public void testPutSegmentHash() {
         ByteBuffer digest = ByteBuffer.wrap("digest1".getBytes());
-        dbObj.putSegmentHash(treeId, segId, digest);
+        dbObj.putSegmentHash(defaultTreeId, defaultSegId, digest);
 
-        SegmentHash sh = dbObj.getSegmentHash(treeId, segId);
+        SegmentHash sh = dbObj.getSegmentHash(defaultTreeId, defaultSegId);
         Assert.assertNotNull(sh);
         Assert.assertEquals(digest, sh.hash);
 
@@ -104,13 +109,13 @@ public class HashTreePersistentStorageTest {
         expected.add(sh);
 
         List<Integer> nodeIds = new ArrayList<Integer>();
-        nodeIds.add(segId);
+        nodeIds.add(defaultSegId);
 
-        List<SegmentHash> actual = dbObj.getSegmentHashes(treeId, nodeIds);
+        List<SegmentHash> actual = dbObj.getSegmentHashes(defaultTreeId, nodeIds);
         Assert.assertNotNull(actual);
 
         Assert.assertEquals(expected, actual);
-        dbObj.deleteTree(treeId);
+        dbObj.deleteTree(defaultTreeId);
     }
 
     @Test
@@ -118,26 +123,92 @@ public class HashTreePersistentStorageTest {
         ByteBuffer key = ByteBuffer.wrap("key1".getBytes());
         ByteBuffer digest = ByteBuffer.wrap("digest1".getBytes());
 
-        dbObj.putSegmentData(treeId, segId, key, digest);
-        dbObj.deleteTree(treeId);
+        dbObj.putSegmentData(defaultTreeId, defaultSegId, key, digest);
+        dbObj.deleteTree(defaultTreeId);
 
-        SegmentData sd = dbObj.getSegmentData(treeId, segId, key);
+        SegmentData sd = dbObj.getSegmentData(defaultTreeId, defaultSegId, key);
         Assert.assertNull(sd);
     }
 
     @Test
     public void testSetLastFullyTreeBuiltTimestamp() {
         long exTs = System.currentTimeMillis();
-        dbObj.setLastFullyTreeBuiltTimestamp(treeId, exTs);
-        long dbTs = dbObj.getLastFullyTreeReBuiltTimestamp(treeId);
+        dbObj.setLastFullyTreeBuiltTimestamp(defaultTreeId, exTs);
+        long dbTs = dbObj.getLastFullyTreeReBuiltTimestamp(defaultTreeId);
         Assert.assertEquals(exTs, dbTs);
     }
 
     @Test
     public void testLastHashTreeUpdatedTimestamp() {
         long exTs = System.currentTimeMillis();
-        dbObj.setLastHashTreeUpdatedTimestamp(treeId, exTs);
-        long dbTs = dbObj.getLastHashTreeUpdatedTimestamp(treeId);
+        dbObj.setLastHashTreeUpdatedTimestamp(defaultTreeId, exTs);
+        long dbTs = dbObj.getLastHashTreeUpdatedTimestamp(defaultTreeId);
         Assert.assertEquals(exTs, dbTs);
+    }
+
+    private List<Pair<ByteBuffer, ByteBuffer>> generateRandomKeyValueList(int count) {
+        List<Pair<ByteBuffer, ByteBuffer>> result = new ArrayList<Pair<ByteBuffer, ByteBuffer>>();
+        for(int i = 0; i < count; i++)
+            result.add(Pair.create(HashTreeImplTestUtils.randomByteBuffer(),
+                                   HashTreeImplTestUtils.randomByteBuffer()));
+        return result;
+    }
+
+    private List<Pair<ByteBuffer, ByteBuffer>> generateRandomKeyList(int count) {
+        List<Pair<ByteBuffer, ByteBuffer>> result = new ArrayList<Pair<ByteBuffer, ByteBuffer>>();
+        ByteBuffer value = null;
+        for(int i = 0; i < count; i++)
+            result.add(Pair.create(HashTreeImplTestUtils.randomByteBuffer(), value));
+        return result;
+    }
+
+    @Test
+    public void testVersionedData() {
+        int treeId = 5;
+        ByteBuffer value = null;
+
+        List<Pair<ByteBuffer, ByteBuffer>> expected = generateRandomKeyValueList(10);
+        expected.addAll(generateRandomKeyList(10));
+        Collections.shuffle(expected);
+
+        for(Pair<ByteBuffer, ByteBuffer> pair: expected) {
+            if(pair.getSecond() == null)
+                dbObj.putVersionedDataToRemovalList(treeId, pair.getFirst());
+            else
+                dbObj.putVersionedDataToAdditionList(treeId, pair.getFirst(), pair.getSecond());
+        }
+
+        Iterator<VersionedData> itr = dbObj.getVersionedData(treeId);
+        List<Pair<ByteBuffer, ByteBuffer>> actual = new ArrayList<Pair<ByteBuffer, ByteBuffer>>();
+        while(itr.hasNext()) {
+            VersionedData vData = itr.next();
+            if(vData.addedOrRemoved)
+                actual.add(Pair.create(vData.key, vData.value));
+            else
+                actual.add(Pair.create(vData.key, value));
+        }
+
+        validate(expected, actual);
+    }
+
+    private void validate(List<Pair<ByteBuffer, ByteBuffer>> expected,
+                          List<Pair<ByteBuffer, ByteBuffer>> actual) {
+        if(expected == null && actual == null)
+            return;
+        if(expected == null || actual == null)
+            Assert.assertTrue(false);
+
+        Assert.assertEquals(expected.size(), actual.size());
+
+        for(int i = 0; i < expected.size(); i++) {
+            Assert.assertTrue(Arrays.equals(expected.get(i).getFirst().array(), actual.get(i)
+                                                                                      .getFirst()
+                                                                                      .array()));
+            if(expected.get(i).getSecond() == null)
+                Assert.assertEquals(expected.get(i).getSecond(), actual.get(i).getSecond());
+            else
+                Assert.assertTrue(Arrays.equals(expected.get(i).getSecond().array(),
+                                                actual.get(i).getSecond().array()));
+        }
     }
 }

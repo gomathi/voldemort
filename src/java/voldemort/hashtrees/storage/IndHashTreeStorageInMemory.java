@@ -48,9 +48,11 @@ class IndHashTreeStorageInMemory {
     private final AtomicLong fullyRebuiltTreeTs = new AtomicLong(0);
     private final AtomicLong rebuiltTreeTs = new AtomicLong(0);
     private final AtomicLong versionNo = new AtomicLong();
+    private final int treeId;
 
-    public IndHashTreeStorageInMemory(int noOfSegDataBlocks) {
+    public IndHashTreeStorageInMemory(int treeId, int noOfSegDataBlocks) {
         this.dirtySegments = new AtomicBitSet(noOfSegDataBlocks);
+        this.treeId = treeId;
     }
 
     public void putSegmentHash(int nodeId, ByteBuffer digest) {
@@ -145,13 +147,13 @@ class IndHashTreeStorageInMemory {
         return rebuiltTreeTs.get();
     }
 
-    public void putVersionedDataAddition(int treeId, ByteBuffer key, ByteBuffer value) {
+    public void putVersionedDataAddition(ByteBuffer key, ByteBuffer value) {
         VersionedData vData = new VersionedData(versionNo.incrementAndGet(), treeId, true, key);
         vData.setValue(value);
         versionedData.put(vData.getVersionNo(), vData);
     }
 
-    public void putVersionedDataRemoval(int treeId, ByteBuffer key) {
+    public void putVersionedDataRemoval(ByteBuffer key) {
         VersionedData vData = new VersionedData(versionNo.incrementAndGet(), treeId, false, key);
         versionedData.put(vData.getVersionNo(), vData);
     }

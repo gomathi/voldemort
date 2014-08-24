@@ -45,7 +45,8 @@ public class HashTreeStorageInMemory implements HashTreeStorage {
     private IndHashTreeStorageInMemory getIndHTree(int treeId) {
         if(!treeIdAndIndHashTree.containsKey(treeId))
             treeIdAndIndHashTree.putIfAbsent(treeId,
-                                             new IndHashTreeStorageInMemory(noOfSegDataBlocks));
+                                             new IndHashTreeStorageInMemory(treeId,
+                                                                            noOfSegDataBlocks));
         return treeIdAndIndHashTree.get(treeId);
     }
 
@@ -135,13 +136,13 @@ public class HashTreeStorageInMemory implements HashTreeStorage {
     }
 
     @Override
-    public void putVersionedDataAddition(int treeId, ByteBuffer key, ByteBuffer value) {
-        getIndHTree(treeId).putVersionedDataAddition(treeId, key, value);
+    public void putVersionedDataToAdditionList(int treeId, ByteBuffer key, ByteBuffer value) {
+        getIndHTree(treeId).putVersionedDataAddition(key, value);
     }
 
     @Override
-    public void putVersionedDataRemoval(int treeId, ByteBuffer key) {
-        getIndHTree(treeId).putVersionedDataRemoval(treeId, key);
+    public void putVersionedDataToRemovalList(int treeId, ByteBuffer key) {
+        getIndHTree(treeId).putVersionedDataRemoval(key);
     }
 
 }

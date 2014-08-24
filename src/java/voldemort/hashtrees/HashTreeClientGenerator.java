@@ -24,7 +24,8 @@ import org.apache.thrift.transport.TTransportException;
 import voldemort.hashtrees.thrift.generated.HashTreeSyncInterface;
 
 /**
- * A hashtree client which talks to a hashtree server in another node.
+ * A hashtree client which talks to a hashtree server in another node through
+ * thrift protocol.
  * 
  */
 
