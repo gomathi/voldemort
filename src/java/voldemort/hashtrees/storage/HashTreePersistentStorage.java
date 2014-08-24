@@ -24,7 +24,6 @@ import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
 import java.util.NoSuchElementException;
-import java.util.Observable;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -38,9 +37,9 @@ import org.iq80.leveldb.Options;
 
 import voldemort.hashtrees.thrift.generated.SegmentData;
 import voldemort.hashtrees.thrift.generated.SegmentHash;
+import voldemort.hashtrees.thrift.generated.VersionedData;
 import voldemort.utils.AtomicBitSet;
 import voldemort.utils.ByteUtils;
-import voldemort.utils.Pair;
 
 /**
  * Uses LevelDB for storing segment hashes and segment data. Dirty segment
@@ -51,23 +50,29 @@ import voldemort.utils.Pair;
  * 1) Metadata info [Like when the tree was built fully last time]. Format is
  * ['M'|key] -> [value] 2) SegmentData, format is ['S'|treeId|segId|key] ->
  * [value] 3) SegmentHash, format is ['H'|treeId|nodeId] -> [value] 4) Put
- * versioned (key,value) pairs into the database. ['V'|treeId|versionNo|datakey]
- * -> [value] pair.
+ * versioned (key,value) pairs into the database.
+ * ['V'|treeId|versionNo|[Addition|Removal]|datakey] -> [value] pair.
  * 
  */
 
-public class HashTreePersistentStorage extends Observable implements HashTreeStorage {
+public class HashTreePersistentStorage implements HashTreeStorage {
 
     private static final Logger LOG = Logger.getLogger(HashTreePersistentStorage.class);
 
     private static final byte[] KEY_LAST_FULLY_TREE_BUILT_TS = "ltfbTs".getBytes();
     private static final byte[] KEY_LAST_TREE_BUILT_TS = "ltbTs".getBytes();
-    private static final byte KEY_META_DATA_PREFIX = 'M';
-    private static final byte KEY_SEG_HASH_PREFIX = 'H';
-    private static final byte KEY_SEG_DATA_PREFIX = 'S';
+
+    private static final byte META_DATA_MARKER = 'M';
+    private static final byte SEG_HASH_MARKER = 'H';
+    private static final byte SEG_DATA_MARKER = 'S';
+
     private static final byte KEY_VERSIONED_DATA_PREFIX = 'V';
-    private static final byte[] KEY_PREFIX_ARRAY = { KEY_META_DATA_PREFIX, KEY_SEG_DATA_PREFIX,
-            KEY_SEG_HASH_PREFIX, KEY_VERSIONED_DATA_PREFIX };
+    private static final byte ADDITION_MARKER = 'A';
+    private static final byte REMOVAL_MARKER = 'R';
+    private static final byte[] DUMMY_ENTRY = { 'd' };
+
+    private static final byte[] KEY_PREFIX_ARRAY = { META_DATA_MARKER, SEG_DATA_MARKER,
+            SEG_HASH_MARKER, KEY_VERSIONED_DATA_PREFIX };
 
     private final DB dbObj;
     private final int noOfSegDataBlocks;
@@ -102,7 +107,7 @@ public class HashTreePersistentStorage extends Observable implements HashTreeSto
             prepareKeyPrefix(keyPrefixBuf, KEY_VERSIONED_DATA_PREFIX, treeId);
             DBIterator itr = dbObj.iterator();
             itr.seek(keyPrefix);
-            itr.seekToFirst();
+            itr.seekToLast();
             if(itr.hasNext()) {
                 byte[] key = itr.peekNext().getKey();
                 long versionNo = ByteUtils.readLong(key, keyPrefix.length);
@@ -136,7 +141,7 @@ public class HashTreePersistentStorage extends Observable implements HashTreeSto
     private static byte[] prepareSegmentHashKey(int treeId, int nodeId) {
         byte[] key = new byte[1 + ByteUtils.SIZE_OF_INT * 2];
         ByteBuffer bb = ByteBuffer.wrap(key);
-        prepareKeyPrefix(bb, KEY_SEG_HASH_PREFIX, treeId, nodeId);
+        prepareKeyPrefix(bb, SEG_HASH_MARKER, treeId, nodeId);
         return key;
     }
 
@@ -149,14 +154,14 @@ public class HashTreePersistentStorage extends Observable implements HashTreeSto
     private static byte[] prepareSegmentDataKeyPrefix(int treeId, int segId) {
         byte[] byteKey = new byte[1 + ByteUtils.SIZE_OF_INT * 2];
         ByteBuffer bb = ByteBuffer.wrap(byteKey);
-        prepareKeyPrefix(bb, KEY_SEG_DATA_PREFIX, treeId, segId);
+        prepareKeyPrefix(bb, SEG_DATA_MARKER, treeId, segId);
         return byteKey;
     }
 
     private static byte[] prepareSegmentDataKey(int treeId, int segId, ByteBuffer key) {
         byte[] byteKey = new byte[1 + ByteUtils.SIZE_OF_INT * 2 + (key.array().length)];
         ByteBuffer bb = ByteBuffer.wrap(byteKey);
-        prepareKeyPrefix(bb, KEY_SEG_DATA_PREFIX, treeId, segId);
+        prepareKeyPrefix(bb, SEG_DATA_MARKER, treeId, segId);
         bb.put(key.array());
         return byteKey;
     }
@@ -164,7 +169,7 @@ public class HashTreePersistentStorage extends Observable implements HashTreeSto
     private static byte[] prepareMetaDataKey(int treeId, byte[] keyName) {
         byte[] byteKey = new byte[1 + ByteUtils.SIZE_OF_INT + keyName.length];
         ByteBuffer bb = ByteBuffer.wrap(byteKey);
-        prepareKeyPrefix(bb, KEY_META_DATA_PREFIX, treeId);
+        prepareKeyPrefix(bb, META_DATA_MARKER, treeId);
         bb.put(keyName);
         return byteKey;
     }
@@ -316,21 +321,33 @@ public class HashTreePersistentStorage extends Observable implements HashTreeSto
     }
 
     @Override
-    public void putVersionedData(int treeId, ByteBuffer key, ByteBuffer value) {
-        byte[] fullKey = new byte[1 + ByteUtils.SIZE_OF_INT + ByteUtils.SIZE_OF_LONG];
+    public void putVersionedDataAddition(int treeId, ByteBuffer key, ByteBuffer value) {
+        byte[] keyArr = key.array();
+        byte[] fullKey = new byte[2 + ByteUtils.SIZE_OF_INT + ByteUtils.SIZE_OF_LONG
+                                  + keyArr.length];
         ByteBuffer fullKeyBuffer = ByteBuffer.wrap(fullKey);
         prepareKeyPrefix(fullKeyBuffer, KEY_VERSIONED_DATA_PREFIX, treeId);
         fullKeyBuffer.putLong(getNextVersionId(treeId));
-
-        byte[] array = new byte[key.array().length + value.array().length];
-        ByteBuffer bb = ByteBuffer.wrap(array);
-        bb.put(key.array());
-        bb.put(value.array());
-        dbObj.put(fullKeyBuffer.array(), bb.array());
+        fullKeyBuffer.put(ADDITION_MARKER);
+        fullKeyBuffer.put(keyArr);
+        dbObj.put(fullKeyBuffer.array(), value.array());
     }
 
     @Override
-    public Iterator<Pair<ByteBuffer, ByteBuffer>> getVersionedData(int treeId) {
+    public void putVersionedDataRemoval(int treeId, ByteBuffer key) {
+        byte[] keyArr = key.array();
+        byte[] fullKey = new byte[2 + ByteUtils.SIZE_OF_INT + ByteUtils.SIZE_OF_LONG
+                                  + keyArr.length];
+        ByteBuffer fullKeyBuffer = ByteBuffer.wrap(fullKey);
+        prepareKeyPrefix(fullKeyBuffer, KEY_VERSIONED_DATA_PREFIX, treeId);
+        fullKeyBuffer.putLong(getNextVersionId(treeId));
+        fullKeyBuffer.put(REMOVAL_MARKER);
+        fullKeyBuffer.put(keyArr);
+        dbObj.put(fullKeyBuffer.array(), DUMMY_ENTRY);
+    }
+
+    @Override
+    public Iterator<VersionedData> getVersionedData(int treeId) {
         final byte[] seekKey = new byte[1 + ByteUtils.SIZE_OF_INT];
         ByteBuffer bb = ByteBuffer.wrap(seekKey);
         prepareKeyPrefix(bb, KEY_VERSIONED_DATA_PREFIX, treeId);
@@ -338,7 +355,7 @@ public class HashTreePersistentStorage extends Observable implements HashTreeSto
     }
 
     @Override
-    public Iterator<Pair<ByteBuffer, ByteBuffer>> getVersionedData(int treeId, long versionNo) {
+    public Iterator<VersionedData> getVersionedData(int treeId, long versionNo) {
         final byte[] seekKey = new byte[1 + ByteUtils.SIZE_OF_INT + ByteUtils.SIZE_OF_LONG];
         final byte[] keyPrefix = new byte[1 + ByteUtils.SIZE_OF_INT];
 
@@ -353,14 +370,34 @@ public class HashTreePersistentStorage extends Observable implements HashTreeSto
         return getVersionedData(seekKey, keyPrefix);
     }
 
-    private Iterator<Pair<ByteBuffer, ByteBuffer>> getVersionedData(final byte[] startKey,
-                                                                    final byte[] keyPrefix) {
+    private VersionedData getVersionedData(final byte[] rowKey) {
+        int offset = 0;
+        byte versionMarker = rowKey[offset];
+        if(versionMarker != KEY_VERSIONED_DATA_PREFIX)
+            return null;
+        offset++;
+        int treeId = ByteUtils.readInt(rowKey, 1);
+        offset += ByteUtils.SIZE_OF_INT;
+        long versionNo = ByteUtils.readLong(rowKey, offset);
+        offset += ByteUtils.SIZE_OF_LONG;
+        byte dataMarker = rowKey[offset];
+        boolean addedOrRemoved = (dataMarker == ADDITION_MARKER) ? true : false;
+        offset++;
+        int length = rowKey.length - offset + 1;
+        byte[] dataKey = new byte[length];
+        System.arraycopy(rowKey, offset, dataKey, 0, length);
+
+        return new VersionedData(versionNo, treeId, addedOrRemoved, ByteBuffer.wrap(dataKey));
+    }
+
+    private Iterator<VersionedData> getVersionedData(final byte[] startKey, final byte[] keyPrefix) {
         final DBIterator iterator = dbObj.iterator();
         iterator.seek(startKey);
+        iterator.seekToFirst();
 
-        return new Iterator<Pair<ByteBuffer, ByteBuffer>>() {
+        return new Iterator<VersionedData>() {
 
-            private Queue<Pair<ByteBuffer, ByteBuffer>> queue = new ArrayDeque<Pair<ByteBuffer, ByteBuffer>>();
+            private Queue<VersionedData> queue = new ArrayDeque<VersionedData>(1);
 
             @Override
             public boolean hasNext() {
@@ -369,7 +406,7 @@ public class HashTreePersistentStorage extends Observable implements HashTreeSto
             }
 
             @Override
-            public Pair<ByteBuffer, ByteBuffer> next() {
+            public VersionedData next() {
                 if(queue.size() == 0)
                     throw new NoSuchElementException();
                 return queue.remove();
@@ -387,15 +424,12 @@ public class HashTreePersistentStorage extends Observable implements HashTreeSto
                                          0,
                                          keyPrefix.length) != 0)
                         return;
-                    byte[] key = iterator.peekNext().getKey();
-                    byte[] value = iterator.peekNext().getValue();
-                    int offset = 1 + ByteUtils.SIZE_OF_INT + ByteUtils.SIZE_OF_LONG;
-                    int length = key.length - offset + 1;
-                    byte[] actualKey = new byte[length];
-                    System.arraycopy(key, offset, actualKey, 0, length);
-                    ByteUtils.readBytes(key, offset, key.length - offset);
-                    queue.add(new Pair<ByteBuffer, ByteBuffer>(ByteBuffer.wrap(actualKey),
-                                                               ByteBuffer.wrap(value)));
+                    byte[] rowKey = iterator.peekNext().getKey();
+                    byte[] rowValue = iterator.peekNext().getValue();
+                    VersionedData vData = getVersionedData(rowKey);
+                    if(vData.isAddedOrRemoved())
+                        vData.setValue(rowValue);
+                    queue.add(vData);
                 }
             }
 

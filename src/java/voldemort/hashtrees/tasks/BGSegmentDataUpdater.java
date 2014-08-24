@@ -80,10 +80,10 @@ public class BGSegmentDataUpdater extends BGStoppableTask {
                     Pair<HTOperation, List<ByteBuffer>> pair = que.take();
                     switch(pair.getFirst()) {
                         case PUT:
-                            hTreeManager.hPut(pair.getSecond().get(0), pair.getSecond().get(1));
+                            hTreeManager.hPut(pair.getSecond());
                             break;
                         case REMOVE:
-                            hTreeManager.hRemove(pair.getSecond().get(0));
+                            hTreeManager.hRemove(pair.getSecond());
                             break;
                         case STOP:
                             // no op
@@ -92,6 +92,8 @@ public class BGSegmentDataUpdater extends BGStoppableTask {
                 } catch(InterruptedException e) {
                     LOG.error("Interrupted while waiting for removing an element from the queue. Exiting");
                     return;
+                } catch(Exception e) {
+                    LOG.error("Exception occurred while adding the element.", e);
                 } finally {
                     if(hasStopRequested() && que.isEmpty()) {
                         disableRunningStatus();

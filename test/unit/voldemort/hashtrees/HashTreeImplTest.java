@@ -286,7 +286,9 @@ public class HashTreeImplTest {
         HTreeComponents remoteHTreeComp = createHashTree(DEFAULT_SEG_DATA_BLOCKS_COUNT, remoteStore);
         HashTreeManager hTreeManager = new HashTreeManager("test",
                                                            remoteHTreeComp.hTree,
-                                                           treeIdProvider);
+                                                           treeIdProvider,
+                                                           remoteStore,
+                                                           false);
 
         BGHashTreeServer server = new BGHashTreeServer(remoteHTreeComp.hTree,
                                                        hTreeManager,

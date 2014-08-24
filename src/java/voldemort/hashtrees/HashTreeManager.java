@@ -1,3 +1,18 @@
+/*
+ * Copyright 2008-2014 LinkedIn, Inc
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License"); you may not
+ * use this file except in compliance with the License. You may obtain a copy of
+ * the License at
+ * 
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * 
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+ * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+ * License for the specific language governing permissions and limitations under
+ * the License.
+ */
 package voldemort.hashtrees;
 
 import java.nio.ByteBuffer;
@@ -12,6 +27,7 @@ import org.apache.log4j.Logger;
 import org.apache.thrift.TException;
 import org.apache.thrift.transport.TTransportException;
 
+import voldemort.hashtrees.storage.HashTreeStorage;
 import voldemort.hashtrees.tasks.BGTasksManager;
 import voldemort.hashtrees.thrift.generated.HashTreeSyncInterface;
 import voldemort.utils.Pair;
@@ -55,7 +71,9 @@ public class HashTreeManager implements Runnable, HashTreeLocalSyncManager {
     private final long rebuildFullTreeTimeInterval;
     private final HashTree hashTree;
     private final HashTreeIdProvider treeIdProvider;
+    private final HashTreeStorage htStorage;
     private final String thisHostName;
+    private final boolean enableVersionedData;
 
     private final ConcurrentMap<String, Integer> hostNameAndRemotePortNo = new ConcurrentHashMap<String, Integer>();
     private final ConcurrentMap<String, HashTreeSyncInterface.Iface> hostNameAndRemoteHTrees = new ConcurrentHashMap<String, HashTreeSyncInterface.Iface>();
@@ -69,18 +87,31 @@ public class HashTreeManager implements Runnable, HashTreeLocalSyncManager {
     private volatile boolean enabledBGTasks;
     private volatile BGTasksManager bgTasksMgr;
 
-    public HashTreeManager(String thisHostName, HashTree hashTree, HashTreeIdProvider treeIdProvider) {
-        this(thisHostName, DEFAULT_FULL_TREE_TIME_INTERVAL, hashTree, treeIdProvider);
+    public HashTreeManager(String thisHostName,
+                           HashTree hashTree,
+                           HashTreeIdProvider treeIdProvider,
+                           HashTreeStorage htStorage,
+                           boolean enableVersionedData) {
+        this(thisHostName,
+             DEFAULT_FULL_TREE_TIME_INTERVAL,
+             hashTree,
+             treeIdProvider,
+             htStorage,
+             enableVersionedData);
     }
 
     public HashTreeManager(String hostName,
                            long rebuildFullTreeTimeInterval,
                            HashTree hashTree,
-                           HashTreeIdProvider treeIdProvider) {
+                           HashTreeIdProvider treeIdProvider,
+                           HashTreeStorage htStorage,
+                           boolean enableVersionedData) {
         this.thisHostName = hostName;
         this.rebuildFullTreeTimeInterval = rebuildFullTreeTimeInterval;
         this.hashTree = hashTree;
         this.treeIdProvider = treeIdProvider;
+        this.htStorage = htStorage;
+        this.enableVersionedData = enableVersionedData;
     }
 
     private STATE getNextState(STATE currState) {
@@ -287,6 +318,20 @@ public class HashTreeManager implements Runnable, HashTreeLocalSyncManager {
         second.add(value);
         bgTasksMgr.bgSegDataUpdater.enque(new Pair<HTOperation, List<ByteBuffer>>(HTOperation.PUT,
                                                                                   second));
+    }
+
+    public void hPut(List<ByteBuffer> input) throws Exception {
+        hashTree.hPut(input.get(0), input.get(1));
+        if(enableVersionedData)
+            htStorage.putVersionedDataAddition(treeIdProvider.getTreeId(input.get(0)),
+                                               input.get(0),
+                                               input.get(1));
+    }
+
+    public void hRemove(List<ByteBuffer> input) throws Exception {
+        hashTree.hRemove(input.get(0));
+        if(enableVersionedData)
+            htStorage.putVersionedDataRemoval(treeIdProvider.getTreeId(input.get(0)), input.get(0));
     }
 
     public void hRemove(final ByteBuffer key) {
