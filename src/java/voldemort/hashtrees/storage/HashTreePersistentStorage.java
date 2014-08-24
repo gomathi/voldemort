@@ -31,6 +31,7 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.log4j.Logger;
+import org.apache.thrift.TException;
 import org.fusesource.leveldbjni.JniDBFactory;
 import org.iq80.leveldb.DB;
 import org.iq80.leveldb.DBIterator;
@@ -74,10 +75,14 @@ public class HashTreePersistentStorage extends Observable implements HashTreeSto
     private final ConcurrentMap<Integer, AtomicLong> treeIdsAndVersionNos = new ConcurrentHashMap<Integer, AtomicLong>();
     private final ConcurrentMap<Integer, AtomicBitSet> treeIdAndDirtySegmentMap = new ConcurrentHashMap<Integer, AtomicBitSet>();
 
-    public HashTreePersistentStorage(String dbDir, int noOfSegDataBlocks) throws IOException {
-        this.dbObj = initDatabase(dbDir);
-        this.noOfSegDataBlocks = noOfSegDataBlocks;
-        loadTreeIdsAndVersionNos();
+    public HashTreePersistentStorage(String dbDir, int noOfSegDataBlocks) throws TException {
+        try {
+            this.dbObj = initDatabase(dbDir);
+            this.noOfSegDataBlocks = noOfSegDataBlocks;
+            loadTreeIdsAndVersionNos();
+        } catch(IOException e) {
+            throw new TException(e);
+        }
     }
 
     private static boolean createDir(String dirName) {

@@ -30,7 +30,7 @@ import voldemort.hashtrees.thrift.generated.HashTreeSyncInterface;
 
 public class HashTreeClientGenerator {
 
-    public static HashTreeSyncInterface.Iface getHashTreeClient(String serverName, int portNo)
+    public static HashTreeSyncInterface.Iface getRemoteHashTreeClient(String serverName, int portNo)
             throws TTransportException {
         TTransport transport = new TSocket(serverName, portNo);
         transport.open();
@@ -38,8 +38,21 @@ public class HashTreeClientGenerator {
         return new HashTreeSyncInterface.Client(protocol);
     }
 
-    public static HashTreeSyncInterface.Iface getHashTreeClient(String serverName)
+    public static HashTreeSyncInterface.Iface getRemoteHashTreeClient(String serverName)
             throws TTransportException {
+        return getRemoteHashTreeClient(serverName,
+                                       HashTreeConstants.DEFAULT_HASH_TREE_SERVER_PORT_NO);
+    }
+
+    public static HashTree getHashTreeClient(String serverName, int portNo)
+            throws TTransportException {
+        TTransport transport = new TSocket(serverName, portNo);
+        transport.open();
+        TProtocol protocol = new TBinaryProtocol(transport);
+        return new HashTreeClient(new HashTreeSyncInterface.Client(protocol));
+    }
+
+    public static HashTree getHashTreeClient(String serverName) throws TTransportException {
         return getHashTreeClient(serverName, HashTreeConstants.DEFAULT_HASH_TREE_SERVER_PORT_NO);
     }
 }

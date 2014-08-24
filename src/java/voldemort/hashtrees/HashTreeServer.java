@@ -32,49 +32,85 @@ public class HashTreeServer implements HashTreeSyncInterface.Iface {
 
     @Override
     public void sPut(Map<ByteBuffer, ByteBuffer> keyValuePairs) throws TException {
-        hashTree.sPut(keyValuePairs);
+        try {
+            hashTree.sPut(keyValuePairs);
+        } catch(Exception e) {
+            throw new TException(e);
+        }
     }
 
     @Override
     public void sRemove(List<ByteBuffer> keys) throws TException {
-        hashTree.sRemove(keys);
+        try {
+            hashTree.sRemove(keys);
+        } catch(Exception e) {
+            throw new TException(e);
+        }
     }
 
     @Override
     public List<SegmentHash> getSegmentHashes(int treeId, List<Integer> nodeIds) throws TException {
-        return hashTree.getSegmentHashes(treeId, nodeIds);
+        try {
+            return hashTree.getSegmentHashes(treeId, nodeIds);
+        } catch(Exception e) {
+            throw new TException(e);
+        }
     }
 
     @Override
     public SegmentHash getSegmentHash(int treeId, int nodeId) throws TException {
-        return hashTree.getSegmentHash(treeId, nodeId);
+        try {
+            return hashTree.getSegmentHash(treeId, nodeId);
+        } catch(Exception e) {
+            throw new TException(e);
+        }
     }
 
     @Override
     public List<SegmentData> getSegment(int treeId, int segId) throws TException {
-        return hashTree.getSegment(treeId, segId);
+        try {
+            return hashTree.getSegment(treeId, segId);
+        } catch(Exception e) {
+            throw new TException(e);
+        }
     }
 
     @Override
     public SegmentData getSegmentData(int treeId, int segId, ByteBuffer key) throws TException {
-        return hashTree.getSegmentData(treeId, segId, key);
+        try {
+            return hashTree.getSegmentData(treeId, segId, key);
+        } catch(Exception e) {
+            throw new TException(e);
+        }
     }
 
     @Override
     public void deleteTreeNodes(int treeId, List<Integer> nodeIds) throws TException {
-        hashTree.deleteTreeNodes(treeId, nodeIds);
+        try {
+            hashTree.deleteTreeNodes(treeId, nodeIds);
+        } catch(Exception e) {
+            throw new TException(e);
+        }
     }
 
     @Override
     public void rebuildHashTree(long tokenNo, int treeId, long expFullRebuildTimeInt)
             throws TException {
-        hashTreeManager.rebuild(tokenNo, treeId, expFullRebuildTimeInt);
+        try {
+            hashTreeManager.rebuild(tokenNo, treeId, expFullRebuildTimeInt);
+        } catch(Exception e) {
+            throw new TException(e);
+        }
     }
 
     @Override
     public void postRebuildHashTreeResponse(String hostName, long tokenNo, int treeId)
             throws TException {
-        hashTreeManager.onRebuildHashTreeResponse(hostName, tokenNo, treeId);
+        try {
+            hashTreeManager.onRebuildHashTreeResponse(hostName, tokenNo, treeId);
+        } catch(Exception e) {
+            throw new TException(e);
+        }
     }
 
 }

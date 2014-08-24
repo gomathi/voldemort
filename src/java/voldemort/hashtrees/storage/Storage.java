@@ -24,9 +24,9 @@ public interface Storage {
 
     ByteBuffer get(ByteBuffer key);
 
-    void put(ByteBuffer key, ByteBuffer value);
+    void put(ByteBuffer key, ByteBuffer value) throws Exception;
 
-    ByteBuffer remove(ByteBuffer key);
+    ByteBuffer remove(ByteBuffer key) throws Exception;
 
     Iterator<Pair<ByteBuffer, ByteBuffer>> iterator();
 }

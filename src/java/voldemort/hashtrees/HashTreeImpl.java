@@ -21,7 +21,6 @@ import static voldemort.utils.TreeUtils.getNoOfNodes;
 import static voldemort.utils.TreeUtils.getParent;
 import static voldemort.utils.TreeUtils.height;
 
-import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -39,15 +38,12 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
-import org.apache.thrift.TException;
-
 import voldemort.annotations.concurrency.Threadsafe;
 import voldemort.hashtrees.storage.HashTreePersistentStorage;
 import voldemort.hashtrees.storage.HashTreeStorage;
 import voldemort.hashtrees.storage.HashTreeStorageInMemory;
 import voldemort.hashtrees.storage.Storage;
 import voldemort.hashtrees.storage.StorageImpl;
-import voldemort.hashtrees.thrift.generated.HashTreeSyncInterface;
 import voldemort.hashtrees.thrift.generated.SegmentData;
 import voldemort.hashtrees.thrift.generated.SegmentHash;
 import voldemort.utils.ByteUtils;
@@ -111,7 +107,7 @@ public class HashTreeImpl implements HashTree {
         this.storage = storage;
     }
 
-    public HashTreeImpl(int noOfSegments, String dbDir) throws IOException {
+    public HashTreeImpl(int noOfSegments, String dbDir) throws Exception {
         this(noOfSegments,
              new HashTreeIdProviderImpl(),
              new DefaultSegIdProviderImpl(noOfSegments),
@@ -147,8 +143,7 @@ public class HashTreeImpl implements HashTree {
     }
 
     @Override
-    public boolean synch(int treeId, final HashTreeSyncInterface.Iface remoteTree)
-            throws TException {
+    public boolean synch(int treeId, final HashTree remoteTree) throws Exception {
 
         Collection<Integer> leafNodesToCheck = new ArrayList<Integer>();
         Collection<Integer> missingNodesInRemote = new ArrayList<Integer>();
@@ -175,10 +170,10 @@ public class HashTreeImpl implements HashTree {
     }
 
     private void findDifferences(int treeId,
-                                 HashTreeSyncInterface.Iface remoteTree,
+                                 HashTree remoteTree,
                                  Collection<Integer> nodesToCheck,
                                  Collection<Integer> missingNodesInRemote,
-                                 Collection<Integer> missingNodesInLocal) throws TException {
+                                 Collection<Integer> missingNodesInLocal) throws Exception {
         CollectionPeekingIterator<SegmentHash> localItr = null, remoteItr = null;
         SegmentHash local, remote;
 
@@ -221,15 +216,13 @@ public class HashTreeImpl implements HashTree {
         }
     }
 
-    private void syncSegments(int treeId,
-                              Collection<Integer> segIds,
-                              HashTreeSyncInterface.Iface remoteTree) throws TException {
+    private void syncSegments(int treeId, Collection<Integer> segIds, HashTree remoteTree)
+            throws Exception {
         for(int segId: segIds)
             syncSegment(treeId, segId, remoteTree);
     }
 
-    private void syncSegment(int treeId, int segId, HashTreeSyncInterface.Iface remoteTree)
-            throws TException {
+    private void syncSegment(int treeId, int segId, HashTree remoteTree) throws Exception {
         CollectionPeekingIterator<SegmentData> localDataItr = new CollectionPeekingIterator<SegmentData>(getSegment(treeId,
                                                                                                                     segId));
         CollectionPeekingIterator<SegmentData> remoteDataItr = new CollectionPeekingIterator<SegmentData>(remoteTree.getSegment(treeId,
@@ -273,8 +266,7 @@ public class HashTreeImpl implements HashTree {
 
     private void updateRemoteTreeWithMissingSegments(int treeId,
                                                      Collection<Integer> segIds,
-                                                     HashTreeSyncInterface.Iface remoteTree)
-            throws TException {
+                                                     HashTree remoteTree) throws Exception {
         for(int segId: segIds) {
             final Map<ByteBuffer, ByteBuffer> keyValuePairs = new HashMap<ByteBuffer, ByteBuffer>();
             List<SegmentData> sdValues = getSegment(treeId, segId);
@@ -355,19 +347,19 @@ public class HashTreeImpl implements HashTree {
     }
 
     @Override
-    public void sPut(final Map<ByteBuffer, ByteBuffer> keyValuePairs) {
+    public void sPut(final Map<ByteBuffer, ByteBuffer> keyValuePairs) throws Exception {
         for(Map.Entry<ByteBuffer, ByteBuffer> keyValuePair: keyValuePairs.entrySet())
             storage.put(keyValuePair.getKey(), keyValuePair.getValue());
     }
 
     @Override
-    public void sRemove(final List<ByteBuffer> keys) {
+    public void sRemove(final List<ByteBuffer> keys) throws Exception {
         for(ByteBuffer key: keys)
             storage.remove(key);
     }
 
     @Override
-    public void deleteTreeNodes(int treeId, List<Integer> nodeIds) {
+    public void deleteTreeNodes(int treeId, List<Integer> nodeIds) throws Exception {
         List<Integer> segIds = getSegmentIdsFromLeafIds(getAllLeafNodeIds(nodeIds));
         for(int segId: segIds) {
             Iterator<SegmentData> segDataItr = getSegment(treeId, segId).iterator();

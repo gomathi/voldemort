@@ -122,7 +122,7 @@ public class HashTreeManager implements Runnable, HashTreeLocalSyncManager {
         }
     }
 
-    public void rebuild(long tokenNo, int treeId, long expFullRebuildTimeInt) throws TException {
+    public void rebuild(long tokenNo, int treeId, long expFullRebuildTimeInt) throws Exception {
         boolean fullRebuild = (System.currentTimeMillis() - hashTree.getLastFullyRebuiltTimeStamp(treeId)) > expFullRebuildTimeInt ? true
                                                                                                                                   : false;
         hashTree.rebuildHashTree(treeId, fullRebuild);
@@ -134,10 +134,15 @@ public class HashTreeManager implements Runnable, HashTreeLocalSyncManager {
         List<Integer> treeIds = treeIdProvider.getAllPrimaryTreeIds();
         for(int treeId: treeIds) {
             expRebuiltConfirmMap.remove(treeId);
-            boolean fullRebuild = (System.currentTimeMillis() - hashTree.getLastFullyRebuiltTimeStamp(treeId)) > rebuildFullTreeTimeInterval ? true
-                                                                                                                                            : false;
-            sendRequestForRebuild(treeId);
-            hashTree.rebuildHashTree(treeId, fullRebuild);
+            boolean fullRebuild;
+            try {
+                fullRebuild = (System.currentTimeMillis() - hashTree.getLastFullyRebuiltTimeStamp(treeId)) > rebuildFullTreeTimeInterval ? true
+                                                                                                                                        : false;
+                sendRequestForRebuild(treeId);
+                hashTree.rebuildHashTree(treeId, fullRebuild);
+            } catch(Exception e) {
+                LOG.warn("Exception occurred while rebuilding.", e);
+            }
         }
     }
 
@@ -184,26 +189,30 @@ public class HashTreeManager implements Runnable, HashTreeLocalSyncManager {
                     continue;
                 }
 
-                if((value == true)) {
-                    synch(treeId, hostName);
-                    unSyncedTimeIntervalMap.remove(hostNameAndTreeId);
-                } else if((System.currentTimeMillis() - unsyncedTime) > DEFAULT_MAX_UNSYNCED_TIME_INTERVAL) {
-                    synch(treeId, hostName);
-                    unSyncedTimeIntervalMap.remove(hostNameAndTreeId);
-                } else {
-                    LOG.info("Did not receive confirmation from " + hostNameAndTreeId
-                             + " for the rebuilding. Not syncing the remote node.");
+                try {
+                    if((value == true)) {
+                        synch(treeId, hostName);
+                        unSyncedTimeIntervalMap.remove(hostNameAndTreeId);
+                    } else if((System.currentTimeMillis() - unsyncedTime) > DEFAULT_MAX_UNSYNCED_TIME_INTERVAL) {
+                        synch(treeId, hostName);
+                        unSyncedTimeIntervalMap.remove(hostNameAndTreeId);
+                    } else {
+                        LOG.info("Did not receive confirmation from " + hostNameAndTreeId
+                                 + " for the rebuilding. Not syncing the remote node.");
+                    }
+                } catch(Exception e) {
+                    LOG.error("Exception occurred while doing synch.", e);
                 }
             }
         }
         LOG.info("Synching remote hash trees. - Done");
     }
 
-    private void synch(int treeId, String hostName) {
+    private void synch(int treeId, String hostName) throws Exception {
         try {
             Pair<String, Integer> hostNameAndTreeId = Pair.create(hostName, treeId);
             LOG.info("Syncing " + hostNameAndTreeId);
-            HashTreeSyncInterface.Iface remoteTree = getHashTreeClient(hostName);
+            HashTree remoteTree = new HashTreeClient(getHashTreeClient(hostName));
             hashTree.synch(treeId, remoteTree);
             LOG.info("Syncing " + hostNameAndTreeId + " complete.");
         } catch(TException e) {
@@ -217,9 +226,9 @@ public class HashTreeManager implements Runnable, HashTreeLocalSyncManager {
         if(!hostNameAndRemoteHTrees.containsKey(hostName)) {
             Integer portNoObj = hostNameAndRemotePortNo.get(hostName);
             hostNameAndRemoteHTrees.putIfAbsent(hostName,
-                                                portNoObj == null ? HashTreeClientGenerator.getHashTreeClient(hostName)
-                                                                 : HashTreeClientGenerator.getHashTreeClient(hostName,
-                                                                                                             portNoObj));
+                                                portNoObj == null ? HashTreeClientGenerator.getRemoteHashTreeClient(hostName)
+                                                                 : HashTreeClientGenerator.getRemoteHashTreeClient(hostName,
+                                                                                                                   portNoObj));
         }
         return hostNameAndRemoteHTrees.get(hostName);
     }

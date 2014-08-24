@@ -25,6 +25,7 @@ import java.util.Random;
 import junit.framework.Assert;
 
 import org.apache.commons.io.FileUtils;
+import org.apache.thrift.TException;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -41,7 +42,7 @@ public class HashTreePersistentStorageTest {
     private int segId = 0;
 
     @Before
-    public void init() throws IOException {
+    public void init() throws IOException, TException {
         dbDir = "/tmp/random" + new Random().nextInt();
         dbObj = new HashTreePersistentStorage(dbDir, 1024);
     }

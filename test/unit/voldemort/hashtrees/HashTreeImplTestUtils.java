@@ -1,6 +1,5 @@
 package voldemort.hashtrees;
 
-import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -54,6 +53,11 @@ public class HashTreeImplTestUtils {
             return treeIds;
         }
 
+        @Override
+        public List<Integer> getAllPrimaryTreeIds() {
+            return null;
+        }
+
     }
 
     public static class StorageImplTest implements Storage {
@@ -71,14 +75,14 @@ public class HashTreeImplTestUtils {
         }
 
         @Override
-        public void put(ByteBuffer key, ByteBuffer value) {
+        public void put(ByteBuffer key, ByteBuffer value) throws Exception {
             localStorage.put(key, value);
             if(hashTree != null)
                 hashTree.hPut(key, value);
         }
 
         @Override
-        public ByteBuffer remove(ByteBuffer key) {
+        public ByteBuffer remove(ByteBuffer key) throws Exception {
             ByteBuffer value = localStorage.remove(key);
             if(hashTree != null) {
                 hashTree.hRemove(key);
@@ -128,7 +132,7 @@ public class HashTreeImplTestUtils {
     public static HTreeComponents createHashTree(int noOfSegDataBlocks,
                                                  final HashTreeIdProvider treeIdProv,
                                                  final SegmentIdProvider segIdPro,
-                                                 final HashTreeStorage hTStorage) {
+                                                 final HashTreeStorage hTStorage) throws Exception {
         StorageImplTest storage = new StorageImplTest();
         HashTree hTree = new HashTreeImpl(noOfSegDataBlocks,
                                           treeIdProv,
@@ -139,7 +143,8 @@ public class HashTreeImplTestUtils {
         return new HTreeComponents(hTStorage, storage, hTree);
     }
 
-    public static HTreeComponents createHashTree(int noOfSegments, final HashTreeStorage hTStorage) {
+    public static HTreeComponents createHashTree(int noOfSegments, final HashTreeStorage hTStorage)
+            throws Exception {
         HashTreeIdProvider treeIdProvider = new HashTreeIdProviderTest();
         StorageImplTest storage = new StorageImplTest();
         HashTree hTree = new HashTreeImpl(noOfSegments, treeIdProvider, hTStorage, storage);
@@ -152,13 +157,12 @@ public class HashTreeImplTestUtils {
         return new HashTreeStorageInMemory(noOfSegDataBlocks);
     }
 
-    private static HashTreeStorage generatePersistentStore(int noOfSegDataBlocks)
-            throws IOException {
+    private static HashTreeStorage generatePersistentStore(int noOfSegDataBlocks) throws Exception {
         return new HashTreePersistentStorage(randomDirName(), noOfSegDataBlocks);
     }
 
     public static HashTreeStorage[] generateInMemoryAndPersistentStores(int noOfSegDataBlocks)
-            throws IOException {
+            throws Exception {
         HashTreeStorage[] stores = new HashTreeStorage[2];
         stores[0] = generateInMemoryStore(noOfSegDataBlocks);
         stores[1] = generatePersistentStore(noOfSegDataBlocks);

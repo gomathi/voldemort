@@ -19,9 +19,6 @@ import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Map;
 
-import org.apache.thrift.TException;
-
-import voldemort.hashtrees.thrift.generated.HashTreeSyncInterface;
 import voldemort.hashtrees.thrift.generated.SegmentData;
 import voldemort.hashtrees.thrift.generated.SegmentHash;
 
@@ -38,7 +35,7 @@ public interface HashTree {
      * 
      * @param keyValuePairs
      */
-    public void sPut(Map<ByteBuffer, ByteBuffer> keyValuePairs);
+    public void sPut(Map<ByteBuffer, ByteBuffer> keyValuePairs) throws Exception;
 
     /**
      * Deletes the keys from the storage. While synching this function is used.
@@ -46,7 +43,7 @@ public interface HashTree {
      * @param keys
      * 
      */
-    public void sRemove(List<ByteBuffer> keys);
+    public void sRemove(List<ByteBuffer> keys) throws Exception;
 
     /**
      * Hash tree internal nodes store the hash of their children nodes. Given a
@@ -58,7 +55,7 @@ public interface HashTree {
      * @return
      * 
      */
-    public List<SegmentHash> getSegmentHashes(int treeId, List<Integer> nodeIds);
+    public List<SegmentHash> getSegmentHashes(int treeId, List<Integer> nodeIds) throws Exception;
 
     /**
      * Returns the segment hash that is stored on the tree.
@@ -68,7 +65,7 @@ public interface HashTree {
      * @return
      * 
      */
-    public SegmentHash getSegmentHash(int treeId, int nodeId);
+    public SegmentHash getSegmentHash(int treeId, int nodeId) throws Exception;
 
     /**
      * Hash tree data is stored on the leaf blocks. Given a segment id this
@@ -79,7 +76,7 @@ public interface HashTree {
      * @return
      * 
      */
-    public List<SegmentData> getSegment(int treeId, int segId);
+    public List<SegmentData> getSegment(int treeId, int segId) throws Exception;
 
     /**
      * Returns the (key,digest) for the given key in the given segment.
@@ -89,7 +86,7 @@ public interface HashTree {
      * @param segId
      * @param key
      */
-    public SegmentData getSegmentData(int treeId, int segId, ByteBuffer key);
+    public SegmentData getSegmentData(int treeId, int segId, ByteBuffer key) throws Exception;
 
     /**
      * Deletes tree nodes from the hash tree, and the corresponding segments.
@@ -98,7 +95,7 @@ public interface HashTree {
      * @param treeId
      * @param nodeIds
      */
-    public void deleteTreeNodes(int treeId, List<Integer> nodeIds);
+    public void deleteTreeNodes(int treeId, List<Integer> nodeIds) throws Exception;
 
     /**
      * Adds the key, and digest of value to the segment block in HashTree.
@@ -106,14 +103,14 @@ public interface HashTree {
      * @param key
      * @param value
      */
-    void hPut(ByteBuffer key, ByteBuffer value);
+    void hPut(ByteBuffer key, ByteBuffer value) throws Exception;
 
     /**
      * Deletes the key from the hash tree.
      * 
      * @param key
      */
-    void hRemove(ByteBuffer key);
+    void hRemove(ByteBuffer key) throws Exception;
 
     /**
      * Updates the other HTree based on the differences with local objects.
@@ -125,7 +122,7 @@ public interface HashTree {
      * @return, true indicates some modifications made to the remote tree, false
      *          means two trees were already in synch status.
      */
-    boolean synch(int treeId, HashTreeSyncInterface.Iface remoteTree) throws TException;
+    boolean synch(int treeId, HashTree remoteTree) throws Exception;
 
     /**
      * Hash tree implementations do not update the segment hashes tree on every
@@ -135,7 +132,7 @@ public interface HashTree {
      * @param fullRebuild, indicates whether to rebuild all segments, or just
      *        the dirty segments.
      */
-    void rebuildHashTrees(boolean fullRebuild);
+    void rebuildHashTrees(boolean fullRebuild) throws Exception;
 
     /**
      * Updates segment hashes based on the dirty entries.
@@ -145,7 +142,7 @@ public interface HashTree {
      *        the dirty entries, true indicates complete rebuild of the tree
      *        irrespective of dirty markers.
      */
-    void rebuildHashTree(int treeId, boolean fullRebuild);
+    void rebuildHashTree(int treeId, boolean fullRebuild) throws Exception;
 
     /**
      * Returns the timestamp at which the tree was fully rebuilt.
@@ -153,5 +150,5 @@ public interface HashTree {
      * @param treeId
      * @return
      */
-    long getLastFullyRebuiltTimeStamp(int treeId);
+    long getLastFullyRebuiltTimeStamp(int treeId) throws Exception;
 }
