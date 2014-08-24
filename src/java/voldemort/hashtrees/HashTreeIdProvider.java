@@ -39,6 +39,18 @@ public interface HashTreeIdProvider {
      */
     int getTreeId(ByteBuffer key);
 
+    /**
+     * All the treeIds which are currently maintained by current node.
+     * 
+     * @return
+     */
     List<Integer> getAllTreeIds();
+
+    /**
+     * Returns treeIds for which the current node is responsible for.
+     * 
+     * @return
+     */
+    List<Integer> getAllPrimaryTreeIds();
 
 }

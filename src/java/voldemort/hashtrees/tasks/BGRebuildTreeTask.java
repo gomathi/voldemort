@@ -112,7 +112,7 @@ public class BGRebuildTreeTask extends BGStoppableTask {
                 LOG.info(taskType + " for treeid " + treeId + " started.");
                 long startTime = System.currentTimeMillis();
 
-                hashTree.updateHashTree(treeId, fullRebuild);
+                hashTree.rebuildHashTree(treeId, fullRebuild);
 
                 long endTime = System.currentTimeMillis();
                 LOG.info("Total time took for " + taskType + " for treeId " + treeId + ","

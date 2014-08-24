@@ -18,11 +18,17 @@ package voldemort.hashtrees.storage;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Iterator;
 import java.util.List;
+import java.util.NoSuchElementException;
+import java.util.Observable;
+import java.util.Queue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.log4j.Logger;
 import org.fusesource.leveldbjni.JniDBFactory;
@@ -34,6 +40,7 @@ import voldemort.hashtrees.thrift.generated.SegmentData;
 import voldemort.hashtrees.thrift.generated.SegmentHash;
 import voldemort.utils.AtomicBitSet;
 import voldemort.utils.ByteUtils;
+import voldemort.utils.Pair;
 
 /**
  * Uses LevelDB for storing segment hashes and segment data. Dirty segment
@@ -43,12 +50,13 @@ import voldemort.utils.ByteUtils;
  * 
  * 1) Metadata info [Like when the tree was built fully last time]. Format is
  * ['M'|key] -> [value] 2) SegmentData, format is ['S'|treeId|segId|key] ->
- * [value] 3) SegmentHash, format is ['H'|treeId|nodeId] -> [value]
- * 
+ * [value] 3) SegmentHash, format is ['H'|treeId|nodeId] -> [value] 4) Put
+ * versioned (key,value) pairs into the database. ['V'|treeId|versionNo|datakey]
+ * -> [value] pair.
  * 
  */
 
-public class HashTreePersistentStorage implements HashTreeStorage {
+public class HashTreePersistentStorage extends Observable implements HashTreeStorage {
 
     private static final Logger LOG = Logger.getLogger(HashTreePersistentStorage.class);
 
@@ -57,16 +65,19 @@ public class HashTreePersistentStorage implements HashTreeStorage {
     private static final byte KEY_META_DATA_PREFIX = 'M';
     private static final byte KEY_SEG_HASH_PREFIX = 'H';
     private static final byte KEY_SEG_DATA_PREFIX = 'S';
+    private static final byte KEY_VERSIONED_DATA_PREFIX = 'V';
     private static final byte[] KEY_PREFIX_ARRAY = { KEY_META_DATA_PREFIX, KEY_SEG_DATA_PREFIX,
-            KEY_SEG_HASH_PREFIX };
+            KEY_SEG_HASH_PREFIX, KEY_VERSIONED_DATA_PREFIX };
 
     private final DB dbObj;
     private final int noOfSegDataBlocks;
+    private final ConcurrentMap<Integer, AtomicLong> treeIdsAndVersionNos = new ConcurrentHashMap<Integer, AtomicLong>();
     private final ConcurrentMap<Integer, AtomicBitSet> treeIdAndDirtySegmentMap = new ConcurrentHashMap<Integer, AtomicBitSet>();
 
     public HashTreePersistentStorage(String dbDir, int noOfSegDataBlocks) throws IOException {
-        this.dbObj = createDb(dbDir);
+        this.dbObj = initDatabase(dbDir);
         this.noOfSegDataBlocks = noOfSegDataBlocks;
+        loadTreeIdsAndVersionNos();
     }
 
     private static boolean createDir(String dirName) {
@@ -76,18 +87,36 @@ public class HashTreePersistentStorage implements HashTreeStorage {
         return file.mkdirs();
     }
 
-    private static DB createDb(String dbDir) throws IOException {
+    private static DB initDatabase(String dbDir) throws IOException {
         createDir(dbDir);
         Options options = new Options();
         options.createIfMissing(true);
         return new JniDBFactory().open(new File(dbDir), options);
     }
 
+    private void loadTreeIdsAndVersionNos() {
+        int treeId = 0;
+        while(true) {
+            byte[] keyPrefix = new byte[1 + ByteUtils.SIZE_OF_INT];
+            ByteBuffer keyPrefixBuf = ByteBuffer.wrap(keyPrefix);
+            prepareKeyPrefix(keyPrefixBuf, KEY_VERSIONED_DATA_PREFIX, treeId);
+            DBIterator itr = dbObj.iterator();
+            itr.seek(keyPrefix);
+            itr.seekToFirst();
+            if(itr.hasNext()) {
+                byte[] key = itr.peekNext().getKey();
+                long versionNo = ByteUtils.readLong(key, keyPrefix.length);
+                treeIdsAndVersionNos.put(treeId, new AtomicLong(versionNo));
+                treeId++;
+            } else
+                break;
+        }
+    }
+
     public void close() {
         try {
             dbObj.close();
         } catch(IOException e) {
-            // TODO Auto-generated catch block
             LOG.warn("Exception occurred while closing leveldb connection.");
         }
     }
@@ -274,10 +303,102 @@ public class HashTreePersistentStorage implements HashTreeStorage {
             try {
                 iterator.close();
             } catch(IOException e) {
-                // TODO Auto-generated catch block
                 LOG.warn("Exception occurred while closing the DBIterator.", e);
             }
         }
         return result;
+    }
+
+    private long getNextVersionId(int treeId) {
+        if(!treeIdsAndVersionNos.containsKey(treeId))
+            treeIdsAndVersionNos.putIfAbsent(treeId, new AtomicLong());
+        return treeIdsAndVersionNos.get(treeId).incrementAndGet();
+    }
+
+    @Override
+    public void putVersionedData(int treeId, ByteBuffer key, ByteBuffer value) {
+        byte[] fullKey = new byte[1 + ByteUtils.SIZE_OF_INT + ByteUtils.SIZE_OF_LONG];
+        ByteBuffer fullKeyBuffer = ByteBuffer.wrap(fullKey);
+        prepareKeyPrefix(fullKeyBuffer, KEY_VERSIONED_DATA_PREFIX, treeId);
+        fullKeyBuffer.putLong(getNextVersionId(treeId));
+
+        byte[] array = new byte[key.array().length + value.array().length];
+        ByteBuffer bb = ByteBuffer.wrap(array);
+        bb.put(key.array());
+        bb.put(value.array());
+        dbObj.put(fullKeyBuffer.array(), bb.array());
+    }
+
+    @Override
+    public Iterator<Pair<ByteBuffer, ByteBuffer>> getVersionedData(int treeId) {
+        final byte[] seekKey = new byte[1 + ByteUtils.SIZE_OF_INT];
+        ByteBuffer bb = ByteBuffer.wrap(seekKey);
+        prepareKeyPrefix(bb, KEY_VERSIONED_DATA_PREFIX, treeId);
+        return getVersionedData(seekKey, seekKey);
+    }
+
+    @Override
+    public Iterator<Pair<ByteBuffer, ByteBuffer>> getVersionedData(int treeId, long versionNo) {
+        final byte[] seekKey = new byte[1 + ByteUtils.SIZE_OF_INT + ByteUtils.SIZE_OF_LONG];
+        final byte[] keyPrefix = new byte[1 + ByteUtils.SIZE_OF_INT];
+
+        ByteBuffer keyPrefixBB = ByteBuffer.wrap(keyPrefix);
+        prepareKeyPrefix(keyPrefixBB, KEY_VERSIONED_DATA_PREFIX, treeId);
+
+        ByteBuffer seekKeyBB = ByteBuffer.wrap(seekKey);
+        seekKeyBB.put(KEY_VERSIONED_DATA_PREFIX);
+        seekKeyBB.putInt(treeId);
+        seekKeyBB.putLong(versionNo);
+
+        return getVersionedData(seekKey, keyPrefix);
+    }
+
+    private Iterator<Pair<ByteBuffer, ByteBuffer>> getVersionedData(final byte[] startKey,
+                                                                    final byte[] keyPrefix) {
+        final DBIterator iterator = dbObj.iterator();
+        iterator.seek(startKey);
+
+        return new Iterator<Pair<ByteBuffer, ByteBuffer>>() {
+
+            private Queue<Pair<ByteBuffer, ByteBuffer>> queue = new ArrayDeque<Pair<ByteBuffer, ByteBuffer>>();
+
+            @Override
+            public boolean hasNext() {
+                load();
+                return queue.size() > 0;
+            }
+
+            @Override
+            public Pair<ByteBuffer, ByteBuffer> next() {
+                if(queue.size() == 0)
+                    throw new NoSuchElementException();
+                return queue.remove();
+            }
+
+            @Override
+            public void remove() {
+                throw new UnsupportedOperationException();
+            }
+
+            private void load() {
+                if(iterator.hasNext()) {
+                    if(ByteUtils.compare(keyPrefix,
+                                         iterator.peekNext().getKey(),
+                                         0,
+                                         keyPrefix.length) != 0)
+                        return;
+                    byte[] key = iterator.peekNext().getKey();
+                    byte[] value = iterator.peekNext().getValue();
+                    int offset = 1 + ByteUtils.SIZE_OF_INT + ByteUtils.SIZE_OF_LONG;
+                    int length = key.length - offset + 1;
+                    byte[] actualKey = new byte[length];
+                    System.arraycopy(key, offset, actualKey, 0, length);
+                    ByteUtils.readBytes(key, offset, key.length - offset);
+                    queue.add(new Pair<ByteBuffer, ByteBuffer>(ByteBuffer.wrap(actualKey),
+                                                               ByteBuffer.wrap(value)));
+                }
+            }
+
+        };
     }
 }

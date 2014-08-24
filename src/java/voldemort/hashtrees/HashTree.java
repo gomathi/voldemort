@@ -16,17 +16,89 @@
 package voldemort.hashtrees;
 
 import java.nio.ByteBuffer;
+import java.util.List;
+import java.util.Map;
 
 import org.apache.thrift.TException;
 
 import voldemort.hashtrees.thrift.generated.HashTreeSyncInterface;
+import voldemort.hashtrees.thrift.generated.SegmentData;
+import voldemort.hashtrees.thrift.generated.SegmentHash;
 
 /**
  * Defines Hash tree methods. Hash tree provides a way for nodes to synch up
  * quickly by exchanging very little information.
  * 
  */
-public interface HashTree extends HashTreeSyncInterface.Iface {
+public interface HashTree {
+
+    /**
+     * Adds the (key,value) pair to the original storage. Intended to be used
+     * while synch operation.
+     * 
+     * @param keyValuePairs
+     */
+    public void sPut(Map<ByteBuffer, ByteBuffer> keyValuePairs);
+
+    /**
+     * Deletes the keys from the storage. While synching this function is used.
+     * 
+     * @param keys
+     * 
+     */
+    public void sRemove(List<ByteBuffer> keys);
+
+    /**
+     * Hash tree internal nodes store the hash of their children nodes. Given a
+     * set of internal node ids, this returns the hashes that are stored on the
+     * internal node.
+     * 
+     * @param treeId
+     * @param nodeIds, internal tree node ids.
+     * @return
+     * 
+     */
+    public List<SegmentHash> getSegmentHashes(int treeId, List<Integer> nodeIds);
+
+    /**
+     * Returns the segment hash that is stored on the tree.
+     * 
+     * @param treeId, hash tree id.
+     * @param nodeId, node id
+     * @return
+     * 
+     */
+    public SegmentHash getSegmentHash(int treeId, int nodeId);
+
+    /**
+     * Hash tree data is stored on the leaf blocks. Given a segment id this
+     * method is supposed to return (key,hash) pairs.
+     * 
+     * @param treeId
+     * @param segId, id of the segment block.
+     * @return
+     * 
+     */
+    public List<SegmentData> getSegment(int treeId, int segId);
+
+    /**
+     * Returns the (key,digest) for the given key in the given segment.
+     * 
+     * 
+     * @param treeId
+     * @param segId
+     * @param key
+     */
+    public SegmentData getSegmentData(int treeId, int segId, ByteBuffer key);
+
+    /**
+     * Deletes tree nodes from the hash tree, and the corresponding segments.
+     * 
+     * 
+     * @param treeId
+     * @param nodeIds
+     */
+    public void deleteTreeNodes(int treeId, List<Integer> nodeIds);
 
     /**
      * Adds the key, and digest of value to the segment block in HashTree.
@@ -56,33 +128,6 @@ public interface HashTree extends HashTreeSyncInterface.Iface {
     boolean synch(int treeId, HashTreeSyncInterface.Iface remoteTree) throws TException;
 
     /**
-     * Sets the remote hostname and port no.
-     * 
-     * @param hostName
-     * @param portNo is used while syncing with the remote hashtree.
-     */
-    void addTreeAndPortNoForSync(String hostName, int portNo);
-
-    /**
-     * Implementation is expected to run a background task at regular intervals
-     * to update remote hash trees. This function adds a remote tree to synch
-     * list.
-     * 
-     * @param hostName
-     * @param treeId
-     * 
-     */
-    void addTreeToSyncList(String hostName, int treeId);
-
-    /**
-     * Removes the remoteTree from sync list.
-     * 
-     * @param remoteTree
-     * @param treeId
-     */
-    void removeTreeFromSyncList(String hostName, int treeId);
-
-    /**
      * Hash tree implementations do not update the segment hashes tree on every
      * key change. Rather tree is rebuilt at regular intervals. This function
      * provides an option to make a force call to update the entire tree.
@@ -90,7 +135,7 @@ public interface HashTree extends HashTreeSyncInterface.Iface {
      * @param fullRebuild, indicates whether to rebuild all segments, or just
      *        the dirty segments.
      */
-    void updateHashTrees(boolean fullRebuild);
+    void rebuildHashTrees(boolean fullRebuild);
 
     /**
      * Updates segment hashes based on the dirty entries.
@@ -100,5 +145,13 @@ public interface HashTree extends HashTreeSyncInterface.Iface {
      *        the dirty entries, true indicates complete rebuild of the tree
      *        irrespective of dirty markers.
      */
-    void updateHashTree(int treeId, boolean fullRebuild);
+    void rebuildHashTree(int treeId, boolean fullRebuild);
+
+    /**
+     * Returns the timestamp at which the tree was fully rebuilt.
+     * 
+     * @param treeId
+     * @return
+     */
+    long getLastFullyRebuiltTimeStamp(int treeId);
 }

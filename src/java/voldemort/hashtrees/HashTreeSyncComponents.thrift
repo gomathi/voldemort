@@ -76,15 +76,27 @@ service HashTreeSyncInterface
 	SegmentData getSegmentData(1:i32 treeId, 2:i32 segId, 3:binary key);
 	
 	/**
-     * If the HashTree is getting initialized now, then this function returns
-     * false. Otherwise returns true.
-     * 
-     */
-	bool isReadyForSynch(1:i32 treeId);
-	
-	/**
      * Deletes tree nodes from the hash tree, and the corresponding segments.
      * 
      */
 	void deleteTreeNodes(1:i32 treeId, 2:list<i32> nodeIds);
+	
+	/**
+     * Requests a rebuild of the hash tree on the remote node.
+     * 
+     * @param tokenNo a unique tokenNo to differentiate similar requests.
+     * @param treeId
+     * @param expFullRebuildTimeInt, if the remote tree is not fully rebuilt
+     *        within this interval, then remote tree is expected to do a full
+     *        rebuild, otherwise just dirty segments rebuild.
+     */
+    oneway void rebuildHashTree(1:i64 tokenNo, 2:i32 treeId, 3:i64 expFullRebuildTimeInt);
+
+    /**
+     * This method posts a response on completion of the rebuild of the hash
+     * tree.
+     * 
+     * @param tokenNo which was passed in the request.
+     */
+    oneway void postRebuildHashTreeResponse(1:string hostName, 2:i64 tokenNo, 3:i32 treeId);
 }

@@ -23,6 +23,8 @@ import org.apache.thrift.transport.TTransportException;
 
 import voldemort.annotations.concurrency.Threadsafe;
 import voldemort.hashtrees.HashTree;
+import voldemort.hashtrees.HashTreeManager;
+import voldemort.hashtrees.HashTreeServer;
 import voldemort.hashtrees.thrift.generated.HashTreeSyncInterface;
 import voldemort.hashtrees.thrift.generated.HashTreeSyncInterface.Iface;
 
@@ -37,9 +39,10 @@ public class BGHashTreeServer extends BGStoppableTask {
     private final static Logger LOG = Logger.getLogger(BGHashTreeServer.class);
     private final TServer server;
 
-    public BGHashTreeServer(final HashTree localHashTree, final int serverPortNo)
-                                                                                 throws TTransportException {
-        this.server = createServer(serverPortNo, localHashTree);
+    public BGHashTreeServer(final HashTree localHashTree,
+                            final HashTreeManager hashTreeMgr,
+                            final int serverPortNo) throws TTransportException {
+        this.server = createServer(serverPortNo, new HashTreeServer(localHashTree, hashTreeMgr));
     }
 
     @Override
@@ -56,10 +59,10 @@ public class BGHashTreeServer extends BGStoppableTask {
         super.stop();
     }
 
-    private static TServer createServer(int serverPortNo, HashTree hashTree)
+    private static TServer createServer(int serverPortNo, HashTreeServer hashTreeServer)
             throws TTransportException {
         TServerSocket serverTransport = new TServerSocket(serverPortNo);
-        HashTreeSyncInterface.Processor<Iface> processor = new HashTreeSyncInterface.Processor<HashTreeSyncInterface.Iface>(hashTree);
+        HashTreeSyncInterface.Processor<Iface> processor = new HashTreeSyncInterface.Processor<HashTreeSyncInterface.Iface>(hashTreeServer);
         TServer server = new TThreadPoolServer(new TThreadPoolServer.Args(serverTransport).processor(processor));
         return server;
     }

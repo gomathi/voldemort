@@ -1,6 +1,6 @@
 package voldemort.hashtrees;
 
-public enum HashTreeImplEvent {
+public enum HashTreeImplTestEvent {
     UPDATE_SEGMENT,
     UPDATE_FULL_TREE,
     SYNCH,

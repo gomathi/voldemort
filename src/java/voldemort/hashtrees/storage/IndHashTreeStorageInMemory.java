@@ -19,6 +19,7 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -30,6 +31,7 @@ import voldemort.annotations.concurrency.Threadsafe;
 import voldemort.hashtrees.thrift.generated.SegmentData;
 import voldemort.hashtrees.thrift.generated.SegmentHash;
 import voldemort.utils.AtomicBitSet;
+import voldemort.utils.Pair;
 
 /**
  * Hash tree can host multiple similar hash trees. This is mainly used for unit
@@ -41,9 +43,11 @@ class IndHashTreeStorageInMemory {
 
     private final ConcurrentMap<Integer, ByteBuffer> segmentHashes = new ConcurrentSkipListMap<Integer, ByteBuffer>();
     private final ConcurrentMap<Integer, ConcurrentSkipListMap<ByteBuffer, ByteBuffer>> segDataBlocks = new ConcurrentHashMap<Integer, ConcurrentSkipListMap<ByteBuffer, ByteBuffer>>();
+    private final ConcurrentSkipListMap<Long, Pair<ByteBuffer, ByteBuffer>> versionedData = new ConcurrentSkipListMap<Long, Pair<ByteBuffer, ByteBuffer>>();
     private final AtomicBitSet dirtySegments;
     private final AtomicLong fullyRebuiltTreeTs = new AtomicLong(0);
     private final AtomicLong rebuiltTreeTs = new AtomicLong(0);
+    private final AtomicLong versionNo = new AtomicLong();
 
     public IndHashTreeStorageInMemory(int noOfSegDataBlocks) {
         this.dirtySegments = new AtomicBitSet(noOfSegDataBlocks);
@@ -139,5 +143,17 @@ class IndHashTreeStorageInMemory {
 
     public long getLastHashTreeUpdatedTimestamp() {
         return rebuiltTreeTs.get();
+    }
+
+    public void putVersionedData(ByteBuffer key, ByteBuffer value) {
+        versionedData.put(versionNo.incrementAndGet(), new Pair<ByteBuffer, ByteBuffer>(key, value));
+    }
+
+    public Iterator<Pair<ByteBuffer, ByteBuffer>> getVersionedData() {
+        return versionedData.values().iterator();
+    }
+
+    public Iterator<Pair<ByteBuffer, ByteBuffer>> getVersionedData(long versionNo) {
+        return versionedData.tailMap(versionNo).values().iterator();
     }
 }

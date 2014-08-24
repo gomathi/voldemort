@@ -107,15 +107,6 @@ public class HashTreeSyncInterface {
     public SegmentData getSegmentData(int treeId, int segId, ByteBuffer key) throws org.apache.thrift.TException;
 
     /**
-     * If the HashTree is getting initialized now, then this function returns
-     * false. Otherwise returns true.
-     * 
-     * 
-     * @param treeId
-     */
-    public boolean isReadyForSynch(int treeId) throws org.apache.thrift.TException;
-
-    /**
      * Deletes tree nodes from the hash tree, and the corresponding segments.
      * 
      * 
@@ -123,6 +114,33 @@ public class HashTreeSyncInterface {
      * @param nodeIds
      */
     public void deleteTreeNodes(int treeId, List<Integer> nodeIds) throws org.apache.thrift.TException;
+
+    /**
+     * Requests a rebuild of the hash tree on the remote node.
+     * 
+     * @param tokenNo a unique tokenNo to differentiate similar requests.
+     * @param treeId
+     * @param expFullRebuildTimeInt, if the remote tree is not fully rebuilt
+     *        within this interval, then remote tree is expected to do a full
+     *        rebuild, otherwise just dirty segments rebuild.
+     * 
+     * @param tokenNo
+     * @param treeId
+     * @param expFullRebuildTimeInt
+     */
+    public void rebuildHashTree(long tokenNo, int treeId, long expFullRebuildTimeInt) throws org.apache.thrift.TException;
+
+    /**
+     * This method posts a response on completion of the rebuild of the hash
+     * tree.
+     * 
+     * @param tokenNo which was passed in the request.
+     * 
+     * @param hostName
+     * @param tokenNo
+     * @param treeId
+     */
+    public void postRebuildHashTreeResponse(String hostName, long tokenNo, int treeId) throws org.apache.thrift.TException;
 
   }
 
@@ -142,9 +160,11 @@ public class HashTreeSyncInterface {
 
     public void getSegmentData(int treeId, int segId, ByteBuffer key, org.apache.thrift.async.AsyncMethodCallback resultHandler) throws org.apache.thrift.TException;
 
-    public void isReadyForSynch(int treeId, org.apache.thrift.async.AsyncMethodCallback resultHandler) throws org.apache.thrift.TException;
-
     public void deleteTreeNodes(int treeId, List<Integer> nodeIds, org.apache.thrift.async.AsyncMethodCallback resultHandler) throws org.apache.thrift.TException;
+
+    public void rebuildHashTree(long tokenNo, int treeId, long expFullRebuildTimeInt, org.apache.thrift.async.AsyncMethodCallback resultHandler) throws org.apache.thrift.TException;
+
+    public void postRebuildHashTreeResponse(String hostName, long tokenNo, int treeId, org.apache.thrift.async.AsyncMethodCallback resultHandler) throws org.apache.thrift.TException;
 
   }
 
@@ -327,29 +347,6 @@ public class HashTreeSyncInterface {
       throw new org.apache.thrift.TApplicationException(org.apache.thrift.TApplicationException.MISSING_RESULT, "getSegmentData failed: unknown result");
     }
 
-    public boolean isReadyForSynch(int treeId) throws org.apache.thrift.TException
-    {
-      send_isReadyForSynch(treeId);
-      return recv_isReadyForSynch();
-    }
-
-    public void send_isReadyForSynch(int treeId) throws org.apache.thrift.TException
-    {
-      isReadyForSynch_args args = new isReadyForSynch_args();
-      args.setTreeId(treeId);
-      sendBase("isReadyForSynch", args);
-    }
-
-    public boolean recv_isReadyForSynch() throws org.apache.thrift.TException
-    {
-      isReadyForSynch_result result = new isReadyForSynch_result();
-      receiveBase(result, "isReadyForSynch");
-      if (result.isSetSuccess()) {
-        return result.success;
-      }
-      throw new org.apache.thrift.TApplicationException(org.apache.thrift.TApplicationException.MISSING_RESULT, "isReadyForSynch failed: unknown result");
-    }
-
     public void deleteTreeNodes(int treeId, List<Integer> nodeIds) throws org.apache.thrift.TException
     {
       send_deleteTreeNodes(treeId, nodeIds);
@@ -369,6 +366,34 @@ public class HashTreeSyncInterface {
       deleteTreeNodes_result result = new deleteTreeNodes_result();
       receiveBase(result, "deleteTreeNodes");
       return;
+    }
+
+    public void rebuildHashTree(long tokenNo, int treeId, long expFullRebuildTimeInt) throws org.apache.thrift.TException
+    {
+      send_rebuildHashTree(tokenNo, treeId, expFullRebuildTimeInt);
+    }
+
+    public void send_rebuildHashTree(long tokenNo, int treeId, long expFullRebuildTimeInt) throws org.apache.thrift.TException
+    {
+      rebuildHashTree_args args = new rebuildHashTree_args();
+      args.setTokenNo(tokenNo);
+      args.setTreeId(treeId);
+      args.setExpFullRebuildTimeInt(expFullRebuildTimeInt);
+      sendBase("rebuildHashTree", args);
+    }
+
+    public void postRebuildHashTreeResponse(String hostName, long tokenNo, int treeId) throws org.apache.thrift.TException
+    {
+      send_postRebuildHashTreeResponse(hostName, tokenNo, treeId);
+    }
+
+    public void send_postRebuildHashTreeResponse(String hostName, long tokenNo, int treeId) throws org.apache.thrift.TException
+    {
+      postRebuildHashTreeResponse_args args = new postRebuildHashTreeResponse_args();
+      args.setHostName(hostName);
+      args.setTokenNo(tokenNo);
+      args.setTreeId(treeId);
+      sendBase("postRebuildHashTreeResponse", args);
     }
 
   }
@@ -625,38 +650,6 @@ public class HashTreeSyncInterface {
       }
     }
 
-    public void isReadyForSynch(int treeId, org.apache.thrift.async.AsyncMethodCallback resultHandler) throws org.apache.thrift.TException {
-      checkReady();
-      isReadyForSynch_call method_call = new isReadyForSynch_call(treeId, resultHandler, this, ___protocolFactory, ___transport);
-      this.___currentMethod = method_call;
-      ___manager.call(method_call);
-    }
-
-    public static class isReadyForSynch_call extends org.apache.thrift.async.TAsyncMethodCall {
-      private int treeId;
-      public isReadyForSynch_call(int treeId, org.apache.thrift.async.AsyncMethodCallback resultHandler, org.apache.thrift.async.TAsyncClient client, org.apache.thrift.protocol.TProtocolFactory protocolFactory, org.apache.thrift.transport.TNonblockingTransport transport) throws org.apache.thrift.TException {
-        super(client, protocolFactory, transport, resultHandler, false);
-        this.treeId = treeId;
-      }
-
-      public void write_args(org.apache.thrift.protocol.TProtocol prot) throws org.apache.thrift.TException {
-        prot.writeMessageBegin(new org.apache.thrift.protocol.TMessage("isReadyForSynch", org.apache.thrift.protocol.TMessageType.CALL, 0));
-        isReadyForSynch_args args = new isReadyForSynch_args();
-        args.setTreeId(treeId);
-        args.write(prot);
-        prot.writeMessageEnd();
-      }
-
-      public boolean getResult() throws org.apache.thrift.TException {
-        if (getState() != org.apache.thrift.async.TAsyncMethodCall.State.RESPONSE_READ) {
-          throw new IllegalStateException("Method call not finished!");
-        }
-        org.apache.thrift.transport.TMemoryInputTransport memoryTransport = new org.apache.thrift.transport.TMemoryInputTransport(getFrameBuffer().array());
-        org.apache.thrift.protocol.TProtocol prot = client.getProtocolFactory().getProtocol(memoryTransport);
-        return (new Client(prot)).recv_isReadyForSynch();
-      }
-    }
-
     public void deleteTreeNodes(int treeId, List<Integer> nodeIds, org.apache.thrift.async.AsyncMethodCallback resultHandler) throws org.apache.thrift.TException {
       checkReady();
       deleteTreeNodes_call method_call = new deleteTreeNodes_call(treeId, nodeIds, resultHandler, this, ___protocolFactory, ___transport);
@@ -692,6 +685,80 @@ public class HashTreeSyncInterface {
       }
     }
 
+    public void rebuildHashTree(long tokenNo, int treeId, long expFullRebuildTimeInt, org.apache.thrift.async.AsyncMethodCallback resultHandler) throws org.apache.thrift.TException {
+      checkReady();
+      rebuildHashTree_call method_call = new rebuildHashTree_call(tokenNo, treeId, expFullRebuildTimeInt, resultHandler, this, ___protocolFactory, ___transport);
+      this.___currentMethod = method_call;
+      ___manager.call(method_call);
+    }
+
+    public static class rebuildHashTree_call extends org.apache.thrift.async.TAsyncMethodCall {
+      private long tokenNo;
+      private int treeId;
+      private long expFullRebuildTimeInt;
+      public rebuildHashTree_call(long tokenNo, int treeId, long expFullRebuildTimeInt, org.apache.thrift.async.AsyncMethodCallback resultHandler, org.apache.thrift.async.TAsyncClient client, org.apache.thrift.protocol.TProtocolFactory protocolFactory, org.apache.thrift.transport.TNonblockingTransport transport) throws org.apache.thrift.TException {
+        super(client, protocolFactory, transport, resultHandler, true);
+        this.tokenNo = tokenNo;
+        this.treeId = treeId;
+        this.expFullRebuildTimeInt = expFullRebuildTimeInt;
+      }
+
+      public void write_args(org.apache.thrift.protocol.TProtocol prot) throws org.apache.thrift.TException {
+        prot.writeMessageBegin(new org.apache.thrift.protocol.TMessage("rebuildHashTree", org.apache.thrift.protocol.TMessageType.CALL, 0));
+        rebuildHashTree_args args = new rebuildHashTree_args();
+        args.setTokenNo(tokenNo);
+        args.setTreeId(treeId);
+        args.setExpFullRebuildTimeInt(expFullRebuildTimeInt);
+        args.write(prot);
+        prot.writeMessageEnd();
+      }
+
+      public void getResult() throws org.apache.thrift.TException {
+        if (getState() != org.apache.thrift.async.TAsyncMethodCall.State.RESPONSE_READ) {
+          throw new IllegalStateException("Method call not finished!");
+        }
+        org.apache.thrift.transport.TMemoryInputTransport memoryTransport = new org.apache.thrift.transport.TMemoryInputTransport(getFrameBuffer().array());
+        org.apache.thrift.protocol.TProtocol prot = client.getProtocolFactory().getProtocol(memoryTransport);
+      }
+    }
+
+    public void postRebuildHashTreeResponse(String hostName, long tokenNo, int treeId, org.apache.thrift.async.AsyncMethodCallback resultHandler) throws org.apache.thrift.TException {
+      checkReady();
+      postRebuildHashTreeResponse_call method_call = new postRebuildHashTreeResponse_call(hostName, tokenNo, treeId, resultHandler, this, ___protocolFactory, ___transport);
+      this.___currentMethod = method_call;
+      ___manager.call(method_call);
+    }
+
+    public static class postRebuildHashTreeResponse_call extends org.apache.thrift.async.TAsyncMethodCall {
+      private String hostName;
+      private long tokenNo;
+      private int treeId;
+      public postRebuildHashTreeResponse_call(String hostName, long tokenNo, int treeId, org.apache.thrift.async.AsyncMethodCallback resultHandler, org.apache.thrift.async.TAsyncClient client, org.apache.thrift.protocol.TProtocolFactory protocolFactory, org.apache.thrift.transport.TNonblockingTransport transport) throws org.apache.thrift.TException {
+        super(client, protocolFactory, transport, resultHandler, true);
+        this.hostName = hostName;
+        this.tokenNo = tokenNo;
+        this.treeId = treeId;
+      }
+
+      public void write_args(org.apache.thrift.protocol.TProtocol prot) throws org.apache.thrift.TException {
+        prot.writeMessageBegin(new org.apache.thrift.protocol.TMessage("postRebuildHashTreeResponse", org.apache.thrift.protocol.TMessageType.CALL, 0));
+        postRebuildHashTreeResponse_args args = new postRebuildHashTreeResponse_args();
+        args.setHostName(hostName);
+        args.setTokenNo(tokenNo);
+        args.setTreeId(treeId);
+        args.write(prot);
+        prot.writeMessageEnd();
+      }
+
+      public void getResult() throws org.apache.thrift.TException {
+        if (getState() != org.apache.thrift.async.TAsyncMethodCall.State.RESPONSE_READ) {
+          throw new IllegalStateException("Method call not finished!");
+        }
+        org.apache.thrift.transport.TMemoryInputTransport memoryTransport = new org.apache.thrift.transport.TMemoryInputTransport(getFrameBuffer().array());
+        org.apache.thrift.protocol.TProtocol prot = client.getProtocolFactory().getProtocol(memoryTransport);
+      }
+    }
+
   }
 
   public static class Processor<I extends Iface> extends org.apache.thrift.TBaseProcessor<I> implements org.apache.thrift.TProcessor {
@@ -712,8 +779,9 @@ public class HashTreeSyncInterface {
       processMap.put("getSegmentHash", new getSegmentHash());
       processMap.put("getSegment", new getSegment());
       processMap.put("getSegmentData", new getSegmentData());
-      processMap.put("isReadyForSynch", new isReadyForSynch());
       processMap.put("deleteTreeNodes", new deleteTreeNodes());
+      processMap.put("rebuildHashTree", new rebuildHashTree());
+      processMap.put("postRebuildHashTreeResponse", new postRebuildHashTreeResponse());
       return processMap;
     }
 
@@ -857,27 +925,6 @@ public class HashTreeSyncInterface {
       }
     }
 
-    public static class isReadyForSynch<I extends Iface> extends org.apache.thrift.ProcessFunction<I, isReadyForSynch_args> {
-      public isReadyForSynch() {
-        super("isReadyForSynch");
-      }
-
-      public isReadyForSynch_args getEmptyArgsInstance() {
-        return new isReadyForSynch_args();
-      }
-
-      protected boolean isOneway() {
-        return false;
-      }
-
-      public isReadyForSynch_result getResult(I iface, isReadyForSynch_args args) throws org.apache.thrift.TException {
-        isReadyForSynch_result result = new isReadyForSynch_result();
-        result.success = iface.isReadyForSynch(args.treeId);
-        result.setSuccessIsSet(true);
-        return result;
-      }
-    }
-
     public static class deleteTreeNodes<I extends Iface> extends org.apache.thrift.ProcessFunction<I, deleteTreeNodes_args> {
       public deleteTreeNodes() {
         super("deleteTreeNodes");
@@ -895,6 +942,44 @@ public class HashTreeSyncInterface {
         deleteTreeNodes_result result = new deleteTreeNodes_result();
         iface.deleteTreeNodes(args.treeId, args.nodeIds);
         return result;
+      }
+    }
+
+    public static class rebuildHashTree<I extends Iface> extends org.apache.thrift.ProcessFunction<I, rebuildHashTree_args> {
+      public rebuildHashTree() {
+        super("rebuildHashTree");
+      }
+
+      public rebuildHashTree_args getEmptyArgsInstance() {
+        return new rebuildHashTree_args();
+      }
+
+      protected boolean isOneway() {
+        return true;
+      }
+
+      public org.apache.thrift.TBase getResult(I iface, rebuildHashTree_args args) throws org.apache.thrift.TException {
+        iface.rebuildHashTree(args.tokenNo, args.treeId, args.expFullRebuildTimeInt);
+        return null;
+      }
+    }
+
+    public static class postRebuildHashTreeResponse<I extends Iface> extends org.apache.thrift.ProcessFunction<I, postRebuildHashTreeResponse_args> {
+      public postRebuildHashTreeResponse() {
+        super("postRebuildHashTreeResponse");
+      }
+
+      public postRebuildHashTreeResponse_args getEmptyArgsInstance() {
+        return new postRebuildHashTreeResponse_args();
+      }
+
+      protected boolean isOneway() {
+        return true;
+      }
+
+      public org.apache.thrift.TBase getResult(I iface, postRebuildHashTreeResponse_args args) throws org.apache.thrift.TException {
+        iface.postRebuildHashTreeResponse(args.hostName, args.tokenNo, args.treeId);
+        return null;
       }
     }
 
@@ -918,8 +1003,9 @@ public class HashTreeSyncInterface {
       processMap.put("getSegmentHash", new getSegmentHash());
       processMap.put("getSegment", new getSegment());
       processMap.put("getSegmentData", new getSegmentData());
-      processMap.put("isReadyForSynch", new isReadyForSynch());
       processMap.put("deleteTreeNodes", new deleteTreeNodes());
+      processMap.put("rebuildHashTree", new rebuildHashTree());
+      processMap.put("postRebuildHashTreeResponse", new postRebuildHashTreeResponse());
       return processMap;
     }
 
@@ -1278,58 +1364,6 @@ public class HashTreeSyncInterface {
       }
     }
 
-    public static class isReadyForSynch<I extends AsyncIface> extends org.apache.thrift.AsyncProcessFunction<I, isReadyForSynch_args, Boolean> {
-      public isReadyForSynch() {
-        super("isReadyForSynch");
-      }
-
-      public isReadyForSynch_args getEmptyArgsInstance() {
-        return new isReadyForSynch_args();
-      }
-
-      public AsyncMethodCallback<Boolean> getResultHandler(final AsyncFrameBuffer fb, final int seqid) {
-        final org.apache.thrift.AsyncProcessFunction fcall = this;
-        return new AsyncMethodCallback<Boolean>() { 
-          public void onComplete(Boolean o) {
-            isReadyForSynch_result result = new isReadyForSynch_result();
-            result.success = o;
-            result.setSuccessIsSet(true);
-            try {
-              fcall.sendResponse(fb,result, org.apache.thrift.protocol.TMessageType.REPLY,seqid);
-              return;
-            } catch (Exception e) {
-              LOGGER.error("Exception writing to internal frame buffer", e);
-            }
-            fb.close();
-          }
-          public void onError(Exception e) {
-            byte msgType = org.apache.thrift.protocol.TMessageType.REPLY;
-            org.apache.thrift.TBase msg;
-            isReadyForSynch_result result = new isReadyForSynch_result();
-            {
-              msgType = org.apache.thrift.protocol.TMessageType.EXCEPTION;
-              msg = (org.apache.thrift.TBase)new org.apache.thrift.TApplicationException(org.apache.thrift.TApplicationException.INTERNAL_ERROR, e.getMessage());
-            }
-            try {
-              fcall.sendResponse(fb,msg,msgType,seqid);
-              return;
-            } catch (Exception ex) {
-              LOGGER.error("Exception writing to internal frame buffer", ex);
-            }
-            fb.close();
-          }
-        };
-      }
-
-      protected boolean isOneway() {
-        return false;
-      }
-
-      public void start(I iface, isReadyForSynch_args args, org.apache.thrift.async.AsyncMethodCallback<Boolean> resultHandler) throws TException {
-        iface.isReadyForSynch(args.treeId,resultHandler);
-      }
-    }
-
     public static class deleteTreeNodes<I extends AsyncIface> extends org.apache.thrift.AsyncProcessFunction<I, deleteTreeNodes_args, Void> {
       public deleteTreeNodes() {
         super("deleteTreeNodes");
@@ -1377,6 +1411,62 @@ public class HashTreeSyncInterface {
 
       public void start(I iface, deleteTreeNodes_args args, org.apache.thrift.async.AsyncMethodCallback<Void> resultHandler) throws TException {
         iface.deleteTreeNodes(args.treeId, args.nodeIds,resultHandler);
+      }
+    }
+
+    public static class rebuildHashTree<I extends AsyncIface> extends org.apache.thrift.AsyncProcessFunction<I, rebuildHashTree_args, Void> {
+      public rebuildHashTree() {
+        super("rebuildHashTree");
+      }
+
+      public rebuildHashTree_args getEmptyArgsInstance() {
+        return new rebuildHashTree_args();
+      }
+
+      public AsyncMethodCallback<Void> getResultHandler(final AsyncFrameBuffer fb, final int seqid) {
+        final org.apache.thrift.AsyncProcessFunction fcall = this;
+        return new AsyncMethodCallback<Void>() { 
+          public void onComplete(Void o) {
+          }
+          public void onError(Exception e) {
+          }
+        };
+      }
+
+      protected boolean isOneway() {
+        return true;
+      }
+
+      public void start(I iface, rebuildHashTree_args args, org.apache.thrift.async.AsyncMethodCallback<Void> resultHandler) throws TException {
+        iface.rebuildHashTree(args.tokenNo, args.treeId, args.expFullRebuildTimeInt,resultHandler);
+      }
+    }
+
+    public static class postRebuildHashTreeResponse<I extends AsyncIface> extends org.apache.thrift.AsyncProcessFunction<I, postRebuildHashTreeResponse_args, Void> {
+      public postRebuildHashTreeResponse() {
+        super("postRebuildHashTreeResponse");
+      }
+
+      public postRebuildHashTreeResponse_args getEmptyArgsInstance() {
+        return new postRebuildHashTreeResponse_args();
+      }
+
+      public AsyncMethodCallback<Void> getResultHandler(final AsyncFrameBuffer fb, final int seqid) {
+        final org.apache.thrift.AsyncProcessFunction fcall = this;
+        return new AsyncMethodCallback<Void>() { 
+          public void onComplete(Void o) {
+          }
+          public void onError(Exception e) {
+          }
+        };
+      }
+
+      protected boolean isOneway() {
+        return true;
+      }
+
+      public void start(I iface, postRebuildHashTreeResponse_args args, org.apache.thrift.async.AsyncMethodCallback<Void> resultHandler) throws TException {
+        iface.postRebuildHashTreeResponse(args.hostName, args.tokenNo, args.treeId,resultHandler);
       }
     }
 
@@ -6767,712 +6857,6 @@ public class HashTreeSyncInterface {
 
   }
 
-  public static class isReadyForSynch_args implements org.apache.thrift.TBase<isReadyForSynch_args, isReadyForSynch_args._Fields>, java.io.Serializable, Cloneable, Comparable<isReadyForSynch_args>   {
-    private static final org.apache.thrift.protocol.TStruct STRUCT_DESC = new org.apache.thrift.protocol.TStruct("isReadyForSynch_args");
-
-    private static final org.apache.thrift.protocol.TField TREE_ID_FIELD_DESC = new org.apache.thrift.protocol.TField("treeId", org.apache.thrift.protocol.TType.I32, (short)1);
-
-    private static final Map<Class<? extends IScheme>, SchemeFactory> schemes = new HashMap<Class<? extends IScheme>, SchemeFactory>();
-    static {
-      schemes.put(StandardScheme.class, new isReadyForSynch_argsStandardSchemeFactory());
-      schemes.put(TupleScheme.class, new isReadyForSynch_argsTupleSchemeFactory());
-    }
-
-    public int treeId; // required
-
-    /** The set of fields this struct contains, along with convenience methods for finding and manipulating them. */
-    public enum _Fields implements org.apache.thrift.TFieldIdEnum {
-      TREE_ID((short)1, "treeId");
-
-      private static final Map<String, _Fields> byName = new HashMap<String, _Fields>();
-
-      static {
-        for (_Fields field : EnumSet.allOf(_Fields.class)) {
-          byName.put(field.getFieldName(), field);
-        }
-      }
-
-      /**
-       * Find the _Fields constant that matches fieldId, or null if its not found.
-       */
-      public static _Fields findByThriftId(int fieldId) {
-        switch(fieldId) {
-          case 1: // TREE_ID
-            return TREE_ID;
-          default:
-            return null;
-        }
-      }
-
-      /**
-       * Find the _Fields constant that matches fieldId, throwing an exception
-       * if it is not found.
-       */
-      public static _Fields findByThriftIdOrThrow(int fieldId) {
-        _Fields fields = findByThriftId(fieldId);
-        if (fields == null) throw new IllegalArgumentException("Field " + fieldId + " doesn't exist!");
-        return fields;
-      }
-
-      /**
-       * Find the _Fields constant that matches name, or null if its not found.
-       */
-      public static _Fields findByName(String name) {
-        return byName.get(name);
-      }
-
-      private final short _thriftId;
-      private final String _fieldName;
-
-      _Fields(short thriftId, String fieldName) {
-        _thriftId = thriftId;
-        _fieldName = fieldName;
-      }
-
-      public short getThriftFieldId() {
-        return _thriftId;
-      }
-
-      public String getFieldName() {
-        return _fieldName;
-      }
-    }
-
-    // isset id assignments
-    private static final int __TREEID_ISSET_ID = 0;
-    private byte __isset_bitfield = 0;
-    public static final Map<_Fields, org.apache.thrift.meta_data.FieldMetaData> metaDataMap;
-    static {
-      Map<_Fields, org.apache.thrift.meta_data.FieldMetaData> tmpMap = new EnumMap<_Fields, org.apache.thrift.meta_data.FieldMetaData>(_Fields.class);
-      tmpMap.put(_Fields.TREE_ID, new org.apache.thrift.meta_data.FieldMetaData("treeId", org.apache.thrift.TFieldRequirementType.DEFAULT, 
-          new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.I32)));
-      metaDataMap = Collections.unmodifiableMap(tmpMap);
-      org.apache.thrift.meta_data.FieldMetaData.addStructMetaDataMap(isReadyForSynch_args.class, metaDataMap);
-    }
-
-    public isReadyForSynch_args() {
-    }
-
-    public isReadyForSynch_args(
-      int treeId)
-    {
-      this();
-      this.treeId = treeId;
-      setTreeIdIsSet(true);
-    }
-
-    /**
-     * Performs a deep copy on <i>other</i>.
-     */
-    public isReadyForSynch_args(isReadyForSynch_args other) {
-      __isset_bitfield = other.__isset_bitfield;
-      this.treeId = other.treeId;
-    }
-
-    public isReadyForSynch_args deepCopy() {
-      return new isReadyForSynch_args(this);
-    }
-
-    @Override
-    public void clear() {
-      setTreeIdIsSet(false);
-      this.treeId = 0;
-    }
-
-    public int getTreeId() {
-      return this.treeId;
-    }
-
-    public isReadyForSynch_args setTreeId(int treeId) {
-      this.treeId = treeId;
-      setTreeIdIsSet(true);
-      return this;
-    }
-
-    public void unsetTreeId() {
-      __isset_bitfield = EncodingUtils.clearBit(__isset_bitfield, __TREEID_ISSET_ID);
-    }
-
-    /** Returns true if field treeId is set (has been assigned a value) and false otherwise */
-    public boolean isSetTreeId() {
-      return EncodingUtils.testBit(__isset_bitfield, __TREEID_ISSET_ID);
-    }
-
-    public void setTreeIdIsSet(boolean value) {
-      __isset_bitfield = EncodingUtils.setBit(__isset_bitfield, __TREEID_ISSET_ID, value);
-    }
-
-    public void setFieldValue(_Fields field, Object value) {
-      switch (field) {
-      case TREE_ID:
-        if (value == null) {
-          unsetTreeId();
-        } else {
-          setTreeId((Integer)value);
-        }
-        break;
-
-      }
-    }
-
-    public Object getFieldValue(_Fields field) {
-      switch (field) {
-      case TREE_ID:
-        return Integer.valueOf(getTreeId());
-
-      }
-      throw new IllegalStateException();
-    }
-
-    /** Returns true if field corresponding to fieldID is set (has been assigned a value) and false otherwise */
-    public boolean isSet(_Fields field) {
-      if (field == null) {
-        throw new IllegalArgumentException();
-      }
-
-      switch (field) {
-      case TREE_ID:
-        return isSetTreeId();
-      }
-      throw new IllegalStateException();
-    }
-
-    @Override
-    public boolean equals(Object that) {
-      if (that == null)
-        return false;
-      if (that instanceof isReadyForSynch_args)
-        return this.equals((isReadyForSynch_args)that);
-      return false;
-    }
-
-    public boolean equals(isReadyForSynch_args that) {
-      if (that == null)
-        return false;
-
-      boolean this_present_treeId = true;
-      boolean that_present_treeId = true;
-      if (this_present_treeId || that_present_treeId) {
-        if (!(this_present_treeId && that_present_treeId))
-          return false;
-        if (this.treeId != that.treeId)
-          return false;
-      }
-
-      return true;
-    }
-
-    @Override
-    public int hashCode() {
-      return 0;
-    }
-
-    @Override
-    public int compareTo(isReadyForSynch_args other) {
-      if (!getClass().equals(other.getClass())) {
-        return getClass().getName().compareTo(other.getClass().getName());
-      }
-
-      int lastComparison = 0;
-
-      lastComparison = Boolean.valueOf(isSetTreeId()).compareTo(other.isSetTreeId());
-      if (lastComparison != 0) {
-        return lastComparison;
-      }
-      if (isSetTreeId()) {
-        lastComparison = org.apache.thrift.TBaseHelper.compareTo(this.treeId, other.treeId);
-        if (lastComparison != 0) {
-          return lastComparison;
-        }
-      }
-      return 0;
-    }
-
-    public _Fields fieldForId(int fieldId) {
-      return _Fields.findByThriftId(fieldId);
-    }
-
-    public void read(org.apache.thrift.protocol.TProtocol iprot) throws org.apache.thrift.TException {
-      schemes.get(iprot.getScheme()).getScheme().read(iprot, this);
-    }
-
-    public void write(org.apache.thrift.protocol.TProtocol oprot) throws org.apache.thrift.TException {
-      schemes.get(oprot.getScheme()).getScheme().write(oprot, this);
-    }
-
-    @Override
-    public String toString() {
-      StringBuilder sb = new StringBuilder("isReadyForSynch_args(");
-      boolean first = true;
-
-      sb.append("treeId:");
-      sb.append(this.treeId);
-      first = false;
-      sb.append(")");
-      return sb.toString();
-    }
-
-    public void validate() throws org.apache.thrift.TException {
-      // check for required fields
-      // check for sub-struct validity
-    }
-
-    private void writeObject(java.io.ObjectOutputStream out) throws java.io.IOException {
-      try {
-        write(new org.apache.thrift.protocol.TCompactProtocol(new org.apache.thrift.transport.TIOStreamTransport(out)));
-      } catch (org.apache.thrift.TException te) {
-        throw new java.io.IOException(te);
-      }
-    }
-
-    private void readObject(java.io.ObjectInputStream in) throws java.io.IOException, ClassNotFoundException {
-      try {
-        // it doesn't seem like you should have to do this, but java serialization is wacky, and doesn't call the default constructor.
-        __isset_bitfield = 0;
-        read(new org.apache.thrift.protocol.TCompactProtocol(new org.apache.thrift.transport.TIOStreamTransport(in)));
-      } catch (org.apache.thrift.TException te) {
-        throw new java.io.IOException(te);
-      }
-    }
-
-    private static class isReadyForSynch_argsStandardSchemeFactory implements SchemeFactory {
-      public isReadyForSynch_argsStandardScheme getScheme() {
-        return new isReadyForSynch_argsStandardScheme();
-      }
-    }
-
-    private static class isReadyForSynch_argsStandardScheme extends StandardScheme<isReadyForSynch_args> {
-
-      public void read(org.apache.thrift.protocol.TProtocol iprot, isReadyForSynch_args struct) throws org.apache.thrift.TException {
-        org.apache.thrift.protocol.TField schemeField;
-        iprot.readStructBegin();
-        while (true)
-        {
-          schemeField = iprot.readFieldBegin();
-          if (schemeField.type == org.apache.thrift.protocol.TType.STOP) { 
-            break;
-          }
-          switch (schemeField.id) {
-            case 1: // TREE_ID
-              if (schemeField.type == org.apache.thrift.protocol.TType.I32) {
-                struct.treeId = iprot.readI32();
-                struct.setTreeIdIsSet(true);
-              } else { 
-                org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
-              }
-              break;
-            default:
-              org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
-          }
-          iprot.readFieldEnd();
-        }
-        iprot.readStructEnd();
-
-        // check for required fields of primitive type, which can't be checked in the validate method
-        struct.validate();
-      }
-
-      public void write(org.apache.thrift.protocol.TProtocol oprot, isReadyForSynch_args struct) throws org.apache.thrift.TException {
-        struct.validate();
-
-        oprot.writeStructBegin(STRUCT_DESC);
-        oprot.writeFieldBegin(TREE_ID_FIELD_DESC);
-        oprot.writeI32(struct.treeId);
-        oprot.writeFieldEnd();
-        oprot.writeFieldStop();
-        oprot.writeStructEnd();
-      }
-
-    }
-
-    private static class isReadyForSynch_argsTupleSchemeFactory implements SchemeFactory {
-      public isReadyForSynch_argsTupleScheme getScheme() {
-        return new isReadyForSynch_argsTupleScheme();
-      }
-    }
-
-    private static class isReadyForSynch_argsTupleScheme extends TupleScheme<isReadyForSynch_args> {
-
-      @Override
-      public void write(org.apache.thrift.protocol.TProtocol prot, isReadyForSynch_args struct) throws org.apache.thrift.TException {
-        TTupleProtocol oprot = (TTupleProtocol) prot;
-        BitSet optionals = new BitSet();
-        if (struct.isSetTreeId()) {
-          optionals.set(0);
-        }
-        oprot.writeBitSet(optionals, 1);
-        if (struct.isSetTreeId()) {
-          oprot.writeI32(struct.treeId);
-        }
-      }
-
-      @Override
-      public void read(org.apache.thrift.protocol.TProtocol prot, isReadyForSynch_args struct) throws org.apache.thrift.TException {
-        TTupleProtocol iprot = (TTupleProtocol) prot;
-        BitSet incoming = iprot.readBitSet(1);
-        if (incoming.get(0)) {
-          struct.treeId = iprot.readI32();
-          struct.setTreeIdIsSet(true);
-        }
-      }
-    }
-
-  }
-
-  public static class isReadyForSynch_result implements org.apache.thrift.TBase<isReadyForSynch_result, isReadyForSynch_result._Fields>, java.io.Serializable, Cloneable, Comparable<isReadyForSynch_result>   {
-    private static final org.apache.thrift.protocol.TStruct STRUCT_DESC = new org.apache.thrift.protocol.TStruct("isReadyForSynch_result");
-
-    private static final org.apache.thrift.protocol.TField SUCCESS_FIELD_DESC = new org.apache.thrift.protocol.TField("success", org.apache.thrift.protocol.TType.BOOL, (short)0);
-
-    private static final Map<Class<? extends IScheme>, SchemeFactory> schemes = new HashMap<Class<? extends IScheme>, SchemeFactory>();
-    static {
-      schemes.put(StandardScheme.class, new isReadyForSynch_resultStandardSchemeFactory());
-      schemes.put(TupleScheme.class, new isReadyForSynch_resultTupleSchemeFactory());
-    }
-
-    public boolean success; // required
-
-    /** The set of fields this struct contains, along with convenience methods for finding and manipulating them. */
-    public enum _Fields implements org.apache.thrift.TFieldIdEnum {
-      SUCCESS((short)0, "success");
-
-      private static final Map<String, _Fields> byName = new HashMap<String, _Fields>();
-
-      static {
-        for (_Fields field : EnumSet.allOf(_Fields.class)) {
-          byName.put(field.getFieldName(), field);
-        }
-      }
-
-      /**
-       * Find the _Fields constant that matches fieldId, or null if its not found.
-       */
-      public static _Fields findByThriftId(int fieldId) {
-        switch(fieldId) {
-          case 0: // SUCCESS
-            return SUCCESS;
-          default:
-            return null;
-        }
-      }
-
-      /**
-       * Find the _Fields constant that matches fieldId, throwing an exception
-       * if it is not found.
-       */
-      public static _Fields findByThriftIdOrThrow(int fieldId) {
-        _Fields fields = findByThriftId(fieldId);
-        if (fields == null) throw new IllegalArgumentException("Field " + fieldId + " doesn't exist!");
-        return fields;
-      }
-
-      /**
-       * Find the _Fields constant that matches name, or null if its not found.
-       */
-      public static _Fields findByName(String name) {
-        return byName.get(name);
-      }
-
-      private final short _thriftId;
-      private final String _fieldName;
-
-      _Fields(short thriftId, String fieldName) {
-        _thriftId = thriftId;
-        _fieldName = fieldName;
-      }
-
-      public short getThriftFieldId() {
-        return _thriftId;
-      }
-
-      public String getFieldName() {
-        return _fieldName;
-      }
-    }
-
-    // isset id assignments
-    private static final int __SUCCESS_ISSET_ID = 0;
-    private byte __isset_bitfield = 0;
-    public static final Map<_Fields, org.apache.thrift.meta_data.FieldMetaData> metaDataMap;
-    static {
-      Map<_Fields, org.apache.thrift.meta_data.FieldMetaData> tmpMap = new EnumMap<_Fields, org.apache.thrift.meta_data.FieldMetaData>(_Fields.class);
-      tmpMap.put(_Fields.SUCCESS, new org.apache.thrift.meta_data.FieldMetaData("success", org.apache.thrift.TFieldRequirementType.DEFAULT, 
-          new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.BOOL)));
-      metaDataMap = Collections.unmodifiableMap(tmpMap);
-      org.apache.thrift.meta_data.FieldMetaData.addStructMetaDataMap(isReadyForSynch_result.class, metaDataMap);
-    }
-
-    public isReadyForSynch_result() {
-    }
-
-    public isReadyForSynch_result(
-      boolean success)
-    {
-      this();
-      this.success = success;
-      setSuccessIsSet(true);
-    }
-
-    /**
-     * Performs a deep copy on <i>other</i>.
-     */
-    public isReadyForSynch_result(isReadyForSynch_result other) {
-      __isset_bitfield = other.__isset_bitfield;
-      this.success = other.success;
-    }
-
-    public isReadyForSynch_result deepCopy() {
-      return new isReadyForSynch_result(this);
-    }
-
-    @Override
-    public void clear() {
-      setSuccessIsSet(false);
-      this.success = false;
-    }
-
-    public boolean isSuccess() {
-      return this.success;
-    }
-
-    public isReadyForSynch_result setSuccess(boolean success) {
-      this.success = success;
-      setSuccessIsSet(true);
-      return this;
-    }
-
-    public void unsetSuccess() {
-      __isset_bitfield = EncodingUtils.clearBit(__isset_bitfield, __SUCCESS_ISSET_ID);
-    }
-
-    /** Returns true if field success is set (has been assigned a value) and false otherwise */
-    public boolean isSetSuccess() {
-      return EncodingUtils.testBit(__isset_bitfield, __SUCCESS_ISSET_ID);
-    }
-
-    public void setSuccessIsSet(boolean value) {
-      __isset_bitfield = EncodingUtils.setBit(__isset_bitfield, __SUCCESS_ISSET_ID, value);
-    }
-
-    public void setFieldValue(_Fields field, Object value) {
-      switch (field) {
-      case SUCCESS:
-        if (value == null) {
-          unsetSuccess();
-        } else {
-          setSuccess((Boolean)value);
-        }
-        break;
-
-      }
-    }
-
-    public Object getFieldValue(_Fields field) {
-      switch (field) {
-      case SUCCESS:
-        return Boolean.valueOf(isSuccess());
-
-      }
-      throw new IllegalStateException();
-    }
-
-    /** Returns true if field corresponding to fieldID is set (has been assigned a value) and false otherwise */
-    public boolean isSet(_Fields field) {
-      if (field == null) {
-        throw new IllegalArgumentException();
-      }
-
-      switch (field) {
-      case SUCCESS:
-        return isSetSuccess();
-      }
-      throw new IllegalStateException();
-    }
-
-    @Override
-    public boolean equals(Object that) {
-      if (that == null)
-        return false;
-      if (that instanceof isReadyForSynch_result)
-        return this.equals((isReadyForSynch_result)that);
-      return false;
-    }
-
-    public boolean equals(isReadyForSynch_result that) {
-      if (that == null)
-        return false;
-
-      boolean this_present_success = true;
-      boolean that_present_success = true;
-      if (this_present_success || that_present_success) {
-        if (!(this_present_success && that_present_success))
-          return false;
-        if (this.success != that.success)
-          return false;
-      }
-
-      return true;
-    }
-
-    @Override
-    public int hashCode() {
-      return 0;
-    }
-
-    @Override
-    public int compareTo(isReadyForSynch_result other) {
-      if (!getClass().equals(other.getClass())) {
-        return getClass().getName().compareTo(other.getClass().getName());
-      }
-
-      int lastComparison = 0;
-
-      lastComparison = Boolean.valueOf(isSetSuccess()).compareTo(other.isSetSuccess());
-      if (lastComparison != 0) {
-        return lastComparison;
-      }
-      if (isSetSuccess()) {
-        lastComparison = org.apache.thrift.TBaseHelper.compareTo(this.success, other.success);
-        if (lastComparison != 0) {
-          return lastComparison;
-        }
-      }
-      return 0;
-    }
-
-    public _Fields fieldForId(int fieldId) {
-      return _Fields.findByThriftId(fieldId);
-    }
-
-    public void read(org.apache.thrift.protocol.TProtocol iprot) throws org.apache.thrift.TException {
-      schemes.get(iprot.getScheme()).getScheme().read(iprot, this);
-    }
-
-    public void write(org.apache.thrift.protocol.TProtocol oprot) throws org.apache.thrift.TException {
-      schemes.get(oprot.getScheme()).getScheme().write(oprot, this);
-      }
-
-    @Override
-    public String toString() {
-      StringBuilder sb = new StringBuilder("isReadyForSynch_result(");
-      boolean first = true;
-
-      sb.append("success:");
-      sb.append(this.success);
-      first = false;
-      sb.append(")");
-      return sb.toString();
-    }
-
-    public void validate() throws org.apache.thrift.TException {
-      // check for required fields
-      // check for sub-struct validity
-    }
-
-    private void writeObject(java.io.ObjectOutputStream out) throws java.io.IOException {
-      try {
-        write(new org.apache.thrift.protocol.TCompactProtocol(new org.apache.thrift.transport.TIOStreamTransport(out)));
-      } catch (org.apache.thrift.TException te) {
-        throw new java.io.IOException(te);
-      }
-    }
-
-    private void readObject(java.io.ObjectInputStream in) throws java.io.IOException, ClassNotFoundException {
-      try {
-        // it doesn't seem like you should have to do this, but java serialization is wacky, and doesn't call the default constructor.
-        __isset_bitfield = 0;
-        read(new org.apache.thrift.protocol.TCompactProtocol(new org.apache.thrift.transport.TIOStreamTransport(in)));
-      } catch (org.apache.thrift.TException te) {
-        throw new java.io.IOException(te);
-      }
-    }
-
-    private static class isReadyForSynch_resultStandardSchemeFactory implements SchemeFactory {
-      public isReadyForSynch_resultStandardScheme getScheme() {
-        return new isReadyForSynch_resultStandardScheme();
-      }
-    }
-
-    private static class isReadyForSynch_resultStandardScheme extends StandardScheme<isReadyForSynch_result> {
-
-      public void read(org.apache.thrift.protocol.TProtocol iprot, isReadyForSynch_result struct) throws org.apache.thrift.TException {
-        org.apache.thrift.protocol.TField schemeField;
-        iprot.readStructBegin();
-        while (true)
-        {
-          schemeField = iprot.readFieldBegin();
-          if (schemeField.type == org.apache.thrift.protocol.TType.STOP) { 
-            break;
-          }
-          switch (schemeField.id) {
-            case 0: // SUCCESS
-              if (schemeField.type == org.apache.thrift.protocol.TType.BOOL) {
-                struct.success = iprot.readBool();
-                struct.setSuccessIsSet(true);
-              } else { 
-                org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
-              }
-              break;
-            default:
-              org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
-          }
-          iprot.readFieldEnd();
-        }
-        iprot.readStructEnd();
-
-        // check for required fields of primitive type, which can't be checked in the validate method
-        struct.validate();
-      }
-
-      public void write(org.apache.thrift.protocol.TProtocol oprot, isReadyForSynch_result struct) throws org.apache.thrift.TException {
-        struct.validate();
-
-        oprot.writeStructBegin(STRUCT_DESC);
-        if (struct.isSetSuccess()) {
-          oprot.writeFieldBegin(SUCCESS_FIELD_DESC);
-          oprot.writeBool(struct.success);
-          oprot.writeFieldEnd();
-        }
-        oprot.writeFieldStop();
-        oprot.writeStructEnd();
-      }
-
-    }
-
-    private static class isReadyForSynch_resultTupleSchemeFactory implements SchemeFactory {
-      public isReadyForSynch_resultTupleScheme getScheme() {
-        return new isReadyForSynch_resultTupleScheme();
-      }
-    }
-
-    private static class isReadyForSynch_resultTupleScheme extends TupleScheme<isReadyForSynch_result> {
-
-      @Override
-      public void write(org.apache.thrift.protocol.TProtocol prot, isReadyForSynch_result struct) throws org.apache.thrift.TException {
-        TTupleProtocol oprot = (TTupleProtocol) prot;
-        BitSet optionals = new BitSet();
-        if (struct.isSetSuccess()) {
-          optionals.set(0);
-        }
-        oprot.writeBitSet(optionals, 1);
-        if (struct.isSetSuccess()) {
-          oprot.writeBool(struct.success);
-        }
-      }
-
-      @Override
-      public void read(org.apache.thrift.protocol.TProtocol prot, isReadyForSynch_result struct) throws org.apache.thrift.TException {
-        TTupleProtocol iprot = (TTupleProtocol) prot;
-        BitSet incoming = iprot.readBitSet(1);
-        if (incoming.get(0)) {
-          struct.success = iprot.readBool();
-          struct.setSuccessIsSet(true);
-        }
-      }
-    }
-
-  }
-
   public static class deleteTreeNodes_args implements org.apache.thrift.TBase<deleteTreeNodes_args, deleteTreeNodes_args._Fields>, java.io.Serializable, Cloneable, Comparable<deleteTreeNodes_args>   {
     private static final org.apache.thrift.protocol.TStruct STRUCT_DESC = new org.apache.thrift.protocol.TStruct("deleteTreeNodes_args");
 
@@ -8215,6 +7599,1092 @@ public class HashTreeSyncInterface {
       @Override
       public void read(org.apache.thrift.protocol.TProtocol prot, deleteTreeNodes_result struct) throws org.apache.thrift.TException {
         TTupleProtocol iprot = (TTupleProtocol) prot;
+      }
+    }
+
+  }
+
+  public static class rebuildHashTree_args implements org.apache.thrift.TBase<rebuildHashTree_args, rebuildHashTree_args._Fields>, java.io.Serializable, Cloneable, Comparable<rebuildHashTree_args>   {
+    private static final org.apache.thrift.protocol.TStruct STRUCT_DESC = new org.apache.thrift.protocol.TStruct("rebuildHashTree_args");
+
+    private static final org.apache.thrift.protocol.TField TOKEN_NO_FIELD_DESC = new org.apache.thrift.protocol.TField("tokenNo", org.apache.thrift.protocol.TType.I64, (short)1);
+    private static final org.apache.thrift.protocol.TField TREE_ID_FIELD_DESC = new org.apache.thrift.protocol.TField("treeId", org.apache.thrift.protocol.TType.I32, (short)2);
+    private static final org.apache.thrift.protocol.TField EXP_FULL_REBUILD_TIME_INT_FIELD_DESC = new org.apache.thrift.protocol.TField("expFullRebuildTimeInt", org.apache.thrift.protocol.TType.I64, (short)3);
+
+    private static final Map<Class<? extends IScheme>, SchemeFactory> schemes = new HashMap<Class<? extends IScheme>, SchemeFactory>();
+    static {
+      schemes.put(StandardScheme.class, new rebuildHashTree_argsStandardSchemeFactory());
+      schemes.put(TupleScheme.class, new rebuildHashTree_argsTupleSchemeFactory());
+    }
+
+    public long tokenNo; // required
+    public int treeId; // required
+    public long expFullRebuildTimeInt; // required
+
+    /** The set of fields this struct contains, along with convenience methods for finding and manipulating them. */
+    public enum _Fields implements org.apache.thrift.TFieldIdEnum {
+      TOKEN_NO((short)1, "tokenNo"),
+      TREE_ID((short)2, "treeId"),
+      EXP_FULL_REBUILD_TIME_INT((short)3, "expFullRebuildTimeInt");
+
+      private static final Map<String, _Fields> byName = new HashMap<String, _Fields>();
+
+      static {
+        for (_Fields field : EnumSet.allOf(_Fields.class)) {
+          byName.put(field.getFieldName(), field);
+        }
+      }
+
+      /**
+       * Find the _Fields constant that matches fieldId, or null if its not found.
+       */
+      public static _Fields findByThriftId(int fieldId) {
+        switch(fieldId) {
+          case 1: // TOKEN_NO
+            return TOKEN_NO;
+          case 2: // TREE_ID
+            return TREE_ID;
+          case 3: // EXP_FULL_REBUILD_TIME_INT
+            return EXP_FULL_REBUILD_TIME_INT;
+          default:
+            return null;
+        }
+      }
+
+      /**
+       * Find the _Fields constant that matches fieldId, throwing an exception
+       * if it is not found.
+       */
+      public static _Fields findByThriftIdOrThrow(int fieldId) {
+        _Fields fields = findByThriftId(fieldId);
+        if (fields == null) throw new IllegalArgumentException("Field " + fieldId + " doesn't exist!");
+        return fields;
+      }
+
+      /**
+       * Find the _Fields constant that matches name, or null if its not found.
+       */
+      public static _Fields findByName(String name) {
+        return byName.get(name);
+      }
+
+      private final short _thriftId;
+      private final String _fieldName;
+
+      _Fields(short thriftId, String fieldName) {
+        _thriftId = thriftId;
+        _fieldName = fieldName;
+      }
+
+      public short getThriftFieldId() {
+        return _thriftId;
+      }
+
+      public String getFieldName() {
+        return _fieldName;
+      }
+    }
+
+    // isset id assignments
+    private static final int __TOKENNO_ISSET_ID = 0;
+    private static final int __TREEID_ISSET_ID = 1;
+    private static final int __EXPFULLREBUILDTIMEINT_ISSET_ID = 2;
+    private byte __isset_bitfield = 0;
+    public static final Map<_Fields, org.apache.thrift.meta_data.FieldMetaData> metaDataMap;
+    static {
+      Map<_Fields, org.apache.thrift.meta_data.FieldMetaData> tmpMap = new EnumMap<_Fields, org.apache.thrift.meta_data.FieldMetaData>(_Fields.class);
+      tmpMap.put(_Fields.TOKEN_NO, new org.apache.thrift.meta_data.FieldMetaData("tokenNo", org.apache.thrift.TFieldRequirementType.DEFAULT, 
+          new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.I64)));
+      tmpMap.put(_Fields.TREE_ID, new org.apache.thrift.meta_data.FieldMetaData("treeId", org.apache.thrift.TFieldRequirementType.DEFAULT, 
+          new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.I32)));
+      tmpMap.put(_Fields.EXP_FULL_REBUILD_TIME_INT, new org.apache.thrift.meta_data.FieldMetaData("expFullRebuildTimeInt", org.apache.thrift.TFieldRequirementType.DEFAULT, 
+          new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.I64)));
+      metaDataMap = Collections.unmodifiableMap(tmpMap);
+      org.apache.thrift.meta_data.FieldMetaData.addStructMetaDataMap(rebuildHashTree_args.class, metaDataMap);
+    }
+
+    public rebuildHashTree_args() {
+    }
+
+    public rebuildHashTree_args(
+      long tokenNo,
+      int treeId,
+      long expFullRebuildTimeInt)
+    {
+      this();
+      this.tokenNo = tokenNo;
+      setTokenNoIsSet(true);
+      this.treeId = treeId;
+      setTreeIdIsSet(true);
+      this.expFullRebuildTimeInt = expFullRebuildTimeInt;
+      setExpFullRebuildTimeIntIsSet(true);
+    }
+
+    /**
+     * Performs a deep copy on <i>other</i>.
+     */
+    public rebuildHashTree_args(rebuildHashTree_args other) {
+      __isset_bitfield = other.__isset_bitfield;
+      this.tokenNo = other.tokenNo;
+      this.treeId = other.treeId;
+      this.expFullRebuildTimeInt = other.expFullRebuildTimeInt;
+    }
+
+    public rebuildHashTree_args deepCopy() {
+      return new rebuildHashTree_args(this);
+    }
+
+    @Override
+    public void clear() {
+      setTokenNoIsSet(false);
+      this.tokenNo = 0;
+      setTreeIdIsSet(false);
+      this.treeId = 0;
+      setExpFullRebuildTimeIntIsSet(false);
+      this.expFullRebuildTimeInt = 0;
+    }
+
+    public long getTokenNo() {
+      return this.tokenNo;
+    }
+
+    public rebuildHashTree_args setTokenNo(long tokenNo) {
+      this.tokenNo = tokenNo;
+      setTokenNoIsSet(true);
+      return this;
+    }
+
+    public void unsetTokenNo() {
+      __isset_bitfield = EncodingUtils.clearBit(__isset_bitfield, __TOKENNO_ISSET_ID);
+    }
+
+    /** Returns true if field tokenNo is set (has been assigned a value) and false otherwise */
+    public boolean isSetTokenNo() {
+      return EncodingUtils.testBit(__isset_bitfield, __TOKENNO_ISSET_ID);
+    }
+
+    public void setTokenNoIsSet(boolean value) {
+      __isset_bitfield = EncodingUtils.setBit(__isset_bitfield, __TOKENNO_ISSET_ID, value);
+    }
+
+    public int getTreeId() {
+      return this.treeId;
+    }
+
+    public rebuildHashTree_args setTreeId(int treeId) {
+      this.treeId = treeId;
+      setTreeIdIsSet(true);
+      return this;
+    }
+
+    public void unsetTreeId() {
+      __isset_bitfield = EncodingUtils.clearBit(__isset_bitfield, __TREEID_ISSET_ID);
+    }
+
+    /** Returns true if field treeId is set (has been assigned a value) and false otherwise */
+    public boolean isSetTreeId() {
+      return EncodingUtils.testBit(__isset_bitfield, __TREEID_ISSET_ID);
+    }
+
+    public void setTreeIdIsSet(boolean value) {
+      __isset_bitfield = EncodingUtils.setBit(__isset_bitfield, __TREEID_ISSET_ID, value);
+    }
+
+    public long getExpFullRebuildTimeInt() {
+      return this.expFullRebuildTimeInt;
+    }
+
+    public rebuildHashTree_args setExpFullRebuildTimeInt(long expFullRebuildTimeInt) {
+      this.expFullRebuildTimeInt = expFullRebuildTimeInt;
+      setExpFullRebuildTimeIntIsSet(true);
+      return this;
+    }
+
+    public void unsetExpFullRebuildTimeInt() {
+      __isset_bitfield = EncodingUtils.clearBit(__isset_bitfield, __EXPFULLREBUILDTIMEINT_ISSET_ID);
+    }
+
+    /** Returns true if field expFullRebuildTimeInt is set (has been assigned a value) and false otherwise */
+    public boolean isSetExpFullRebuildTimeInt() {
+      return EncodingUtils.testBit(__isset_bitfield, __EXPFULLREBUILDTIMEINT_ISSET_ID);
+    }
+
+    public void setExpFullRebuildTimeIntIsSet(boolean value) {
+      __isset_bitfield = EncodingUtils.setBit(__isset_bitfield, __EXPFULLREBUILDTIMEINT_ISSET_ID, value);
+    }
+
+    public void setFieldValue(_Fields field, Object value) {
+      switch (field) {
+      case TOKEN_NO:
+        if (value == null) {
+          unsetTokenNo();
+        } else {
+          setTokenNo((Long)value);
+        }
+        break;
+
+      case TREE_ID:
+        if (value == null) {
+          unsetTreeId();
+        } else {
+          setTreeId((Integer)value);
+        }
+        break;
+
+      case EXP_FULL_REBUILD_TIME_INT:
+        if (value == null) {
+          unsetExpFullRebuildTimeInt();
+        } else {
+          setExpFullRebuildTimeInt((Long)value);
+        }
+        break;
+
+      }
+    }
+
+    public Object getFieldValue(_Fields field) {
+      switch (field) {
+      case TOKEN_NO:
+        return Long.valueOf(getTokenNo());
+
+      case TREE_ID:
+        return Integer.valueOf(getTreeId());
+
+      case EXP_FULL_REBUILD_TIME_INT:
+        return Long.valueOf(getExpFullRebuildTimeInt());
+
+      }
+      throw new IllegalStateException();
+    }
+
+    /** Returns true if field corresponding to fieldID is set (has been assigned a value) and false otherwise */
+    public boolean isSet(_Fields field) {
+      if (field == null) {
+        throw new IllegalArgumentException();
+      }
+
+      switch (field) {
+      case TOKEN_NO:
+        return isSetTokenNo();
+      case TREE_ID:
+        return isSetTreeId();
+      case EXP_FULL_REBUILD_TIME_INT:
+        return isSetExpFullRebuildTimeInt();
+      }
+      throw new IllegalStateException();
+    }
+
+    @Override
+    public boolean equals(Object that) {
+      if (that == null)
+        return false;
+      if (that instanceof rebuildHashTree_args)
+        return this.equals((rebuildHashTree_args)that);
+      return false;
+    }
+
+    public boolean equals(rebuildHashTree_args that) {
+      if (that == null)
+        return false;
+
+      boolean this_present_tokenNo = true;
+      boolean that_present_tokenNo = true;
+      if (this_present_tokenNo || that_present_tokenNo) {
+        if (!(this_present_tokenNo && that_present_tokenNo))
+          return false;
+        if (this.tokenNo != that.tokenNo)
+          return false;
+      }
+
+      boolean this_present_treeId = true;
+      boolean that_present_treeId = true;
+      if (this_present_treeId || that_present_treeId) {
+        if (!(this_present_treeId && that_present_treeId))
+          return false;
+        if (this.treeId != that.treeId)
+          return false;
+      }
+
+      boolean this_present_expFullRebuildTimeInt = true;
+      boolean that_present_expFullRebuildTimeInt = true;
+      if (this_present_expFullRebuildTimeInt || that_present_expFullRebuildTimeInt) {
+        if (!(this_present_expFullRebuildTimeInt && that_present_expFullRebuildTimeInt))
+          return false;
+        if (this.expFullRebuildTimeInt != that.expFullRebuildTimeInt)
+          return false;
+      }
+
+      return true;
+    }
+
+    @Override
+    public int hashCode() {
+      return 0;
+    }
+
+    @Override
+    public int compareTo(rebuildHashTree_args other) {
+      if (!getClass().equals(other.getClass())) {
+        return getClass().getName().compareTo(other.getClass().getName());
+      }
+
+      int lastComparison = 0;
+
+      lastComparison = Boolean.valueOf(isSetTokenNo()).compareTo(other.isSetTokenNo());
+      if (lastComparison != 0) {
+        return lastComparison;
+      }
+      if (isSetTokenNo()) {
+        lastComparison = org.apache.thrift.TBaseHelper.compareTo(this.tokenNo, other.tokenNo);
+        if (lastComparison != 0) {
+          return lastComparison;
+        }
+      }
+      lastComparison = Boolean.valueOf(isSetTreeId()).compareTo(other.isSetTreeId());
+      if (lastComparison != 0) {
+        return lastComparison;
+      }
+      if (isSetTreeId()) {
+        lastComparison = org.apache.thrift.TBaseHelper.compareTo(this.treeId, other.treeId);
+        if (lastComparison != 0) {
+          return lastComparison;
+        }
+      }
+      lastComparison = Boolean.valueOf(isSetExpFullRebuildTimeInt()).compareTo(other.isSetExpFullRebuildTimeInt());
+      if (lastComparison != 0) {
+        return lastComparison;
+      }
+      if (isSetExpFullRebuildTimeInt()) {
+        lastComparison = org.apache.thrift.TBaseHelper.compareTo(this.expFullRebuildTimeInt, other.expFullRebuildTimeInt);
+        if (lastComparison != 0) {
+          return lastComparison;
+        }
+      }
+      return 0;
+    }
+
+    public _Fields fieldForId(int fieldId) {
+      return _Fields.findByThriftId(fieldId);
+    }
+
+    public void read(org.apache.thrift.protocol.TProtocol iprot) throws org.apache.thrift.TException {
+      schemes.get(iprot.getScheme()).getScheme().read(iprot, this);
+    }
+
+    public void write(org.apache.thrift.protocol.TProtocol oprot) throws org.apache.thrift.TException {
+      schemes.get(oprot.getScheme()).getScheme().write(oprot, this);
+    }
+
+    @Override
+    public String toString() {
+      StringBuilder sb = new StringBuilder("rebuildHashTree_args(");
+      boolean first = true;
+
+      sb.append("tokenNo:");
+      sb.append(this.tokenNo);
+      first = false;
+      if (!first) sb.append(", ");
+      sb.append("treeId:");
+      sb.append(this.treeId);
+      first = false;
+      if (!first) sb.append(", ");
+      sb.append("expFullRebuildTimeInt:");
+      sb.append(this.expFullRebuildTimeInt);
+      first = false;
+      sb.append(")");
+      return sb.toString();
+    }
+
+    public void validate() throws org.apache.thrift.TException {
+      // check for required fields
+      // check for sub-struct validity
+    }
+
+    private void writeObject(java.io.ObjectOutputStream out) throws java.io.IOException {
+      try {
+        write(new org.apache.thrift.protocol.TCompactProtocol(new org.apache.thrift.transport.TIOStreamTransport(out)));
+      } catch (org.apache.thrift.TException te) {
+        throw new java.io.IOException(te);
+      }
+    }
+
+    private void readObject(java.io.ObjectInputStream in) throws java.io.IOException, ClassNotFoundException {
+      try {
+        // it doesn't seem like you should have to do this, but java serialization is wacky, and doesn't call the default constructor.
+        __isset_bitfield = 0;
+        read(new org.apache.thrift.protocol.TCompactProtocol(new org.apache.thrift.transport.TIOStreamTransport(in)));
+      } catch (org.apache.thrift.TException te) {
+        throw new java.io.IOException(te);
+      }
+    }
+
+    private static class rebuildHashTree_argsStandardSchemeFactory implements SchemeFactory {
+      public rebuildHashTree_argsStandardScheme getScheme() {
+        return new rebuildHashTree_argsStandardScheme();
+      }
+    }
+
+    private static class rebuildHashTree_argsStandardScheme extends StandardScheme<rebuildHashTree_args> {
+
+      public void read(org.apache.thrift.protocol.TProtocol iprot, rebuildHashTree_args struct) throws org.apache.thrift.TException {
+        org.apache.thrift.protocol.TField schemeField;
+        iprot.readStructBegin();
+        while (true)
+        {
+          schemeField = iprot.readFieldBegin();
+          if (schemeField.type == org.apache.thrift.protocol.TType.STOP) { 
+            break;
+          }
+          switch (schemeField.id) {
+            case 1: // TOKEN_NO
+              if (schemeField.type == org.apache.thrift.protocol.TType.I64) {
+                struct.tokenNo = iprot.readI64();
+                struct.setTokenNoIsSet(true);
+              } else { 
+                org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
+              }
+              break;
+            case 2: // TREE_ID
+              if (schemeField.type == org.apache.thrift.protocol.TType.I32) {
+                struct.treeId = iprot.readI32();
+                struct.setTreeIdIsSet(true);
+              } else { 
+                org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
+              }
+              break;
+            case 3: // EXP_FULL_REBUILD_TIME_INT
+              if (schemeField.type == org.apache.thrift.protocol.TType.I64) {
+                struct.expFullRebuildTimeInt = iprot.readI64();
+                struct.setExpFullRebuildTimeIntIsSet(true);
+              } else { 
+                org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
+              }
+              break;
+            default:
+              org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
+          }
+          iprot.readFieldEnd();
+        }
+        iprot.readStructEnd();
+
+        // check for required fields of primitive type, which can't be checked in the validate method
+        struct.validate();
+      }
+
+      public void write(org.apache.thrift.protocol.TProtocol oprot, rebuildHashTree_args struct) throws org.apache.thrift.TException {
+        struct.validate();
+
+        oprot.writeStructBegin(STRUCT_DESC);
+        oprot.writeFieldBegin(TOKEN_NO_FIELD_DESC);
+        oprot.writeI64(struct.tokenNo);
+        oprot.writeFieldEnd();
+        oprot.writeFieldBegin(TREE_ID_FIELD_DESC);
+        oprot.writeI32(struct.treeId);
+        oprot.writeFieldEnd();
+        oprot.writeFieldBegin(EXP_FULL_REBUILD_TIME_INT_FIELD_DESC);
+        oprot.writeI64(struct.expFullRebuildTimeInt);
+        oprot.writeFieldEnd();
+        oprot.writeFieldStop();
+        oprot.writeStructEnd();
+      }
+
+    }
+
+    private static class rebuildHashTree_argsTupleSchemeFactory implements SchemeFactory {
+      public rebuildHashTree_argsTupleScheme getScheme() {
+        return new rebuildHashTree_argsTupleScheme();
+      }
+    }
+
+    private static class rebuildHashTree_argsTupleScheme extends TupleScheme<rebuildHashTree_args> {
+
+      @Override
+      public void write(org.apache.thrift.protocol.TProtocol prot, rebuildHashTree_args struct) throws org.apache.thrift.TException {
+        TTupleProtocol oprot = (TTupleProtocol) prot;
+        BitSet optionals = new BitSet();
+        if (struct.isSetTokenNo()) {
+          optionals.set(0);
+        }
+        if (struct.isSetTreeId()) {
+          optionals.set(1);
+        }
+        if (struct.isSetExpFullRebuildTimeInt()) {
+          optionals.set(2);
+        }
+        oprot.writeBitSet(optionals, 3);
+        if (struct.isSetTokenNo()) {
+          oprot.writeI64(struct.tokenNo);
+        }
+        if (struct.isSetTreeId()) {
+          oprot.writeI32(struct.treeId);
+        }
+        if (struct.isSetExpFullRebuildTimeInt()) {
+          oprot.writeI64(struct.expFullRebuildTimeInt);
+        }
+      }
+
+      @Override
+      public void read(org.apache.thrift.protocol.TProtocol prot, rebuildHashTree_args struct) throws org.apache.thrift.TException {
+        TTupleProtocol iprot = (TTupleProtocol) prot;
+        BitSet incoming = iprot.readBitSet(3);
+        if (incoming.get(0)) {
+          struct.tokenNo = iprot.readI64();
+          struct.setTokenNoIsSet(true);
+        }
+        if (incoming.get(1)) {
+          struct.treeId = iprot.readI32();
+          struct.setTreeIdIsSet(true);
+        }
+        if (incoming.get(2)) {
+          struct.expFullRebuildTimeInt = iprot.readI64();
+          struct.setExpFullRebuildTimeIntIsSet(true);
+        }
+      }
+    }
+
+  }
+
+  public static class postRebuildHashTreeResponse_args implements org.apache.thrift.TBase<postRebuildHashTreeResponse_args, postRebuildHashTreeResponse_args._Fields>, java.io.Serializable, Cloneable, Comparable<postRebuildHashTreeResponse_args>   {
+    private static final org.apache.thrift.protocol.TStruct STRUCT_DESC = new org.apache.thrift.protocol.TStruct("postRebuildHashTreeResponse_args");
+
+    private static final org.apache.thrift.protocol.TField HOST_NAME_FIELD_DESC = new org.apache.thrift.protocol.TField("hostName", org.apache.thrift.protocol.TType.STRING, (short)1);
+    private static final org.apache.thrift.protocol.TField TOKEN_NO_FIELD_DESC = new org.apache.thrift.protocol.TField("tokenNo", org.apache.thrift.protocol.TType.I64, (short)2);
+    private static final org.apache.thrift.protocol.TField TREE_ID_FIELD_DESC = new org.apache.thrift.protocol.TField("treeId", org.apache.thrift.protocol.TType.I32, (short)3);
+
+    private static final Map<Class<? extends IScheme>, SchemeFactory> schemes = new HashMap<Class<? extends IScheme>, SchemeFactory>();
+    static {
+      schemes.put(StandardScheme.class, new postRebuildHashTreeResponse_argsStandardSchemeFactory());
+      schemes.put(TupleScheme.class, new postRebuildHashTreeResponse_argsTupleSchemeFactory());
+    }
+
+    public String hostName; // required
+    public long tokenNo; // required
+    public int treeId; // required
+
+    /** The set of fields this struct contains, along with convenience methods for finding and manipulating them. */
+    public enum _Fields implements org.apache.thrift.TFieldIdEnum {
+      HOST_NAME((short)1, "hostName"),
+      TOKEN_NO((short)2, "tokenNo"),
+      TREE_ID((short)3, "treeId");
+
+      private static final Map<String, _Fields> byName = new HashMap<String, _Fields>();
+
+      static {
+        for (_Fields field : EnumSet.allOf(_Fields.class)) {
+          byName.put(field.getFieldName(), field);
+        }
+      }
+
+      /**
+       * Find the _Fields constant that matches fieldId, or null if its not found.
+       */
+      public static _Fields findByThriftId(int fieldId) {
+        switch(fieldId) {
+          case 1: // HOST_NAME
+            return HOST_NAME;
+          case 2: // TOKEN_NO
+            return TOKEN_NO;
+          case 3: // TREE_ID
+            return TREE_ID;
+          default:
+            return null;
+        }
+      }
+
+      /**
+       * Find the _Fields constant that matches fieldId, throwing an exception
+       * if it is not found.
+       */
+      public static _Fields findByThriftIdOrThrow(int fieldId) {
+        _Fields fields = findByThriftId(fieldId);
+        if (fields == null) throw new IllegalArgumentException("Field " + fieldId + " doesn't exist!");
+        return fields;
+      }
+
+      /**
+       * Find the _Fields constant that matches name, or null if its not found.
+       */
+      public static _Fields findByName(String name) {
+        return byName.get(name);
+      }
+
+      private final short _thriftId;
+      private final String _fieldName;
+
+      _Fields(short thriftId, String fieldName) {
+        _thriftId = thriftId;
+        _fieldName = fieldName;
+      }
+
+      public short getThriftFieldId() {
+        return _thriftId;
+      }
+
+      public String getFieldName() {
+        return _fieldName;
+      }
+    }
+
+    // isset id assignments
+    private static final int __TOKENNO_ISSET_ID = 0;
+    private static final int __TREEID_ISSET_ID = 1;
+    private byte __isset_bitfield = 0;
+    public static final Map<_Fields, org.apache.thrift.meta_data.FieldMetaData> metaDataMap;
+    static {
+      Map<_Fields, org.apache.thrift.meta_data.FieldMetaData> tmpMap = new EnumMap<_Fields, org.apache.thrift.meta_data.FieldMetaData>(_Fields.class);
+      tmpMap.put(_Fields.HOST_NAME, new org.apache.thrift.meta_data.FieldMetaData("hostName", org.apache.thrift.TFieldRequirementType.DEFAULT, 
+          new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.STRING)));
+      tmpMap.put(_Fields.TOKEN_NO, new org.apache.thrift.meta_data.FieldMetaData("tokenNo", org.apache.thrift.TFieldRequirementType.DEFAULT, 
+          new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.I64)));
+      tmpMap.put(_Fields.TREE_ID, new org.apache.thrift.meta_data.FieldMetaData("treeId", org.apache.thrift.TFieldRequirementType.DEFAULT, 
+          new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.I32)));
+      metaDataMap = Collections.unmodifiableMap(tmpMap);
+      org.apache.thrift.meta_data.FieldMetaData.addStructMetaDataMap(postRebuildHashTreeResponse_args.class, metaDataMap);
+    }
+
+    public postRebuildHashTreeResponse_args() {
+    }
+
+    public postRebuildHashTreeResponse_args(
+      String hostName,
+      long tokenNo,
+      int treeId)
+    {
+      this();
+      this.hostName = hostName;
+      this.tokenNo = tokenNo;
+      setTokenNoIsSet(true);
+      this.treeId = treeId;
+      setTreeIdIsSet(true);
+    }
+
+    /**
+     * Performs a deep copy on <i>other</i>.
+     */
+    public postRebuildHashTreeResponse_args(postRebuildHashTreeResponse_args other) {
+      __isset_bitfield = other.__isset_bitfield;
+      if (other.isSetHostName()) {
+        this.hostName = other.hostName;
+      }
+      this.tokenNo = other.tokenNo;
+      this.treeId = other.treeId;
+    }
+
+    public postRebuildHashTreeResponse_args deepCopy() {
+      return new postRebuildHashTreeResponse_args(this);
+    }
+
+    @Override
+    public void clear() {
+      this.hostName = null;
+      setTokenNoIsSet(false);
+      this.tokenNo = 0;
+      setTreeIdIsSet(false);
+      this.treeId = 0;
+    }
+
+    public String getHostName() {
+      return this.hostName;
+    }
+
+    public postRebuildHashTreeResponse_args setHostName(String hostName) {
+      this.hostName = hostName;
+      return this;
+    }
+
+    public void unsetHostName() {
+      this.hostName = null;
+    }
+
+    /** Returns true if field hostName is set (has been assigned a value) and false otherwise */
+    public boolean isSetHostName() {
+      return this.hostName != null;
+    }
+
+    public void setHostNameIsSet(boolean value) {
+      if (!value) {
+        this.hostName = null;
+      }
+    }
+
+    public long getTokenNo() {
+      return this.tokenNo;
+    }
+
+    public postRebuildHashTreeResponse_args setTokenNo(long tokenNo) {
+      this.tokenNo = tokenNo;
+      setTokenNoIsSet(true);
+      return this;
+    }
+
+    public void unsetTokenNo() {
+      __isset_bitfield = EncodingUtils.clearBit(__isset_bitfield, __TOKENNO_ISSET_ID);
+    }
+
+    /** Returns true if field tokenNo is set (has been assigned a value) and false otherwise */
+    public boolean isSetTokenNo() {
+      return EncodingUtils.testBit(__isset_bitfield, __TOKENNO_ISSET_ID);
+    }
+
+    public void setTokenNoIsSet(boolean value) {
+      __isset_bitfield = EncodingUtils.setBit(__isset_bitfield, __TOKENNO_ISSET_ID, value);
+    }
+
+    public int getTreeId() {
+      return this.treeId;
+    }
+
+    public postRebuildHashTreeResponse_args setTreeId(int treeId) {
+      this.treeId = treeId;
+      setTreeIdIsSet(true);
+      return this;
+    }
+
+    public void unsetTreeId() {
+      __isset_bitfield = EncodingUtils.clearBit(__isset_bitfield, __TREEID_ISSET_ID);
+    }
+
+    /** Returns true if field treeId is set (has been assigned a value) and false otherwise */
+    public boolean isSetTreeId() {
+      return EncodingUtils.testBit(__isset_bitfield, __TREEID_ISSET_ID);
+    }
+
+    public void setTreeIdIsSet(boolean value) {
+      __isset_bitfield = EncodingUtils.setBit(__isset_bitfield, __TREEID_ISSET_ID, value);
+    }
+
+    public void setFieldValue(_Fields field, Object value) {
+      switch (field) {
+      case HOST_NAME:
+        if (value == null) {
+          unsetHostName();
+        } else {
+          setHostName((String)value);
+        }
+        break;
+
+      case TOKEN_NO:
+        if (value == null) {
+          unsetTokenNo();
+        } else {
+          setTokenNo((Long)value);
+        }
+        break;
+
+      case TREE_ID:
+        if (value == null) {
+          unsetTreeId();
+        } else {
+          setTreeId((Integer)value);
+        }
+        break;
+
+      }
+    }
+
+    public Object getFieldValue(_Fields field) {
+      switch (field) {
+      case HOST_NAME:
+        return getHostName();
+
+      case TOKEN_NO:
+        return Long.valueOf(getTokenNo());
+
+      case TREE_ID:
+        return Integer.valueOf(getTreeId());
+
+      }
+      throw new IllegalStateException();
+    }
+
+    /** Returns true if field corresponding to fieldID is set (has been assigned a value) and false otherwise */
+    public boolean isSet(_Fields field) {
+      if (field == null) {
+        throw new IllegalArgumentException();
+      }
+
+      switch (field) {
+      case HOST_NAME:
+        return isSetHostName();
+      case TOKEN_NO:
+        return isSetTokenNo();
+      case TREE_ID:
+        return isSetTreeId();
+      }
+      throw new IllegalStateException();
+    }
+
+    @Override
+    public boolean equals(Object that) {
+      if (that == null)
+        return false;
+      if (that instanceof postRebuildHashTreeResponse_args)
+        return this.equals((postRebuildHashTreeResponse_args)that);
+      return false;
+    }
+
+    public boolean equals(postRebuildHashTreeResponse_args that) {
+      if (that == null)
+        return false;
+
+      boolean this_present_hostName = true && this.isSetHostName();
+      boolean that_present_hostName = true && that.isSetHostName();
+      if (this_present_hostName || that_present_hostName) {
+        if (!(this_present_hostName && that_present_hostName))
+          return false;
+        if (!this.hostName.equals(that.hostName))
+          return false;
+      }
+
+      boolean this_present_tokenNo = true;
+      boolean that_present_tokenNo = true;
+      if (this_present_tokenNo || that_present_tokenNo) {
+        if (!(this_present_tokenNo && that_present_tokenNo))
+          return false;
+        if (this.tokenNo != that.tokenNo)
+          return false;
+      }
+
+      boolean this_present_treeId = true;
+      boolean that_present_treeId = true;
+      if (this_present_treeId || that_present_treeId) {
+        if (!(this_present_treeId && that_present_treeId))
+          return false;
+        if (this.treeId != that.treeId)
+          return false;
+      }
+
+      return true;
+    }
+
+    @Override
+    public int hashCode() {
+      return 0;
+    }
+
+    @Override
+    public int compareTo(postRebuildHashTreeResponse_args other) {
+      if (!getClass().equals(other.getClass())) {
+        return getClass().getName().compareTo(other.getClass().getName());
+      }
+
+      int lastComparison = 0;
+
+      lastComparison = Boolean.valueOf(isSetHostName()).compareTo(other.isSetHostName());
+      if (lastComparison != 0) {
+        return lastComparison;
+      }
+      if (isSetHostName()) {
+        lastComparison = org.apache.thrift.TBaseHelper.compareTo(this.hostName, other.hostName);
+        if (lastComparison != 0) {
+          return lastComparison;
+        }
+      }
+      lastComparison = Boolean.valueOf(isSetTokenNo()).compareTo(other.isSetTokenNo());
+      if (lastComparison != 0) {
+        return lastComparison;
+      }
+      if (isSetTokenNo()) {
+        lastComparison = org.apache.thrift.TBaseHelper.compareTo(this.tokenNo, other.tokenNo);
+        if (lastComparison != 0) {
+          return lastComparison;
+        }
+      }
+      lastComparison = Boolean.valueOf(isSetTreeId()).compareTo(other.isSetTreeId());
+      if (lastComparison != 0) {
+        return lastComparison;
+      }
+      if (isSetTreeId()) {
+        lastComparison = org.apache.thrift.TBaseHelper.compareTo(this.treeId, other.treeId);
+        if (lastComparison != 0) {
+          return lastComparison;
+        }
+      }
+      return 0;
+    }
+
+    public _Fields fieldForId(int fieldId) {
+      return _Fields.findByThriftId(fieldId);
+    }
+
+    public void read(org.apache.thrift.protocol.TProtocol iprot) throws org.apache.thrift.TException {
+      schemes.get(iprot.getScheme()).getScheme().read(iprot, this);
+    }
+
+    public void write(org.apache.thrift.protocol.TProtocol oprot) throws org.apache.thrift.TException {
+      schemes.get(oprot.getScheme()).getScheme().write(oprot, this);
+    }
+
+    @Override
+    public String toString() {
+      StringBuilder sb = new StringBuilder("postRebuildHashTreeResponse_args(");
+      boolean first = true;
+
+      sb.append("hostName:");
+      if (this.hostName == null) {
+        sb.append("null");
+      } else {
+        sb.append(this.hostName);
+      }
+      first = false;
+      if (!first) sb.append(", ");
+      sb.append("tokenNo:");
+      sb.append(this.tokenNo);
+      first = false;
+      if (!first) sb.append(", ");
+      sb.append("treeId:");
+      sb.append(this.treeId);
+      first = false;
+      sb.append(")");
+      return sb.toString();
+    }
+
+    public void validate() throws org.apache.thrift.TException {
+      // check for required fields
+      // check for sub-struct validity
+    }
+
+    private void writeObject(java.io.ObjectOutputStream out) throws java.io.IOException {
+      try {
+        write(new org.apache.thrift.protocol.TCompactProtocol(new org.apache.thrift.transport.TIOStreamTransport(out)));
+      } catch (org.apache.thrift.TException te) {
+        throw new java.io.IOException(te);
+      }
+    }
+
+    private void readObject(java.io.ObjectInputStream in) throws java.io.IOException, ClassNotFoundException {
+      try {
+        // it doesn't seem like you should have to do this, but java serialization is wacky, and doesn't call the default constructor.
+        __isset_bitfield = 0;
+        read(new org.apache.thrift.protocol.TCompactProtocol(new org.apache.thrift.transport.TIOStreamTransport(in)));
+      } catch (org.apache.thrift.TException te) {
+        throw new java.io.IOException(te);
+      }
+    }
+
+    private static class postRebuildHashTreeResponse_argsStandardSchemeFactory implements SchemeFactory {
+      public postRebuildHashTreeResponse_argsStandardScheme getScheme() {
+        return new postRebuildHashTreeResponse_argsStandardScheme();
+      }
+    }
+
+    private static class postRebuildHashTreeResponse_argsStandardScheme extends StandardScheme<postRebuildHashTreeResponse_args> {
+
+      public void read(org.apache.thrift.protocol.TProtocol iprot, postRebuildHashTreeResponse_args struct) throws org.apache.thrift.TException {
+        org.apache.thrift.protocol.TField schemeField;
+        iprot.readStructBegin();
+        while (true)
+        {
+          schemeField = iprot.readFieldBegin();
+          if (schemeField.type == org.apache.thrift.protocol.TType.STOP) { 
+            break;
+          }
+          switch (schemeField.id) {
+            case 1: // HOST_NAME
+              if (schemeField.type == org.apache.thrift.protocol.TType.STRING) {
+                struct.hostName = iprot.readString();
+                struct.setHostNameIsSet(true);
+              } else { 
+                org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
+              }
+              break;
+            case 2: // TOKEN_NO
+              if (schemeField.type == org.apache.thrift.protocol.TType.I64) {
+                struct.tokenNo = iprot.readI64();
+                struct.setTokenNoIsSet(true);
+              } else { 
+                org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
+              }
+              break;
+            case 3: // TREE_ID
+              if (schemeField.type == org.apache.thrift.protocol.TType.I32) {
+                struct.treeId = iprot.readI32();
+                struct.setTreeIdIsSet(true);
+              } else { 
+                org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
+              }
+              break;
+            default:
+              org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
+          }
+          iprot.readFieldEnd();
+        }
+        iprot.readStructEnd();
+
+        // check for required fields of primitive type, which can't be checked in the validate method
+        struct.validate();
+      }
+
+      public void write(org.apache.thrift.protocol.TProtocol oprot, postRebuildHashTreeResponse_args struct) throws org.apache.thrift.TException {
+        struct.validate();
+
+        oprot.writeStructBegin(STRUCT_DESC);
+        if (struct.hostName != null) {
+          oprot.writeFieldBegin(HOST_NAME_FIELD_DESC);
+          oprot.writeString(struct.hostName);
+          oprot.writeFieldEnd();
+        }
+        oprot.writeFieldBegin(TOKEN_NO_FIELD_DESC);
+        oprot.writeI64(struct.tokenNo);
+        oprot.writeFieldEnd();
+        oprot.writeFieldBegin(TREE_ID_FIELD_DESC);
+        oprot.writeI32(struct.treeId);
+        oprot.writeFieldEnd();
+        oprot.writeFieldStop();
+        oprot.writeStructEnd();
+      }
+
+    }
+
+    private static class postRebuildHashTreeResponse_argsTupleSchemeFactory implements SchemeFactory {
+      public postRebuildHashTreeResponse_argsTupleScheme getScheme() {
+        return new postRebuildHashTreeResponse_argsTupleScheme();
+      }
+    }
+
+    private static class postRebuildHashTreeResponse_argsTupleScheme extends TupleScheme<postRebuildHashTreeResponse_args> {
+
+      @Override
+      public void write(org.apache.thrift.protocol.TProtocol prot, postRebuildHashTreeResponse_args struct) throws org.apache.thrift.TException {
+        TTupleProtocol oprot = (TTupleProtocol) prot;
+        BitSet optionals = new BitSet();
+        if (struct.isSetHostName()) {
+          optionals.set(0);
+        }
+        if (struct.isSetTokenNo()) {
+          optionals.set(1);
+        }
+        if (struct.isSetTreeId()) {
+          optionals.set(2);
+        }
+        oprot.writeBitSet(optionals, 3);
+        if (struct.isSetHostName()) {
+          oprot.writeString(struct.hostName);
+        }
+        if (struct.isSetTokenNo()) {
+          oprot.writeI64(struct.tokenNo);
+        }
+        if (struct.isSetTreeId()) {
+          oprot.writeI32(struct.treeId);
+        }
+      }
+
+      @Override
+      public void read(org.apache.thrift.protocol.TProtocol prot, postRebuildHashTreeResponse_args struct) throws org.apache.thrift.TException {
+        TTupleProtocol iprot = (TTupleProtocol) prot;
+        BitSet incoming = iprot.readBitSet(3);
+        if (incoming.get(0)) {
+          struct.hostName = iprot.readString();
+          struct.setHostNameIsSet(true);
+        }
+        if (incoming.get(1)) {
+          struct.tokenNo = iprot.readI64();
+          struct.setTokenNoIsSet(true);
+        }
+        if (incoming.get(2)) {
+          struct.treeId = iprot.readI32();
+          struct.setTreeIdIsSet(true);
+        }
       }
     }
 

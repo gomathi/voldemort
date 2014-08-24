@@ -25,8 +25,8 @@ import org.apache.log4j.Logger;
 
 import voldemort.annotations.concurrency.Threadsafe;
 import voldemort.hashtrees.HTOperation;
-import voldemort.hashtrees.HashTree;
 import voldemort.hashtrees.HashTreeImpl;
+import voldemort.hashtrees.HashTreeManager;
 import voldemort.utils.ByteArray;
 import voldemort.utils.Pair;
 
@@ -45,10 +45,10 @@ public class BGSegmentDataUpdater extends BGStoppableTask {
                                                                                                                    null);
 
     private final BlockingQueue<Pair<HTOperation, List<ByteBuffer>>> que = new ArrayBlockingQueue<Pair<HTOperation, List<ByteBuffer>>>(DEFAULT_QUE_SIZE);
-    private final HashTreeImpl hTreeImpl;
+    private final HashTreeManager hTreeManager;
 
-    public BGSegmentDataUpdater(final HashTree hTreeImpl) {
-        this.hTreeImpl = (HashTreeImpl) hTreeImpl;
+    public BGSegmentDataUpdater(final HashTreeManager hTreeManager) {
+        this.hTreeManager = hTreeManager;
     }
 
     public void enque(Pair<HTOperation, List<ByteBuffer>> data) {
@@ -80,10 +80,10 @@ public class BGSegmentDataUpdater extends BGStoppableTask {
                     Pair<HTOperation, List<ByteBuffer>> pair = que.take();
                     switch(pair.getFirst()) {
                         case PUT:
-                            hTreeImpl.putInternal(pair.getSecond().get(0), pair.getSecond().get(1));
+                            hTreeManager.hPut(pair.getSecond().get(0), pair.getSecond().get(1));
                             break;
                         case REMOVE:
-                            hTreeImpl.removeInternal(pair.getSecond().get(0));
+                            hTreeManager.hRemove(pair.getSecond().get(0));
                             break;
                         case STOP:
                             // no op

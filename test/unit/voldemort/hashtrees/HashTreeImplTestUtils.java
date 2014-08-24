@@ -135,7 +135,7 @@ public class HashTreeImplTestUtils {
                                           segIdPro,
                                           hTStorage,
                                           storage);
-        hTree.updateHashTrees(true);
+        hTree.rebuildHashTrees(true);
         return new HTreeComponents(hTStorage, storage, hTree);
     }
 
@@ -144,7 +144,7 @@ public class HashTreeImplTestUtils {
         StorageImplTest storage = new StorageImplTest();
         HashTree hTree = new HashTreeImpl(noOfSegments, treeIdProvider, hTStorage, storage);
         storage.setHashTree(hTree);
-        hTree.updateHashTrees(true);
+        hTree.rebuildHashTrees(true);
         return new HTreeComponents(hTStorage, storage, hTree);
     }
 

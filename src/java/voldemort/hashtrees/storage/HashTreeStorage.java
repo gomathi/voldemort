@@ -26,7 +26,7 @@ import voldemort.hashtrees.thrift.generated.SegmentHash;
  * Defines storage interface to be used by higher level HTree.
  * 
  */
-public interface HashTreeStorage {
+public interface HashTreeStorage extends VersionedDataStorage {
 
     /**
      * A segment data is the value inside a segment block.

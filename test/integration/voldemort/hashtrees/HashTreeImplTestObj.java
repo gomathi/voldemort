@@ -17,12 +17,12 @@ import voldemort.hashtrees.thrift.generated.SegmentHash;
 
 public class HashTreeImplTestObj extends HashTreeImpl {
 
-    private final BlockingQueue<HashTreeImplEvent> events;
+    private final BlockingQueue<HashTreeImplTestEvent> events;
 
     public HashTreeImplTestObj(final int noOfSegments,
                                final HashTreeStorage htStorage,
                                final Storage storage,
-                               BlockingQueue<HashTreeImplEvent> events) {
+                               BlockingQueue<HashTreeImplTestEvent> events) {
         super(noOfSegments, treeIdProvider, htStorage, storage);
         this.events = events;
     }
@@ -65,7 +65,7 @@ public class HashTreeImplTestObj extends HashTreeImpl {
     @Override
     public boolean isReadyForSynch(int treeId) {
         boolean result = super.isReadyForSynch(treeId);
-        events.add(HashTreeImplEvent.SYNCH_INITIATED);
+        events.add(HashTreeImplTestEvent.SYNCH_INITIATED);
         return result;
     }
 
@@ -87,32 +87,22 @@ public class HashTreeImplTestObj extends HashTreeImpl {
     @Override
     public boolean synch(int treeId, Iface remoteTree) throws TException {
         boolean result = super.synch(treeId, remoteTree);
-        events.add(HashTreeImplEvent.SYNCH);
+        events.add(HashTreeImplTestEvent.SYNCH);
         return result;
     }
 
     @Override
-    public void addTreeToSyncList(String hostName, int treeId) {
-        super.addTreeToSyncList(hostName, treeId);
+    public void rebuildHashTrees(boolean fullRebuild) {
+        super.rebuildHashTrees(fullRebuild);
     }
 
     @Override
-    public void removeTreeFromSyncList(String hostName, int treeId) {
-        super.removeTreeFromSyncList(hostName, treeId);
-    }
-
-    @Override
-    public void updateHashTrees(boolean fullRebuild) {
-        super.updateHashTrees(fullRebuild);
-    }
-
-    @Override
-    public void updateHashTree(int treeId, boolean fullRebuild) {
-        super.updateHashTree(treeId, fullRebuild);
+    public void rebuildHashTree(int treeId, boolean fullRebuild) {
+        super.rebuildHashTree(treeId, fullRebuild);
         if(!fullRebuild)
-            events.add(HashTreeImplEvent.UPDATE_SEGMENT);
+            events.add(HashTreeImplTestEvent.UPDATE_SEGMENT);
         else
-            events.add(HashTreeImplEvent.UPDATE_FULL_TREE);
+            events.add(HashTreeImplTestEvent.UPDATE_FULL_TREE);
     }
 
 }

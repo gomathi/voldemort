@@ -17,6 +17,7 @@ package voldemort.hashtrees.storage;
 
 import java.nio.ByteBuffer;
 import java.util.Collection;
+import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -24,6 +25,7 @@ import java.util.concurrent.ConcurrentMap;
 import voldemort.annotations.concurrency.Threadsafe;
 import voldemort.hashtrees.thrift.generated.SegmentData;
 import voldemort.hashtrees.thrift.generated.SegmentHash;
+import voldemort.utils.Pair;
 
 /**
  * In memory implementation of {@link HashTreeStorage} used only for unit
@@ -120,6 +122,21 @@ public class HashTreeStorageInMemory implements HashTreeStorage {
     @Override
     public long getLastHashTreeUpdatedTimestamp(int treeId) {
         return getIndHTree(treeId).getLastHashTreeUpdatedTimestamp();
+    }
+
+    @Override
+    public void putVersionedData(int treeId, ByteBuffer key, ByteBuffer value) {
+        getIndHTree(treeId).putVersionedData(key, value);
+    }
+
+    @Override
+    public Iterator<Pair<ByteBuffer, ByteBuffer>> getVersionedData(int treeId) {
+        return getIndHTree(treeId).getVersionedData();
+    }
+
+    @Override
+    public Iterator<Pair<ByteBuffer, ByteBuffer>> getVersionedData(int treeId, long versionNo) {
+        return getIndHTree(treeId).getVersionedData(versionNo);
     }
 
 }

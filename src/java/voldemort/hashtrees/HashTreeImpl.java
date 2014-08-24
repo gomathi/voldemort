@@ -39,9 +39,7 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
-import org.apache.log4j.Logger;
 import org.apache.thrift.TException;
-import org.apache.thrift.transport.TTransportException;
 
 import voldemort.annotations.concurrency.Threadsafe;
 import voldemort.hashtrees.storage.HashTreePersistentStorage;
@@ -49,14 +47,11 @@ import voldemort.hashtrees.storage.HashTreeStorage;
 import voldemort.hashtrees.storage.HashTreeStorageInMemory;
 import voldemort.hashtrees.storage.Storage;
 import voldemort.hashtrees.storage.StorageImpl;
-import voldemort.hashtrees.tasks.BGTasksManager;
 import voldemort.hashtrees.thrift.generated.HashTreeSyncInterface;
 import voldemort.hashtrees.thrift.generated.SegmentData;
 import voldemort.hashtrees.thrift.generated.SegmentHash;
-import voldemort.utils.ByteArray;
 import voldemort.utils.ByteUtils;
 import voldemort.utils.CollectionPeekingIterator;
-import voldemort.utils.Pair;
 
 /**
  * HashTree has segment blocks and segment trees.
@@ -77,15 +72,11 @@ import voldemort.utils.Pair;
  * {@link HashTreeStorageInMemory} provides in memory implementation of storing
  * entire tree and segments.
  * 
- * {@link #put(ByteArray, ByteArray)} and {@link #remove(ByteArray)} are non
- * blocking calls in order to avoid any latency issue to storage layer on every
- * update.
  * 
  */
 @Threadsafe
 public class HashTreeImpl implements HashTree {
 
-    private final static Logger LOG = Logger.getLogger(HashTreeImpl.class);
     private final static char COMMA_DELIMETER = ',';
     private final static char NEW_LINE_DELIMETER = '\n';
 
@@ -96,15 +87,11 @@ public class HashTreeImpl implements HashTree {
     private final int noOfChildren;
     private final int internalNodesCount;
     private final int segmentsCount;
-    private volatile long rebuildFullTreeTimeInterval;
 
     private final HashTreeStorage hTStorage;
     private final HashTreeIdProvider treeIdProvider;
     private final SegmentIdProvider segIdProvider;
     private final Storage storage;
-
-    private volatile boolean enabledBGTasks;
-    private volatile BGTasksManager bgTasksMgr;
 
     private final ConcurrentMap<Integer, ReentrantLock> treeLocks = new ConcurrentHashMap<Integer, ReentrantLock>();
 
@@ -122,7 +109,6 @@ public class HashTreeImpl implements HashTree {
         this.segIdProvider = segIdProvider;
         this.hTStorage = hTStroage;
         this.storage = storage;
-        this.rebuildFullTreeTimeInterval = BGTasksManager.DEFAULT_FULL_TREE_TIME_INTERVAL;
     }
 
     public HashTreeImpl(int noOfSegments, String dbDir) throws IOException {
@@ -147,35 +133,14 @@ public class HashTreeImpl implements HashTree {
 
     @Override
     public void hPut(final ByteBuffer key, final ByteBuffer value) {
-        if(enabledBGTasks) {
-            List<ByteBuffer> second = new ArrayList<ByteBuffer>(2);
-            second.add(key);
-            second.add(value);
-            bgTasksMgr.bgSegDataUpdater.enque(new Pair<HTOperation, List<ByteBuffer>>(HTOperation.PUT,
-                                                                                      second));
-        } else
-            putInternal(key, value);
-    }
-
-    @Override
-    public void hRemove(final ByteBuffer key) {
-        if(enabledBGTasks) {
-            List<ByteBuffer> second = new ArrayList<ByteBuffer>(1);
-            second.add(key);
-            bgTasksMgr.bgSegDataUpdater.enque(new Pair<HTOperation, List<ByteBuffer>>(HTOperation.REMOVE,
-                                                                                      second));
-        } else
-            removeInternal(key);
-    }
-
-    public void putInternal(final ByteBuffer key, final ByteBuffer value) {
         int segId = segIdProvider.getSegmentId(key);
         ByteBuffer digest = ByteBuffer.wrap(sha1(value.array()));
         hTStorage.putSegmentData(treeIdProvider.getTreeId(key), segId, key, digest);
         hTStorage.setDirtySegment(treeIdProvider.getTreeId(key), segId);
     }
 
-    public void removeInternal(final ByteBuffer key) {
+    @Override
+    public void hRemove(final ByteBuffer key) {
         int segId = segIdProvider.getSegmentId(key);
         hTStorage.deleteSegmentData(treeIdProvider.getTreeId(key), segId, key);
         hTStorage.setDirtySegment(treeIdProvider.getTreeId(key), segId);
@@ -184,11 +149,6 @@ public class HashTreeImpl implements HashTree {
     @Override
     public boolean synch(int treeId, final HashTreeSyncInterface.Iface remoteTree)
             throws TException {
-
-        if(!isReadyForSynch(treeId) || !remoteTree.isReadyForSynch(treeId)) {
-            LOG.info("HashTree has not been initialized. Not doing the sync. Skipping the task");
-            return false;
-        }
 
         Collection<Integer> leafNodesToCheck = new ArrayList<Integer>();
         Collection<Integer> missingNodesInRemote = new ArrayList<Integer>();
@@ -363,14 +323,14 @@ public class HashTreeImpl implements HashTree {
     }
 
     @Override
-    public void updateHashTrees(boolean fullRebuild) {
+    public void rebuildHashTrees(boolean fullRebuild) {
         List<Integer> treeIds = treeIdProvider.getAllTreeIds();
         for(int treeId: treeIds)
-            updateHashTree(treeId, fullRebuild);
+            rebuildHashTree(treeId, fullRebuild);
     }
 
     @Override
-    public void updateHashTree(int treeId, boolean fullRebuild) {
+    public void rebuildHashTree(int treeId, boolean fullRebuild) {
         boolean acquiredLock = fullRebuild ? acquireTreeLock(treeId, true)
                                           : acquireTreeLock(treeId, false);
         if(acquiredLock) {
@@ -404,18 +364,6 @@ public class HashTreeImpl implements HashTree {
     public void sRemove(final List<ByteBuffer> keys) {
         for(ByteBuffer key: keys)
             storage.remove(key);
-    }
-
-    @Override
-    public void addTreeToSyncList(String hostName, int treeId) {
-        if(enabledBGTasks)
-            bgTasksMgr.bgSyncTask.add(hostName, treeId);
-    }
-
-    @Override
-    public void removeTreeFromSyncList(String hostName, int treeId) {
-        if(enabledBGTasks)
-            bgTasksMgr.bgSyncTask.remove(hostName, treeId);
     }
 
     @Override
@@ -618,60 +566,8 @@ public class HashTreeImpl implements HashTree {
                                                            : 1);
     }
 
-    /**
-     * 
-     * @param serverPortNo
-     * @param noOfBGThreads for better throughput, the value should be a maximum
-     *        of 3x or greater than or equal to 2x. x is no of hash trees.
-     * @throws TTransportException
-     */
-    public void startBGTasks(int serverPortNo, int noOfBGThreads) throws TTransportException {
-        if(bgTasksMgr != null)
-            throw new IllegalStateException("Background tasks initiated already.");
-
-        bgTasksMgr = new BGTasksManager(this, treeIdProvider, serverPortNo, noOfBGThreads);
-        startBGTasks(bgTasksMgr);
-    }
-
-    // Used by unit test.
-    public void startBGTasks(final BGTasksManager bgTasksMgr) throws TTransportException {
-        this.bgTasksMgr = bgTasksMgr;
-        bgTasksMgr.startBackgroundTasks();
-        enabledBGTasks = true;
-        rebuildFullTreeTimeInterval = bgTasksMgr.getRebuildFullTreeTimeInterval();
-    }
-
-    public void shutdown() {
-        if(enabledBGTasks) {
-            bgTasksMgr.safeShutdown();
-        }
-    }
-
-    public void enableSync() {
-        if(enabledBGTasks)
-            this.bgTasksMgr.enableSynch();
-    }
-
-    public void disableSync() {
-        if(enabledBGTasks)
-            this.bgTasksMgr.disableSynch();
-    }
-
     @Override
-    public boolean isReadyForSynch(int treeId) {
-        long currentTs = System.currentTimeMillis();
-        long diff = currentTs - hTStorage.getLastFullyTreeReBuiltTimestamp(treeId);
-        return diff <= (2 * rebuildFullTreeTimeInterval);
-    }
-
-    @Override
-    public String ping() throws TException {
-        return "ping";
-    }
-
-    @Override
-    public void addTreeAndPortNoForSync(String hostName, int portNo) {
-        if(enabledBGTasks)
-            bgTasksMgr.bgSyncTask.addHostNameAndPortNo(hostName, portNo);
+    public long getLastFullyRebuiltTimeStamp(int treeId) {
+        return hTStorage.getLastFullyTreeReBuiltTimestamp(treeId);
     }
 }

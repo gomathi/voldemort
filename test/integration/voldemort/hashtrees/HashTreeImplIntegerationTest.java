@@ -23,10 +23,10 @@ import voldemort.hashtrees.tasks.BGTasksManager;
 
 public class HashTreeImplIntegerationTest {
 
-    private static void waitForTheEvent(BlockingQueue<HashTreeImplEvent> events,
-                                        HashTreeImplEvent expectedEvent,
+    private static void waitForTheEvent(BlockingQueue<HashTreeImplTestEvent> events,
+                                        HashTreeImplTestEvent expectedEvent,
                                         long maxWaitTime) throws InterruptedException {
-        HashTreeImplEvent event = null;
+        HashTreeImplTestEvent event = null;
         long cntr = System.currentTimeMillis();
         while(true) {
             event = events.poll(1000, TimeUnit.MILLISECONDS);
@@ -45,7 +45,7 @@ public class HashTreeImplIntegerationTest {
     @Test
     public void testSegmentUpdate() throws TTransportException, InterruptedException {
         HashTreeStorage htStorage = generateInMemoryStore(DEFAULT_SEG_DATA_BLOCKS_COUNT);
-        BlockingQueue<HashTreeImplEvent> events = new ArrayBlockingQueue<HashTreeImplEvent>(10);
+        BlockingQueue<HashTreeImplTestEvent> events = new ArrayBlockingQueue<HashTreeImplTestEvent>(10);
         Storage storage = new StorageImplTest();
         HashTreeImplTestObj hTree = new HashTreeImplTestObj(DEFAULT_SEG_DATA_BLOCKS_COUNT,
                                                             htStorage,
@@ -60,14 +60,14 @@ public class HashTreeImplIntegerationTest {
                                                     1000,
                                                     30000);
         hTree.startBGTasks(bgTasks);
-        waitForTheEvent(events, HashTreeImplEvent.UPDATE_SEGMENT, 10000);
+        waitForTheEvent(events, HashTreeImplTestEvent.UPDATE_SEGMENT, 10000);
         hTree.shutdown();
     }
 
     @Test
     public void testFullTreeUpdate() throws TTransportException, InterruptedException {
         HashTreeStorage htStorage = generateInMemoryStore(DEFAULT_SEG_DATA_BLOCKS_COUNT);
-        BlockingQueue<HashTreeImplEvent> events = new ArrayBlockingQueue<HashTreeImplEvent>(10);
+        BlockingQueue<HashTreeImplTestEvent> events = new ArrayBlockingQueue<HashTreeImplTestEvent>(10);
         Storage storage = new StorageImplTest();
         HashTreeImplTestObj hTree = new HashTreeImplTestObj(DEFAULT_SEG_DATA_BLOCKS_COUNT,
                                                             htStorage,
@@ -82,7 +82,7 @@ public class HashTreeImplIntegerationTest {
                                                     30000,
                                                     30000);
         hTree.startBGTasks(bgTasks);
-        waitForTheEvent(events, HashTreeImplEvent.UPDATE_FULL_TREE, 10000);
+        waitForTheEvent(events, HashTreeImplTestEvent.UPDATE_FULL_TREE, 10000);
         hTree.shutdown();
     }
 
@@ -90,8 +90,8 @@ public class HashTreeImplIntegerationTest {
     public void testSynch() throws TException, InterruptedException {
         HashTreeStorage localHTStorage = generateInMemoryStore(DEFAULT_SEG_DATA_BLOCKS_COUNT);
         HashTreeStorage remoteHTStorage = generateInMemoryStore(DEFAULT_SEG_DATA_BLOCKS_COUNT);
-        BlockingQueue<HashTreeImplEvent> localEvents = new ArrayBlockingQueue<HashTreeImplEvent>(10);
-        BlockingQueue<HashTreeImplEvent> remoteEvents = new ArrayBlockingQueue<HashTreeImplEvent>(10);
+        BlockingQueue<HashTreeImplTestEvent> localEvents = new ArrayBlockingQueue<HashTreeImplTestEvent>(10);
+        BlockingQueue<HashTreeImplTestEvent> remoteEvents = new ArrayBlockingQueue<HashTreeImplTestEvent>(10);
         Storage localStorage = new StorageImplTest();
         Storage remoteStorage = new StorageImplTest();
         HashTreeImplTestObj localHTree = new HashTreeImplTestObj(DEFAULT_SEG_DATA_BLOCKS_COUNT,
@@ -124,8 +124,8 @@ public class HashTreeImplIntegerationTest {
         localHTree.addTreeToSyncList("localhost", DEFAULT_TREE_ID);
 
         remoteHTree.startBGTasks(remoteBGTasks);
-        waitForTheEvent(localEvents, HashTreeImplEvent.SYNCH, 10000);
-        waitForTheEvent(remoteEvents, HashTreeImplEvent.SYNCH_INITIATED, 10000);
+        waitForTheEvent(localEvents, HashTreeImplTestEvent.SYNCH, 10000);
+        waitForTheEvent(remoteEvents, HashTreeImplTestEvent.SYNCH_INITIATED, 10000);
         localHTree.shutdown();
         remoteHTree.shutdown();
     }

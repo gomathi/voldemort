@@ -30,4 +30,9 @@ public class HashTreeIdProviderImpl implements HashTreeIdProvider {
         return null;
     }
 
+    @Override
+    public List<Integer> getAllPrimaryTreeIds() {
+        return null;
+    }
+
 }
