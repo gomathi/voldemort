@@ -104,12 +104,11 @@ public class HashTreePersistentStorage implements HashTreeStorage {
         while(true) {
             byte[] keyPrefix = new byte[1 + ByteUtils.SIZE_OF_INT];
             ByteBuffer keyPrefixBuf = ByteBuffer.wrap(keyPrefix);
-            prepareKeyPrefix(keyPrefixBuf, KEY_VERSIONED_DATA_PREFIX, treeId);
+            prepareKeyPrefix(keyPrefixBuf, KEY_VERSIONED_DATA_PREFIX, treeId + 1);
             DBIterator itr = dbObj.iterator();
             itr.seek(keyPrefix);
-            itr.seekToLast();
-            if(itr.hasNext()) {
-                byte[] key = itr.peekNext().getKey();
+            if(itr.hasPrev()) {
+                byte[] key = itr.peekPrev().getKey();
                 long versionNo = ByteUtils.readLong(key, keyPrefix.length);
                 treeIdsAndVersionNos.put(treeId, new AtomicLong(versionNo));
                 treeId++;
@@ -351,7 +350,7 @@ public class HashTreePersistentStorage implements HashTreeStorage {
         final byte[] seekKey = new byte[1 + ByteUtils.SIZE_OF_INT];
         ByteBuffer bb = ByteBuffer.wrap(seekKey);
         prepareKeyPrefix(bb, KEY_VERSIONED_DATA_PREFIX, treeId);
-        return getVersionedData(seekKey, seekKey);
+        return getVersionedData(bb.array(), bb.array());
     }
 
     @Override
@@ -367,7 +366,7 @@ public class HashTreePersistentStorage implements HashTreeStorage {
         seekKeyBB.putInt(treeId);
         seekKeyBB.putLong(versionNo);
 
-        return getVersionedData(seekKey, keyPrefix);
+        return getVersionedData(seekKeyBB.array(), keyPrefixBB.array());
     }
 
     private VersionedData getVersionedData(final byte[] rowKey) {
@@ -393,7 +392,6 @@ public class HashTreePersistentStorage implements HashTreeStorage {
     private Iterator<VersionedData> getVersionedData(final byte[] startKey, final byte[] keyPrefix) {
         final DBIterator iterator = dbObj.iterator();
         iterator.seek(startKey);
-        iterator.seekToFirst();
 
         return new Iterator<VersionedData>() {
 

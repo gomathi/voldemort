@@ -41,13 +41,19 @@ public class HashTreePersistentStorageTest {
 
     private String dbDir;
     private int defaultTreeId = 1;
+    private int versionedTreeId = 5;
     private int defaultSegId = 0;
+    private int noOfSegDataBlocks = 1024;
     private HashTreePersistentStorage dbObj;
 
     @Before
     public void init() throws Exception {
         dbDir = "/tmp/random" + new Random().nextInt();
-        dbObj = new HashTreePersistentStorage(dbDir, 1024);
+        dbObj = new HashTreePersistentStorage(dbDir, noOfSegDataBlocks);
+    }
+
+    public void init(String dbDirName) throws Exception {
+        dbObj = new HashTreePersistentStorage(dbDirName, noOfSegDataBlocks);
     }
 
     @After
@@ -163,22 +169,51 @@ public class HashTreePersistentStorageTest {
     }
 
     @Test
-    public void testVersionedData() {
-        int treeId = 5;
-        ByteBuffer value = null;
-
+    public void testVersionedData() throws Exception {
         List<Pair<ByteBuffer, ByteBuffer>> expected = generateRandomKeyValueList(10);
         expected.addAll(generateRandomKeyList(10));
         Collections.shuffle(expected);
 
+        writeData(expected);
+        Iterator<VersionedData> itr = dbObj.getVersionedData(versionedTreeId);
+        List<Pair<ByteBuffer, ByteBuffer>> actual = readData(itr);
+        validate(expected, actual);
+
+        writeData(expected);
+        long versionNo = expected.size() + 1;
+        itr = dbObj.getVersionedData(versionedTreeId, versionNo);
+        actual = readData(itr);
+        validate(expected, actual);
+
+        dbObj.close();
+        init(dbDir);
+
+        versionNo = expected.size() + 1;
+        dbObj.putVersionedDataToAdditionList(versionedTreeId,
+                                             HashTreeImplTestUtils.randomByteBuffer(),
+                                             HashTreeImplTestUtils.randomByteBuffer());
+
+        itr = dbObj.getVersionedData(versionedTreeId, versionNo);
+        Assert.assertTrue(itr.hasNext());
+        VersionedData vData = itr.next();
+        Assert.assertEquals(versionNo, vData.getVersionNo());
+
+        dbObj.deleteTree(versionedTreeId);
+    }
+
+    private void writeData(List<Pair<ByteBuffer, ByteBuffer>> expected) {
         for(Pair<ByteBuffer, ByteBuffer> pair: expected) {
             if(pair.getSecond() == null)
-                dbObj.putVersionedDataToRemovalList(treeId, pair.getFirst());
+                dbObj.putVersionedDataToRemovalList(versionedTreeId, pair.getFirst());
             else
-                dbObj.putVersionedDataToAdditionList(treeId, pair.getFirst(), pair.getSecond());
+                dbObj.putVersionedDataToAdditionList(versionedTreeId,
+                                                     pair.getFirst(),
+                                                     pair.getSecond());
         }
+    }
 
-        Iterator<VersionedData> itr = dbObj.getVersionedData(treeId);
+    private List<Pair<ByteBuffer, ByteBuffer>> readData(Iterator<VersionedData> itr) {
+        ByteBuffer value = null;
         List<Pair<ByteBuffer, ByteBuffer>> actual = new ArrayList<Pair<ByteBuffer, ByteBuffer>>();
         while(itr.hasNext()) {
             VersionedData vData = itr.next();
@@ -187,8 +222,7 @@ public class HashTreePersistentStorageTest {
             else
                 actual.add(Pair.create(vData.key, value));
         }
-
-        validate(expected, actual);
+        return actual;
     }
 
     private void validate(List<Pair<ByteBuffer, ByteBuffer>> expected,
