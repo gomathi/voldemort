@@ -21,7 +21,7 @@ import junit.framework.Assert;
 
 import org.junit.Test;
 
-import voldemort.hashtrees.tasks.BGStoppableTask;
+import voldemort.hashtrees.synch.BGStoppableTask;
 
 public class BGStoppableTaskTest {
 

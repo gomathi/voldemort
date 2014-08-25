@@ -31,7 +31,7 @@ import org.junit.Before;
 import org.junit.Test;
 
 import scala.actors.threadpool.Arrays;
-import voldemort.hashtrees.storage.HashTreePersistentStorage;
+import voldemort.hashtrees.storage.HTPersistentStorage;
 import voldemort.hashtrees.thrift.generated.SegmentData;
 import voldemort.hashtrees.thrift.generated.SegmentHash;
 import voldemort.hashtrees.thrift.generated.VersionedData;
@@ -44,16 +44,16 @@ public class HashTreePersistentStorageTest {
     private int versionedTreeId = 5;
     private int defaultSegId = 0;
     private int noOfSegDataBlocks = 1024;
-    private HashTreePersistentStorage dbObj;
+    private HTPersistentStorage dbObj;
 
     @Before
     public void init() throws Exception {
         dbDir = "/tmp/random" + new Random().nextInt();
-        dbObj = new HashTreePersistentStorage(dbDir, noOfSegDataBlocks);
+        dbObj = new HTPersistentStorage(dbDir, noOfSegDataBlocks);
     }
 
     public void init(String dbDirName) throws Exception {
-        dbObj = new HashTreePersistentStorage(dbDirName, noOfSegDataBlocks);
+        dbObj = new HTPersistentStorage(dbDirName, noOfSegDataBlocks);
     }
 
     @After

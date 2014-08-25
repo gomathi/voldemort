@@ -13,7 +13,7 @@
  * License for the specific language governing permissions and limitations under
  * the License.
  */
-package voldemort.hashtrees.tasks;
+package voldemort.hashtrees.synch;
 
 import org.apache.log4j.Logger;
 import org.apache.thrift.server.TServer;
@@ -22,9 +22,7 @@ import org.apache.thrift.transport.TServerSocket;
 import org.apache.thrift.transport.TTransportException;
 
 import voldemort.annotations.concurrency.Threadsafe;
-import voldemort.hashtrees.HashTree;
-import voldemort.hashtrees.HashTreeManager;
-import voldemort.hashtrees.HashTreeServer;
+import voldemort.hashtrees.core.HashTree;
 import voldemort.hashtrees.thrift.generated.HashTreeSyncInterface;
 import voldemort.hashtrees.thrift.generated.HashTreeSyncInterface.Iface;
 
@@ -37,19 +35,28 @@ import voldemort.hashtrees.thrift.generated.HashTreeSyncInterface.Iface;
 public class BGHashTreeServer extends BGStoppableTask {
 
     private final static Logger LOG = Logger.getLogger(BGHashTreeServer.class);
-    private final TServer server;
+    private volatile TServer server;
+    private final HashTree localHashTree;
+    private final HTSyncManagerImpl hTreeMgr;
+    private final int serverPortNo;
 
     public BGHashTreeServer(final HashTree localHashTree,
-                            final HashTreeManager hashTreeMgr,
-                            final int serverPortNo) throws TTransportException {
-        this.server = createServer(serverPortNo, new HashTreeServer(localHashTree, hashTreeMgr));
+                            final HTSyncManagerImpl hashTreeMgr,
+                            final int serverPortNo) {
+        this.localHashTree = localHashTree;
+        this.hTreeMgr = hashTreeMgr;
+        this.serverPortNo = serverPortNo;
     }
 
     @Override
     public void run() {
-        if(server.isServing())
+        if(server != null && server.isServing())
             return;
-        startServer();
+        try {
+            startServer();
+        } catch(TTransportException e) {
+            LOG.error("Exception occurred while starting server.", e);
+        }
     }
 
     @Override
@@ -59,7 +66,7 @@ public class BGHashTreeServer extends BGStoppableTask {
         super.stop();
     }
 
-    private static TServer createServer(int serverPortNo, HashTreeServer hashTreeServer)
+    private static TServer createServer(int serverPortNo, HTServer hashTreeServer)
             throws TTransportException {
         TServerSocket serverTransport = new TServerSocket(serverPortNo);
         HashTreeSyncInterface.Processor<Iface> processor = new HashTreeSyncInterface.Processor<HashTreeSyncInterface.Iface>(hashTreeServer);
@@ -67,7 +74,9 @@ public class BGHashTreeServer extends BGStoppableTask {
         return server;
     }
 
-    private void startServer() {
+    private void startServer() throws TTransportException {
+        if(server == null)
+            this.server = createServer(serverPortNo, new HTServer(localHashTree, hTreeMgr));
         server.serve();
         LOG.info("Hash tree server has started.");
     }

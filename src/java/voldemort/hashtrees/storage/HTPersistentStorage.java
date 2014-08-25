@@ -55,9 +55,9 @@ import voldemort.utils.ByteUtils;
  * 
  */
 
-public class HashTreePersistentStorage implements HashTreeStorage {
+public class HTPersistentStorage implements HashTreeStorage {
 
-    private static final Logger LOG = Logger.getLogger(HashTreePersistentStorage.class);
+    private static final Logger LOG = Logger.getLogger(HTPersistentStorage.class);
 
     private static final byte[] KEY_LAST_FULLY_TREE_BUILT_TS = "ltfbTs".getBytes();
     private static final byte[] KEY_LAST_TREE_BUILT_TS = "ltbTs".getBytes();
@@ -79,7 +79,7 @@ public class HashTreePersistentStorage implements HashTreeStorage {
     private final ConcurrentMap<Integer, AtomicLong> treeIdsAndVersionNos = new ConcurrentHashMap<Integer, AtomicLong>();
     private final ConcurrentMap<Integer, AtomicBitSet> treeIdAndDirtySegmentMap = new ConcurrentHashMap<Integer, AtomicBitSet>();
 
-    public HashTreePersistentStorage(String dbDir, int noOfSegDataBlocks) throws Exception {
+    public HTPersistentStorage(String dbDir, int noOfSegDataBlocks) throws Exception {
         this.dbObj = initDatabase(dbDir);
         this.noOfSegDataBlocks = noOfSegDataBlocks;
         loadTreeIdsAndVersionNos();
@@ -320,29 +320,38 @@ public class HashTreePersistentStorage implements HashTreeStorage {
     }
 
     @Override
-    public void putVersionedDataToAdditionList(int treeId, ByteBuffer key, ByteBuffer value) {
+    public VersionedData putVersionedDataToAdditionList(int treeId, ByteBuffer key, ByteBuffer value) {
         byte[] keyArr = key.array();
         byte[] fullKey = new byte[2 + ByteUtils.SIZE_OF_INT + ByteUtils.SIZE_OF_LONG
                                   + keyArr.length];
         ByteBuffer fullKeyBuffer = ByteBuffer.wrap(fullKey);
         prepareKeyPrefix(fullKeyBuffer, KEY_VERSIONED_DATA_PREFIX, treeId);
-        fullKeyBuffer.putLong(getNextVersionId(treeId));
+        long versionNo = getNextVersionId(treeId);
+        fullKeyBuffer.putLong(versionNo);
         fullKeyBuffer.put(ADDITION_MARKER);
         fullKeyBuffer.put(keyArr);
         dbObj.put(fullKeyBuffer.array(), value.array());
+
+        VersionedData vData = new VersionedData(versionNo, treeId, true, key);
+        vData.setValue(value);
+        return vData;
     }
 
     @Override
-    public void putVersionedDataToRemovalList(int treeId, ByteBuffer key) {
+    public VersionedData putVersionedDataToRemovalList(int treeId, ByteBuffer key) {
         byte[] keyArr = key.array();
         byte[] fullKey = new byte[2 + ByteUtils.SIZE_OF_INT + ByteUtils.SIZE_OF_LONG
                                   + keyArr.length];
         ByteBuffer fullKeyBuffer = ByteBuffer.wrap(fullKey);
         prepareKeyPrefix(fullKeyBuffer, KEY_VERSIONED_DATA_PREFIX, treeId);
-        fullKeyBuffer.putLong(getNextVersionId(treeId));
+        long versionNo = getNextVersionId(treeId);
+        fullKeyBuffer.putLong(versionNo);
         fullKeyBuffer.put(REMOVAL_MARKER);
         fullKeyBuffer.put(keyArr);
         dbObj.put(fullKeyBuffer.array(), DUMMY_ENTRY);
+
+        VersionedData vData = new VersionedData(versionNo, treeId, true, key);
+        return vData;
     }
 
     @Override
@@ -399,7 +408,8 @@ public class HashTreePersistentStorage implements HashTreeStorage {
 
             @Override
             public boolean hasNext() {
-                load();
+                if(queue.size() == 0)
+                    load();
                 return queue.size() > 0;
             }
 

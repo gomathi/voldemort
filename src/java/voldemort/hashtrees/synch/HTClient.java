@@ -1,4 +1,4 @@
-package voldemort.hashtrees;
+package voldemort.hashtrees.synch;
 
 import java.nio.ByteBuffer;
 import java.util.List;
@@ -6,6 +6,7 @@ import java.util.Map;
 
 import org.apache.thrift.TException;
 
+import voldemort.hashtrees.core.HashTree;
 import voldemort.hashtrees.thrift.generated.HashTreeSyncInterface;
 import voldemort.hashtrees.thrift.generated.SegmentData;
 import voldemort.hashtrees.thrift.generated.SegmentHash;
@@ -16,11 +17,11 @@ import voldemort.hashtrees.thrift.generated.SegmentHash;
  * remote tree.
  * 
  */
-public class HashTreeClient implements HashTree {
+public class HTClient implements HashTree {
 
     private final HashTreeSyncInterface.Iface remoteTree;
 
-    public HashTreeClient(final HashTreeSyncInterface.Iface remoteTree) {
+    public HTClient(final HashTreeSyncInterface.Iface remoteTree) {
         this.remoteTree = remoteTree;
     }
 
@@ -86,6 +87,31 @@ public class HashTreeClient implements HashTree {
 
     @Override
     public long getLastFullyRebuiltTimeStamp(int treeId) {
+        throw new UnsupportedOperationException("Remote tree does not support this operation.");
+    }
+
+    @Override
+    public void enableNonblockingOperations() {
+        throw new UnsupportedOperationException("Remote tree does not support this operation.");
+    }
+
+    @Override
+    public void disableNonblockingOperations() {
+        throw new UnsupportedOperationException("Remote tree does not support this operation.");
+    }
+
+    @Override
+    public void stop() {
+        throw new UnsupportedOperationException("Remote tree does not support this operation.");
+    }
+
+    @Override
+    public void enableStoringVersionedData() {
+        throw new UnsupportedOperationException("Remote tree does not support this operation.");
+    }
+
+    @Override
+    public void disableStoringVersionedData() {
         throw new UnsupportedOperationException("Remote tree does not support this operation.");
     }
 

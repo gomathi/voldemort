@@ -8,9 +8,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 
-import voldemort.hashtrees.storage.HashTreePersistentStorage;
+import voldemort.hashtrees.core.HashTree;
+import voldemort.hashtrees.core.HashTreeIdProvider;
+import voldemort.hashtrees.core.HashTreeImpl;
+import voldemort.hashtrees.core.SegmentIdProvider;
+import voldemort.hashtrees.storage.HTPersistentStorage;
 import voldemort.hashtrees.storage.HashTreeStorage;
-import voldemort.hashtrees.storage.HashTreeStorageInMemory;
+import voldemort.hashtrees.storage.HTMemStorage;
 import voldemort.hashtrees.storage.Storage;
 import voldemort.utils.ByteUtils;
 import voldemort.utils.Pair;
@@ -154,11 +158,11 @@ public class HashTreeImplTestUtils {
     }
 
     public static HashTreeStorage generateInMemoryStore(int noOfSegDataBlocks) {
-        return new HashTreeStorageInMemory(noOfSegDataBlocks);
+        return new HTMemStorage(noOfSegDataBlocks);
     }
 
     private static HashTreeStorage generatePersistentStore(int noOfSegDataBlocks) throws Exception {
-        return new HashTreePersistentStorage(randomDirName(), noOfSegDataBlocks);
+        return new HTPersistentStorage(randomDirName(), noOfSegDataBlocks);
     }
 
     public static HashTreeStorage[] generateInMemoryAndPersistentStores(int noOfSegDataBlocks)

@@ -13,7 +13,7 @@
  * License for the specific language governing permissions and limitations under
  * the License.
  */
-package voldemort.hashtrees;
+package voldemort.hashtrees.core;
 
 /**
  * Used to tag type of operation when the input is fed into the non blocking
@@ -22,6 +22,5 @@ package voldemort.hashtrees;
  */
 public enum HTOperation {
     PUT,
-    REMOVE,
-    STOP
+    REMOVE
 }

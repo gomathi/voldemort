@@ -7,11 +7,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.BlockingQueue;
 
-import org.apache.thrift.TException;
-
+import voldemort.hashtrees.core.HashTree;
+import voldemort.hashtrees.core.HashTreeImpl;
 import voldemort.hashtrees.storage.HashTreeStorage;
 import voldemort.hashtrees.storage.Storage;
-import voldemort.hashtrees.thrift.generated.HashTreeSyncInterface.Iface;
 import voldemort.hashtrees.thrift.generated.SegmentData;
 import voldemort.hashtrees.thrift.generated.SegmentHash;
 
@@ -28,17 +27,12 @@ public class HashTreeImplTestObj extends HashTreeImpl {
     }
 
     @Override
-    public String ping() throws TException {
-        return super.ping();
-    }
-
-    @Override
-    public void sPut(Map<ByteBuffer, ByteBuffer> keyValuePairs) {
+    public void sPut(Map<ByteBuffer, ByteBuffer> keyValuePairs) throws Exception {
         super.sPut(keyValuePairs);
     }
 
     @Override
-    public void sRemove(List<ByteBuffer> keys) {
+    public void sRemove(List<ByteBuffer> keys) throws Exception {
         super.sRemove(keys);
     }
 
@@ -63,14 +57,7 @@ public class HashTreeImplTestObj extends HashTreeImpl {
     }
 
     @Override
-    public boolean isReadyForSynch(int treeId) {
-        boolean result = super.isReadyForSynch(treeId);
-        events.add(HashTreeImplTestEvent.SYNCH_INITIATED);
-        return result;
-    }
-
-    @Override
-    public void deleteTreeNodes(int treeId, List<Integer> nodeIds) {
+    public void deleteTreeNodes(int treeId, List<Integer> nodeIds) throws Exception {
         super.deleteTreeNodes(treeId, nodeIds);
     }
 
@@ -85,7 +72,7 @@ public class HashTreeImplTestObj extends HashTreeImpl {
     }
 
     @Override
-    public boolean synch(int treeId, Iface remoteTree) throws TException {
+    public boolean synch(int treeId, HashTree remoteTree) throws Exception {
         boolean result = super.synch(treeId, remoteTree);
         events.add(HashTreeImplTestEvent.SYNCH);
         return result;

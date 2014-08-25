@@ -39,7 +39,7 @@ import voldemort.utils.AtomicBitSet;
  * 
  */
 @Threadsafe
-class IndHashTreeStorageInMemory {
+class IHTMemStorage {
 
     private final ConcurrentMap<Integer, ByteBuffer> segmentHashes = new ConcurrentSkipListMap<Integer, ByteBuffer>();
     private final ConcurrentMap<Integer, ConcurrentSkipListMap<ByteBuffer, ByteBuffer>> segDataBlocks = new ConcurrentHashMap<Integer, ConcurrentSkipListMap<ByteBuffer, ByteBuffer>>();
@@ -50,7 +50,7 @@ class IndHashTreeStorageInMemory {
     private final AtomicLong versionNo = new AtomicLong();
     private final int treeId;
 
-    public IndHashTreeStorageInMemory(int treeId, int noOfSegDataBlocks) {
+    public IHTMemStorage(int treeId, int noOfSegDataBlocks) {
         this.dirtySegments = new AtomicBitSet(noOfSegDataBlocks);
         this.treeId = treeId;
     }
@@ -147,15 +147,17 @@ class IndHashTreeStorageInMemory {
         return rebuiltTreeTs.get();
     }
 
-    public void putVersionedDataAddition(ByteBuffer key, ByteBuffer value) {
+    public VersionedData putVersionedDataAddition(ByteBuffer key, ByteBuffer value) {
         VersionedData vData = new VersionedData(versionNo.incrementAndGet(), treeId, true, key);
         vData.setValue(value);
         versionedData.put(vData.getVersionNo(), vData);
+        return vData;
     }
 
-    public void putVersionedDataRemoval(ByteBuffer key) {
+    public VersionedData putVersionedDataRemoval(ByteBuffer key) {
         VersionedData vData = new VersionedData(versionNo.incrementAndGet(), treeId, false, key);
         versionedData.put(vData.getVersionNo(), vData);
+        return vData;
     }
 
     public Iterator<VersionedData> getVersionedData() {

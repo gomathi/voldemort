@@ -13,10 +13,8 @@
  * License for the specific language governing permissions and limitations under
  * the License.
  */
-package voldemort.hashtrees;
+package voldemort.hashtrees.synch;
 
-import java.nio.ByteBuffer;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -27,8 +25,9 @@ import org.apache.log4j.Logger;
 import org.apache.thrift.TException;
 import org.apache.thrift.transport.TTransportException;
 
-import voldemort.hashtrees.storage.HashTreeStorage;
-import voldemort.hashtrees.tasks.BGTasksManager;
+import voldemort.hashtrees.core.HashTree;
+import voldemort.hashtrees.core.HashTreeIdProvider;
+import voldemort.hashtrees.core.HashTreeImpl;
 import voldemort.hashtrees.thrift.generated.HashTreeSyncInterface;
 import voldemort.utils.Pair;
 import voldemort.utils.Triple;
@@ -51,8 +50,12 @@ import voldemort.utils.Triple;
  * 
  * At any point time, the manager can be asked to shutdown, by requesting stop.
  * 
+ * {@link HashTreeImpl} is a standalone class, it does not do automatically
+ * build segments or any additional synch functionalities, this class provides
+ * provides those functions.
+ * 
  */
-public class HashTreeManager implements Runnable, HashTreeLocalSyncManager {
+public class HTSyncManagerImpl implements Runnable, HTSyncManager {
 
     private enum STATE {
         START,
@@ -60,7 +63,7 @@ public class HashTreeManager implements Runnable, HashTreeLocalSyncManager {
         SYNCH
     }
 
-    private final static Logger LOG = Logger.getLogger(HashTreeManager.class);
+    private final static Logger LOG = Logger.getLogger(HTSyncManagerImpl.class);
     // Expected time interval between two consecutive tree full rebuilds.
     public final static long DEFAULT_FULL_TREE_TIME_INTERVAL = 30 * 60 * 1000;
     // If local hash tree do not receive rebuilt confirmation from remote node,
@@ -71,9 +74,8 @@ public class HashTreeManager implements Runnable, HashTreeLocalSyncManager {
     private final long rebuildFullTreeTimeInterval;
     private final HashTree hashTree;
     private final HashTreeIdProvider treeIdProvider;
-    private final HashTreeStorage htStorage;
     private final String thisHostName;
-    private final boolean enableVersionedData;
+    private final int serverPortNo;
 
     private final ConcurrentMap<String, Integer> hostNameAndRemotePortNo = new ConcurrentHashMap<String, Integer>();
     private final ConcurrentMap<String, HashTreeSyncInterface.Iface> hostNameAndRemoteHTrees = new ConcurrentHashMap<String, HashTreeSyncInterface.Iface>();
@@ -84,34 +86,26 @@ public class HashTreeManager implements Runnable, HashTreeLocalSyncManager {
     private final ConcurrentHashMap<Triple<String, Integer, Long>, Boolean> expRebuiltConfirmMap = new ConcurrentHashMap<Triple<String, Integer, Long>, Boolean>();
 
     private volatile STATE currState = STATE.START;
-    private volatile boolean enabledBGTasks;
-    private volatile BGTasksManager bgTasksMgr;
+    private volatile boolean bgTasksEnabled;
+    private volatile BGHashTreeServer bgHTServer;
 
-    public HashTreeManager(String thisHostName,
-                           HashTree hashTree,
-                           HashTreeIdProvider treeIdProvider,
-                           HashTreeStorage htStorage,
-                           boolean enableVersionedData) {
-        this(thisHostName,
-             DEFAULT_FULL_TREE_TIME_INTERVAL,
-             hashTree,
-             treeIdProvider,
-             htStorage,
-             enableVersionedData);
+    public HTSyncManagerImpl(String thisHostName,
+                             HashTree hashTree,
+                             HashTreeIdProvider treeIdProvider,
+                             int serverPortNo) {
+        this(thisHostName, DEFAULT_FULL_TREE_TIME_INTERVAL, hashTree, treeIdProvider, serverPortNo);
     }
 
-    public HashTreeManager(String hostName,
-                           long rebuildFullTreeTimeInterval,
-                           HashTree hashTree,
-                           HashTreeIdProvider treeIdProvider,
-                           HashTreeStorage htStorage,
-                           boolean enableVersionedData) {
+    public HTSyncManagerImpl(String hostName,
+                             long rebuildFullTreeTimeInterval,
+                             HashTree hashTree,
+                             HashTreeIdProvider treeIdProvider,
+                             int serverPortNo) {
         this.thisHostName = hostName;
         this.rebuildFullTreeTimeInterval = rebuildFullTreeTimeInterval;
         this.hashTree = hashTree;
         this.treeIdProvider = treeIdProvider;
-        this.htStorage = htStorage;
-        this.enableVersionedData = enableVersionedData;
+        this.serverPortNo = serverPortNo;
     }
 
     private STATE getNextState(STATE currState) {
@@ -131,7 +125,7 @@ public class HashTreeManager implements Runnable, HashTreeLocalSyncManager {
         currState = getNextState(currState);
         switch(getNextState(currState)) {
             case REBUILD:
-                rebuild();
+                rebuildAllLocallyManagedTrees();
                 break;
             case SYNCH:
                 synch();
@@ -153,7 +147,8 @@ public class HashTreeManager implements Runnable, HashTreeLocalSyncManager {
         }
     }
 
-    public void rebuild(long tokenNo, int treeId, long expFullRebuildTimeInt) throws Exception {
+    public void onRebuildHashTreeRequest(long tokenNo, int treeId, long expFullRebuildTimeInt)
+            throws Exception {
         boolean fullRebuild = (System.currentTimeMillis() - hashTree.getLastFullyRebuiltTimeStamp(treeId)) > expFullRebuildTimeInt ? true
                                                                                                                                   : false;
         hashTree.rebuildHashTree(treeId, fullRebuild);
@@ -161,7 +156,7 @@ public class HashTreeManager implements Runnable, HashTreeLocalSyncManager {
         client.postRebuildHashTreeResponse(thisHostName, tokenNo, treeId);
     }
 
-    private void rebuild() {
+    private void rebuildAllLocallyManagedTrees() {
         List<Integer> treeIds = treeIdProvider.getAllPrimaryTreeIds();
         for(int treeId: treeIds) {
             expRebuiltConfirmMap.remove(treeId);
@@ -243,7 +238,7 @@ public class HashTreeManager implements Runnable, HashTreeLocalSyncManager {
         try {
             Pair<String, Integer> hostNameAndTreeId = Pair.create(hostName, treeId);
             LOG.info("Syncing " + hostNameAndTreeId);
-            HashTree remoteTree = new HashTreeClient(getHashTreeClient(hostName));
+            HashTree remoteTree = new HTClient(getHashTreeClient(hostName));
             hashTree.synch(treeId, remoteTree);
             LOG.info("Syncing " + hostNameAndTreeId + " complete.");
         } catch(TException e) {
@@ -257,9 +252,9 @@ public class HashTreeManager implements Runnable, HashTreeLocalSyncManager {
         if(!hostNameAndRemoteHTrees.containsKey(hostName)) {
             Integer portNoObj = hostNameAndRemotePortNo.get(hostName);
             hostNameAndRemoteHTrees.putIfAbsent(hostName,
-                                                portNoObj == null ? HashTreeClientGenerator.getRemoteHashTreeClient(hostName)
-                                                                 : HashTreeClientGenerator.getRemoteHashTreeClient(hostName,
-                                                                                                                   portNoObj));
+                                                portNoObj == null ? HTClientProvider.getRemoteHashTreeClient(hostName)
+                                                                 : HTClientProvider.getRemoteHashTreeClient(hostName,
+                                                                                                            portNoObj));
         }
         return hostNameAndRemoteHTrees.get(hostName);
     }
@@ -284,60 +279,22 @@ public class HashTreeManager implements Runnable, HashTreeLocalSyncManager {
                   + " has been removed from sync list.");
     }
 
-    /**
-     * 
-     * @param serverPortNo
-     * @param noOfBGThreads for better throughput, the value should be a maximum
-     *        of 3x or greater than or equal to 2x. x is no of hash trees.
-     * @throws TTransportException
-     */
-    public void startBGTasks(int serverPortNo) throws TTransportException {
-        if(bgTasksMgr != null)
-            throw new IllegalStateException("Background tasks initiated already.");
-
-        bgTasksMgr = new BGTasksManager(hashTree, this, serverPortNo);
-        startBGTasks(bgTasksMgr);
-    }
-
-    // Used by unit test.
-    public void startBGTasks(final BGTasksManager bgTasksMgr) {
-        this.bgTasksMgr = bgTasksMgr;
-        bgTasksMgr.startBackgroundTasks();
-        enabledBGTasks = true;
-    }
-
-    public void shutdown() {
-        if(enabledBGTasks) {
-            bgTasksMgr.safeShutdown();
+    public void start() {
+        if(bgTasksEnabled) {
+            LOG.warn("Background tasks already started. Skipping.");
+            return;
         }
+
+        if(bgHTServer == null)
+            bgHTServer = new BGHashTreeServer(hashTree, this, serverPortNo);
+        new Thread(bgHTServer).start();
+        new Thread(this).start();
     }
 
-    public void hPut(final ByteBuffer key, final ByteBuffer value) {
-        List<ByteBuffer> second = new ArrayList<ByteBuffer>(2);
-        second.add(key);
-        second.add(value);
-        bgTasksMgr.bgSegDataUpdater.enque(new Pair<HTOperation, List<ByteBuffer>>(HTOperation.PUT,
-                                                                                  second));
-    }
-
-    public void hRemove(final ByteBuffer key) {
-        List<ByteBuffer> second = new ArrayList<ByteBuffer>(1);
-        second.add(key);
-        bgTasksMgr.bgSegDataUpdater.enque(new Pair<HTOperation, List<ByteBuffer>>(HTOperation.REMOVE,
-                                                                                  second));
-    }
-
-    public void hPut(List<ByteBuffer> input) throws Exception {
-        hashTree.hPut(input.get(0), input.get(1));
-        if(enableVersionedData)
-            htStorage.putVersionedDataToAdditionList(treeIdProvider.getTreeId(input.get(0)),
-                                               input.get(0),
-                                               input.get(1));
-    }
-
-    public void hRemove(List<ByteBuffer> input) throws Exception {
-        hashTree.hRemove(input.get(0));
-        if(enableVersionedData)
-            htStorage.putVersionedDataToRemovalList(treeIdProvider.getTreeId(input.get(0)), input.get(0));
+    public void stop() {
+        if(!bgTasksEnabled) {
+            LOG.warn("Background tasks already stopped. Skipping.");
+            return;
+        }
     }
 }

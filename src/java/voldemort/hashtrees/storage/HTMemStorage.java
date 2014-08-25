@@ -33,20 +33,18 @@ import voldemort.hashtrees.thrift.generated.VersionedData;
  * 
  */
 @Threadsafe
-public class HashTreeStorageInMemory implements HashTreeStorage {
+public class HTMemStorage implements HashTreeStorage {
 
     private final int noOfSegDataBlocks;
-    private final ConcurrentMap<Integer, IndHashTreeStorageInMemory> treeIdAndIndHashTree = new ConcurrentHashMap<Integer, IndHashTreeStorageInMemory>();
+    private final ConcurrentMap<Integer, IHTMemStorage> treeIdAndIndHashTree = new ConcurrentHashMap<Integer, IHTMemStorage>();
 
-    public HashTreeStorageInMemory(int noOfSegDataBlocks) {
+    public HTMemStorage(int noOfSegDataBlocks) {
         this.noOfSegDataBlocks = noOfSegDataBlocks;
     }
 
-    private IndHashTreeStorageInMemory getIndHTree(int treeId) {
+    private IHTMemStorage getIndHTree(int treeId) {
         if(!treeIdAndIndHashTree.containsKey(treeId))
-            treeIdAndIndHashTree.putIfAbsent(treeId,
-                                             new IndHashTreeStorageInMemory(treeId,
-                                                                            noOfSegDataBlocks));
+            treeIdAndIndHashTree.putIfAbsent(treeId, new IHTMemStorage(treeId, noOfSegDataBlocks));
         return treeIdAndIndHashTree.get(treeId);
     }
 
@@ -136,13 +134,13 @@ public class HashTreeStorageInMemory implements HashTreeStorage {
     }
 
     @Override
-    public void putVersionedDataToAdditionList(int treeId, ByteBuffer key, ByteBuffer value) {
-        getIndHTree(treeId).putVersionedDataAddition(key, value);
+    public VersionedData putVersionedDataToAdditionList(int treeId, ByteBuffer key, ByteBuffer value) {
+        return getIndHTree(treeId).putVersionedDataAddition(key, value);
     }
 
     @Override
-    public void putVersionedDataToRemovalList(int treeId, ByteBuffer key) {
-        getIndHTree(treeId).putVersionedDataRemoval(key);
+    public VersionedData putVersionedDataToRemovalList(int treeId, ByteBuffer key) {
+        return getIndHTree(treeId).putVersionedDataRemoval(key);
     }
 
 }

@@ -13,7 +13,7 @@
  * License for the specific language governing permissions and limitations under
  * the License.
  */
-package voldemort.hashtrees;
+package voldemort.hashtrees.core;
 
 import static voldemort.utils.ByteUtils.sha1;
 import static voldemort.utils.TreeUtils.getImmediateChildren;
@@ -30,24 +30,31 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Observable;
 import java.util.Queue;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
+import org.mortbay.log.Log;
+
+import voldemort.annotations.concurrency.LockedBy;
 import voldemort.annotations.concurrency.Threadsafe;
-import voldemort.hashtrees.storage.HashTreePersistentStorage;
+import voldemort.hashtrees.storage.HTMemStorage;
+import voldemort.hashtrees.storage.HTPersistentStorage;
 import voldemort.hashtrees.storage.HashTreeStorage;
-import voldemort.hashtrees.storage.HashTreeStorageInMemory;
 import voldemort.hashtrees.storage.Storage;
 import voldemort.hashtrees.storage.StorageImpl;
 import voldemort.hashtrees.thrift.generated.SegmentData;
 import voldemort.hashtrees.thrift.generated.SegmentHash;
+import voldemort.hashtrees.thrift.generated.VersionedData;
 import voldemort.utils.ByteUtils;
 import voldemort.utils.CollectionPeekingIterator;
+import voldemort.utils.Pair;
 
 /**
  * HashTree has segment blocks and segment trees.
@@ -65,17 +72,16 @@ import voldemort.utils.CollectionPeekingIterator;
  * hash tree id.
  * 
  * Uses {@link HashTreeStorage} for storing tree and segments.
- * {@link HashTreeStorageInMemory} provides in memory implementation of storing
- * entire tree and segments.
+ * {@link HTMemStorage} provides in memory implementation of storing entire tree
+ * and segments.
  * 
  * 
  */
 @Threadsafe
-public class HashTreeImpl implements HashTree {
+public class HashTreeImpl extends Observable implements HashTree {
 
     private final static char COMMA_DELIMETER = ',';
     private final static char NEW_LINE_DELIMETER = '\n';
-
     private final static int ROOT_NODE = 0;
     private final static int MAX_NO_OF_BUCKETS = 1 << 30;
     private final static int BINARY_TREE = 2;
@@ -90,6 +96,15 @@ public class HashTreeImpl implements HashTree {
     private final Storage storage;
 
     private final ConcurrentMap<Integer, ReentrantLock> treeLocks = new ConcurrentHashMap<Integer, ReentrantLock>();
+
+    private final Object nonBlockingCallsLock = new Object();
+
+    @LockedBy("nonBlockingCallsLock")
+    private volatile boolean enabledNonBlockingCalls;
+    @LockedBy("nonBlockingCallsLock")
+    private volatile BGSegmentDataUpdater bgDataUpdater;
+
+    private volatile boolean enabledVersionedData;
 
     public HashTreeImpl(int noOfSegments,
                         final HashTreeIdProvider treeIdProvider,
@@ -111,7 +126,7 @@ public class HashTreeImpl implements HashTree {
         this(noOfSegments,
              new HashTreeIdProviderImpl(),
              new DefaultSegIdProviderImpl(noOfSegments),
-             new HashTreePersistentStorage(dbDir, noOfSegments),
+             new HTPersistentStorage(dbDir, noOfSegments),
              new StorageImpl());
     }
 
@@ -129,17 +144,51 @@ public class HashTreeImpl implements HashTree {
 
     @Override
     public void hPut(final ByteBuffer key, final ByteBuffer value) {
+        if(enabledNonBlockingCalls) {
+            List<ByteBuffer> input = new ArrayList<ByteBuffer>();
+            input.add(key);
+            input.add(value);
+            bgDataUpdater.enque(Pair.create(HTOperation.PUT, input));
+        } else
+            hPutInternal(key, value);
+    }
+
+    void hPutInternal(final ByteBuffer key, final ByteBuffer value) {
+        int treeId = treeIdProvider.getTreeId(key);
         int segId = segIdProvider.getSegmentId(key);
         ByteBuffer digest = ByteBuffer.wrap(sha1(value.array()));
-        hTStorage.putSegmentData(treeIdProvider.getTreeId(key), segId, key, digest);
-        hTStorage.setDirtySegment(treeIdProvider.getTreeId(key), segId);
+        hTStorage.putSegmentData(treeId, segId, key, digest);
+        hTStorage.setDirtySegment(treeId, segId);
+
+        if(enabledVersionedData) {
+            VersionedData vData = hTStorage.putVersionedDataToAdditionList(treeId, key, value);
+            setChanged();
+            notifyObservers(vData);
+        }
     }
 
     @Override
     public void hRemove(final ByteBuffer key) {
+        if(enabledNonBlockingCalls) {
+            List<ByteBuffer> input = new ArrayList<ByteBuffer>();
+            input.add(key);
+            bgDataUpdater.enque(Pair.create(HTOperation.REMOVE, input));
+        } else {
+            hRemoveInternal(key);
+        }
+    }
+
+    void hRemoveInternal(final ByteBuffer key) {
+        int treeId = treeIdProvider.getTreeId(key);
         int segId = segIdProvider.getSegmentId(key);
-        hTStorage.deleteSegmentData(treeIdProvider.getTreeId(key), segId, key);
-        hTStorage.setDirtySegment(treeIdProvider.getTreeId(key), segId);
+        hTStorage.deleteSegmentData(treeId, segId, key);
+        hTStorage.setDirtySegment(treeId, segId);
+
+        if(enabledVersionedData) {
+            VersionedData vData = hTStorage.putVersionedDataToRemovalList(treeId, key);
+            setChanged();
+            notifyObservers(vData);
+        }
     }
 
     @Override
@@ -561,5 +610,52 @@ public class HashTreeImpl implements HashTree {
     @Override
     public long getLastFullyRebuiltTimeStamp(int treeId) {
         return hTStorage.getLastFullyTreeReBuiltTimestamp(treeId);
+    }
+
+    @Override
+    public void enableNonblockingOperations() {
+        synchronized(nonBlockingCallsLock) {
+            if(enabledNonBlockingCalls) {
+                Log.info("Non blocking calls are already enabled.");
+                return;
+            }
+            if(bgDataUpdater == null)
+                bgDataUpdater = new BGSegmentDataUpdater(this);
+            new Thread(bgDataUpdater).start();
+            enabledNonBlockingCalls = true;
+        }
+    }
+
+    @Override
+    public void disableNonblockingOperations() {
+        synchronized(nonBlockingCallsLock) {
+            if(!enabledNonBlockingCalls) {
+                Log.info("Non blocking calls are already disabled.");
+                return;
+            }
+            CountDownLatch countDownLatch = new CountDownLatch(1);
+            bgDataUpdater.stop(countDownLatch);
+            try {
+                countDownLatch.await();
+            } catch(InterruptedException e) {
+                Log.warn("Exception occurred while waiting data updater to stop", e);
+            }
+            enabledNonBlockingCalls = false;
+        }
+    }
+
+    @Override
+    public void stop() {
+        disableNonblockingOperations();
+    }
+
+    @Override
+    public void enableStoringVersionedData() {
+        enabledVersionedData = true;
+    }
+
+    @Override
+    public void disableStoringVersionedData() {
+        enabledVersionedData = false;
     }
 }

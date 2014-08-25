@@ -35,8 +35,13 @@ import junit.framework.Assert;
 import org.junit.Test;
 
 import voldemort.hashtrees.HashTreeImplTestUtils.HTreeComponents;
+import voldemort.hashtrees.core.HashTree;
+import voldemort.hashtrees.core.HashTreeConstants;
+import voldemort.hashtrees.core.HashTreeImpl;
 import voldemort.hashtrees.storage.HashTreeStorage;
-import voldemort.hashtrees.tasks.BGHashTreeServer;
+import voldemort.hashtrees.synch.BGHashTreeServer;
+import voldemort.hashtrees.synch.HTClientProvider;
+import voldemort.hashtrees.synch.HTSyncManagerImpl;
 import voldemort.hashtrees.thrift.generated.SegmentData;
 import voldemort.hashtrees.thrift.generated.SegmentHash;
 import voldemort.utils.ByteUtils;
@@ -284,11 +289,9 @@ public class HashTreeImplTest {
 
         HTreeComponents localHTreeComp = createHashTree(DEFAULT_SEG_DATA_BLOCKS_COUNT, store);
         HTreeComponents remoteHTreeComp = createHashTree(DEFAULT_SEG_DATA_BLOCKS_COUNT, remoteStore);
-        HashTreeManager hTreeManager = new HashTreeManager("test",
+        HTSyncManagerImpl hTreeManager = new HTSyncManagerImpl("test",
                                                            remoteHTreeComp.hTree,
-                                                           treeIdProvider,
-                                                           remoteStore,
-                                                           false);
+                                                           treeIdProvider);
 
         BGHashTreeServer server = new BGHashTreeServer(remoteHTreeComp.hTree,
                                                        hTreeManager,
@@ -297,7 +300,7 @@ public class HashTreeImplTest {
 
         Thread.sleep(100);
 
-        HashTree thriftClient = HashTreeClientGenerator.getHashTreeClient("localhost");
+        HashTree thriftClient = HTClientProvider.getHashTreeClient("localhost");
 
         for(int i = 1; i <= DEFAULT_SEG_DATA_BLOCKS_COUNT; i++) {
             localHTreeComp.storage.put(randomByteBuffer(), randomByteBuffer());

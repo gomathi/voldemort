@@ -25,8 +25,9 @@ import java.util.concurrent.Future;
 import org.apache.log4j.Logger;
 
 import voldemort.annotations.concurrency.Threadsafe;
-import voldemort.hashtrees.HashTree;
-import voldemort.hashtrees.HashTreeIdProvider;
+import voldemort.hashtrees.core.HashTree;
+import voldemort.hashtrees.core.HashTreeIdProvider;
+import voldemort.hashtrees.synch.BGStoppableTask;
 import voldemort.utils.Pair;
 
 /**

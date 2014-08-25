@@ -13,12 +13,13 @@
  * License for the specific language governing permissions and limitations under
  * the License.
  */
-package voldemort.hashtrees;
+package voldemort.hashtrees.core;
 
 import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Map;
 
+import voldemort.hashtrees.storage.HashTreeStorage;
 import voldemort.hashtrees.thrift.generated.SegmentData;
 import voldemort.hashtrees.thrift.generated.SegmentHash;
 
@@ -151,4 +152,35 @@ public interface HashTree {
      * @return
      */
     long getLastFullyRebuiltTimeStamp(int treeId) throws Exception;
+
+    /**
+     * Enables non blocking puts and removes operations.
+     * 
+     */
+    void enableNonblockingOperations();
+
+    /**
+     * Disable non blocking puts and removes operations. By default hashtree
+     * runs with blocking operations on puts and removes.
+     */
+    void disableNonblockingOperations();
+
+    /**
+     * All versions of the data are stored in {@link HashTreeStorage}. This can
+     * be subscribed later to know all the changes that are happened to the
+     * system.
+     * 
+     */
+    void enableStoringVersionedData();
+
+    /**
+     * Disables storing the versioned data.
+     * 
+     */
+    void disableStoringVersionedData();
+
+    /**
+     * Stops all operations if there are any background jobs are running.
+     */
+    void stop();
 }

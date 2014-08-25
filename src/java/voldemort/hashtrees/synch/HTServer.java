@@ -1,4 +1,4 @@
-package voldemort.hashtrees;
+package voldemort.hashtrees.synch;
 
 import java.nio.ByteBuffer;
 import java.util.List;
@@ -6,6 +6,7 @@ import java.util.Map;
 
 import org.apache.thrift.TException;
 
+import voldemort.hashtrees.core.HashTree;
 import voldemort.hashtrees.thrift.generated.HashTreeSyncInterface;
 import voldemort.hashtrees.thrift.generated.SegmentData;
 import voldemort.hashtrees.thrift.generated.SegmentHash;
@@ -15,12 +16,12 @@ import voldemort.hashtrees.thrift.generated.SegmentHash;
  * {@link HashTreeSyncInterface.Iface}. This is used by Thrift server.
  * 
  */
-public class HashTreeServer implements HashTreeSyncInterface.Iface {
+public class HTServer implements HashTreeSyncInterface.Iface {
 
     private final HashTree hashTree;
-    private final HashTreeManager hashTreeManager;
+    private final HTSyncManagerImpl hashTreeManager;
 
-    public HashTreeServer(final HashTree hashTree, final HashTreeManager hashTreeManager) {
+    public HTServer(final HashTree hashTree, final HTSyncManagerImpl hashTreeManager) {
         this.hashTree = hashTree;
         this.hashTreeManager = hashTreeManager;
     }
@@ -97,7 +98,7 @@ public class HashTreeServer implements HashTreeSyncInterface.Iface {
     public void rebuildHashTree(long tokenNo, int treeId, long expFullRebuildTimeInt)
             throws TException {
         try {
-            hashTreeManager.rebuild(tokenNo, treeId, expFullRebuildTimeInt);
+            hashTreeManager.onRebuildHashTreeRequest(tokenNo, treeId, expFullRebuildTimeInt);
         } catch(Exception e) {
             throw new TException(e);
         }

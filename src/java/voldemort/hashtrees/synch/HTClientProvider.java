@@ -13,7 +13,7 @@
  * License for the specific language governing permissions and limitations under
  * the License.
  */
-package voldemort.hashtrees;
+package voldemort.hashtrees.synch;
 
 import org.apache.thrift.protocol.TBinaryProtocol;
 import org.apache.thrift.protocol.TProtocol;
@@ -21,6 +21,8 @@ import org.apache.thrift.transport.TSocket;
 import org.apache.thrift.transport.TTransport;
 import org.apache.thrift.transport.TTransportException;
 
+import voldemort.hashtrees.core.HashTree;
+import voldemort.hashtrees.core.HashTreeConstants;
 import voldemort.hashtrees.thrift.generated.HashTreeSyncInterface;
 
 /**
@@ -29,7 +31,7 @@ import voldemort.hashtrees.thrift.generated.HashTreeSyncInterface;
  * 
  */
 
-public class HashTreeClientGenerator {
+public class HTClientProvider {
 
     public static HashTreeSyncInterface.Iface getRemoteHashTreeClient(String serverName, int portNo)
             throws TTransportException {
@@ -50,7 +52,7 @@ public class HashTreeClientGenerator {
         TTransport transport = new TSocket(serverName, portNo);
         transport.open();
         TProtocol protocol = new TBinaryProtocol(transport);
-        return new HashTreeClient(new HashTreeSyncInterface.Client(protocol));
+        return new HTClient(new HashTreeSyncInterface.Client(protocol));
     }
 
     public static HashTree getHashTreeClient(String serverName) throws TTransportException {

@@ -13,9 +13,9 @@
  * License for the specific language governing permissions and limitations under
  * the License.
  */
-package voldemort.hashtrees;
+package voldemort.hashtrees.synch;
 
-public interface HashTreeLocalSyncManager {
+public interface HTSyncManager {
 
     /**
      * Sets the remote hostname and port no.

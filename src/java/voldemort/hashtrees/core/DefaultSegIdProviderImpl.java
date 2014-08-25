@@ -1,4 +1,4 @@
-package voldemort.hashtrees;
+package voldemort.hashtrees.core;
 
 import java.nio.ByteBuffer;
 
