@@ -265,11 +265,6 @@ public class HashTreeSyncManagerImpl extends BGStoppableTask implements HashTree
 
     private void synch() {
         List<Integer> treeIds = treeIdProvider.getAllPrimaryTreeIds();
-        if(treeIds.size() == 0) {
-            LOG.info("There are no locally managed trees. So skipping synch operation.");
-            return;
-        }
-
         List<Pair<String, Integer>> hostNameAndTreeIdList = new ArrayList<Pair<String, Integer>>();
 
         for(int treeId: treeIds) {
@@ -313,6 +308,11 @@ public class HashTreeSyncManagerImpl extends BGStoppableTask implements HashTree
                     }
                 }
             }
+        }
+
+        if(hostNameAndTreeIdList.size() == 0) {
+            LOG.info("There is no synch required for any remote trees. Skipping this cycle.");
+            return;
         }
         LOG.info("Synching remote hash trees.");
         Collection<Callable<Void>> syncTasks = Collections2.transform(hostNameAndTreeIdList,

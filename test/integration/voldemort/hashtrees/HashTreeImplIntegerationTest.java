@@ -83,22 +83,25 @@ public class HashTreeImplIntegerationTest {
     }
 
     @Test
-    public void testSynch() throws InterruptedException {
+    public void testSynch() throws Exception {
         HashTreeStorage localHTStorage = generateInMemoryStore(DEFAULT_SEG_DATA_BLOCKS_COUNT);
         HashTreeStorage remoteHTStorage = generateInMemoryStore(DEFAULT_SEG_DATA_BLOCKS_COUNT);
         BlockingQueue<HashTreeImplTestEvent> localEvents = new ArrayBlockingQueue<HashTreeImplTestEvent>(1000);
         BlockingQueue<HashTreeImplTestEvent> remoteEvents = new ArrayBlockingQueue<HashTreeImplTestEvent>(1000);
-        Storage localStorage = new StorageImplTest();
-        Storage remoteStorage = new StorageImplTest();
+        StorageImplTest localStorage = new StorageImplTest();
         HashTreeImplTestObj localHTree = new HashTreeImplTestObj(DEFAULT_SEG_DATA_BLOCKS_COUNT,
                                                                  localHTStorage,
                                                                  localStorage,
                                                                  localEvents);
+        localStorage.setHashTree(localHTree);
+        StorageImplTest remoteStorage = new StorageImplTest();
         HashTreeImplTestObj remoteHTree = new HashTreeImplTestObj(DEFAULT_SEG_DATA_BLOCKS_COUNT,
                                                                   remoteHTStorage,
                                                                   remoteStorage,
                                                                   remoteEvents);
-
+        remoteStorage.setHashTree(remoteHTree);
+        localStorage.put(HashTreeImplTestUtils.randomByteBuffer(),
+                         HashTreeImplTestUtils.randomByteBuffer());
         HashTreeSyncManagerImpl localSyncManager = new HashTreeSyncManagerImpl(localHTree,
                                                                                treeIdProvider,
                                                                                "localhost",
@@ -120,7 +123,7 @@ public class HashTreeImplIntegerationTest {
         localSyncManager.init();
         remoteSyncManager.init();
 
-        waitForTheEvent(localEvents, HashTreeImplTestEvent.SYNCH, 10000);
+        waitForTheEvent(localEvents, HashTreeImplTestEvent.SYNCH, 10000000000000L);
         waitForTheEvent(remoteEvents, HashTreeImplTestEvent.SYNCH_INITIATED, 10000);
         localSyncManager.shutdown();
         remoteSyncManager.shutdown();

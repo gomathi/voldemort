@@ -72,8 +72,8 @@ import voldemort.utils.Pair;
  * hash tree id.
  * 
  * Uses {@link HashTreeStorage} for storing tree and segments.
- * {@link HashTreeMemStorage} provides in memory implementation of storing entire tree
- * and segments.
+ * {@link HashTreeMemStorage} provides in memory implementation of storing
+ * entire tree and segments.
  * 
  */
 @Threadsafe
@@ -308,8 +308,10 @@ public class HashTreeImpl extends Observable implements HashTree {
         while(remoteDataItr.hasNext())
             keysForeRemoval.add(ByteBuffer.wrap(remoteDataItr.next().getKey()));
 
-        remoteTree.sPut(kvsForAddition);
-        remoteTree.sRemove(keysForeRemoval);
+        if(kvsForAddition.size() > 0)
+            remoteTree.sPut(kvsForAddition);
+        if(keysForeRemoval.size() > 0)
+            remoteTree.sRemove(keysForeRemoval);
     }
 
     private void updateRemoteTreeWithMissingSegments(int treeId,
@@ -321,7 +323,8 @@ public class HashTreeImpl extends Observable implements HashTree {
             for(SegmentData sd: sdValues)
                 keyValuePairs.put(ByteBuffer.wrap(sd.getKey()),
                                   storage.get(ByteBuffer.wrap(sd.getKey())));
-            remoteTree.sPut(keyValuePairs);
+            if(sdValues.size() > 0)
+                remoteTree.sPut(keyValuePairs);
         }
     }
 

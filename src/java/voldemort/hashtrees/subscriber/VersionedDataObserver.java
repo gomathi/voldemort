@@ -22,6 +22,10 @@ import voldemort.hashtrees.core.HashTreeImpl;
 import voldemort.hashtrees.core.NonBlockingDataQueueService;
 import voldemort.hashtrees.thrift.generated.VersionedData;
 
+/**
+ *  
+ *
+ */
 public class VersionedDataObserver extends NonBlockingDataQueueService<VersionedData> implements
         Observer {
 

@@ -23,6 +23,12 @@ import java.util.concurrent.ExecutorCompletionService;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 
+/**
+ * Uses {@link CompletionService} and {@link ExecutorService} to schedule tasks.
+ * Initially schedules a fixed no of tasks, and then it schedules a new task
+ * when the result is fetched from the task queue.
+ * 
+ */
 public class TaskQueue<T> implements Iterator<Future<T>> {
 
     private final CompletionService<T> completionService;
