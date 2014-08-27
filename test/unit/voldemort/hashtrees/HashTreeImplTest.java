@@ -39,9 +39,8 @@ import voldemort.hashtrees.core.HashTree;
 import voldemort.hashtrees.core.HashTreeConstants;
 import voldemort.hashtrees.core.HashTreeImpl;
 import voldemort.hashtrees.storage.HashTreeStorage;
-import voldemort.hashtrees.synch.BGHashTreeServer;
-import voldemort.hashtrees.synch.HTClientProvider;
-import voldemort.hashtrees.synch.HTSyncManagerImpl;
+import voldemort.hashtrees.synch.HashTreeClientProvider;
+import voldemort.hashtrees.synch.HashTreeSyncManagerImpl;
 import voldemort.hashtrees.thrift.generated.SegmentData;
 import voldemort.hashtrees.thrift.generated.SegmentHash;
 import voldemort.utils.ByteUtils;
@@ -289,18 +288,14 @@ public class HashTreeImplTest {
 
         HTreeComponents localHTreeComp = createHashTree(DEFAULT_SEG_DATA_BLOCKS_COUNT, store);
         HTreeComponents remoteHTreeComp = createHashTree(DEFAULT_SEG_DATA_BLOCKS_COUNT, remoteStore);
-        HTSyncManagerImpl hTreeManager = new HTSyncManagerImpl("test",
-                                                           remoteHTreeComp.hTree,
-                                                           treeIdProvider);
+        HashTreeSyncManagerImpl hTreeManager = new HashTreeSyncManagerImpl("test",
+                                                               remoteHTreeComp.hTree,
+                                                               treeIdProvider,
+                                                               HashTreeConstants.DEFAULT_HASH_TREE_SERVER_PORT_NO);
 
-        BGHashTreeServer server = new BGHashTreeServer(remoteHTreeComp.hTree,
-                                                       hTreeManager,
-                                                       HashTreeConstants.DEFAULT_HASH_TREE_SERVER_PORT_NO);
-        new Thread(server).start();
-
+        hTreeManager.init();
         Thread.sleep(100);
-
-        HashTree thriftClient = HTClientProvider.getHashTreeClient("localhost");
+        HashTree thriftClient = HashTreeClientProvider.getHashTreeClient("localhost");
 
         for(int i = 1; i <= DEFAULT_SEG_DATA_BLOCKS_COUNT; i++) {
             localHTreeComp.storage.put(randomByteBuffer(), randomByteBuffer());
@@ -321,10 +316,7 @@ public class HashTreeImplTest {
             Assert.assertEquals(localHTreeComp.storage.localStorage,
                                 remoteHTreeComp.storage.localStorage);
         }
-    }
 
-    @Test
-    public void testHashTreeVersionedStorage() {
-
+        hTreeManager.shutdown();
     }
 }

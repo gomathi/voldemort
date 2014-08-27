@@ -80,12 +80,4 @@ public abstract class BGStoppableTask implements Runnable, Stoppable {
 
     @Override
     public abstract void run();
-
-    /**
-     * This is to reset to initialized state, once a task is stopped.
-     */
-    public synchronized void reset() {
-        stopRequested = false;
-        stopListenerLatch = null;
-    }
 }

@@ -31,7 +31,7 @@ import org.junit.Before;
 import org.junit.Test;
 
 import scala.actors.threadpool.Arrays;
-import voldemort.hashtrees.storage.HTPersistentStorage;
+import voldemort.hashtrees.storage.HashTreePersistentStorage;
 import voldemort.hashtrees.thrift.generated.SegmentData;
 import voldemort.hashtrees.thrift.generated.SegmentHash;
 import voldemort.hashtrees.thrift.generated.VersionedData;
@@ -44,16 +44,16 @@ public class HashTreePersistentStorageTest {
     private int versionedTreeId = 5;
     private int defaultSegId = 0;
     private int noOfSegDataBlocks = 1024;
-    private HTPersistentStorage dbObj;
+    private HashTreePersistentStorage dbObj;
 
     @Before
     public void init() throws Exception {
         dbDir = "/tmp/random" + new Random().nextInt();
-        dbObj = new HTPersistentStorage(dbDir, noOfSegDataBlocks);
+        dbObj = new HashTreePersistentStorage(dbDir, noOfSegDataBlocks);
     }
 
     public void init(String dbDirName) throws Exception {
-        dbObj = new HTPersistentStorage(dbDirName, noOfSegDataBlocks);
+        dbObj = new HashTreePersistentStorage(dbDirName, noOfSegDataBlocks);
     }
 
     @After
@@ -189,7 +189,7 @@ public class HashTreePersistentStorageTest {
         init(dbDir);
 
         versionNo = expected.size() + 1;
-        dbObj.putVersionedDataToAdditionList(versionedTreeId,
+        dbObj.versionedPut(versionedTreeId,
                                              HashTreeImplTestUtils.randomByteBuffer(),
                                              HashTreeImplTestUtils.randomByteBuffer());
 
@@ -204,9 +204,9 @@ public class HashTreePersistentStorageTest {
     private void writeData(List<Pair<ByteBuffer, ByteBuffer>> expected) {
         for(Pair<ByteBuffer, ByteBuffer> pair: expected) {
             if(pair.getSecond() == null)
-                dbObj.putVersionedDataToRemovalList(versionedTreeId, pair.getFirst());
+                dbObj.versionedRemove(versionedTreeId, pair.getFirst());
             else
-                dbObj.putVersionedDataToAdditionList(versionedTreeId,
+                dbObj.versionedPut(versionedTreeId,
                                                      pair.getFirst(),
                                                      pair.getSecond());
         }

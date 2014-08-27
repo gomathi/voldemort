@@ -44,8 +44,8 @@ import org.mortbay.log.Log;
 
 import voldemort.annotations.concurrency.LockedBy;
 import voldemort.annotations.concurrency.Threadsafe;
-import voldemort.hashtrees.storage.HTMemStorage;
-import voldemort.hashtrees.storage.HTPersistentStorage;
+import voldemort.hashtrees.storage.HashTreeMemStorage;
+import voldemort.hashtrees.storage.HashTreePersistentStorage;
 import voldemort.hashtrees.storage.HashTreeStorage;
 import voldemort.hashtrees.storage.Storage;
 import voldemort.hashtrees.storage.StorageImpl;
@@ -72,9 +72,8 @@ import voldemort.utils.Pair;
  * hash tree id.
  * 
  * Uses {@link HashTreeStorage} for storing tree and segments.
- * {@link HTMemStorage} provides in memory implementation of storing entire tree
+ * {@link HashTreeMemStorage} provides in memory implementation of storing entire tree
  * and segments.
- * 
  * 
  */
 @Threadsafe
@@ -102,7 +101,7 @@ public class HashTreeImpl extends Observable implements HashTree {
     @LockedBy("nonBlockingCallsLock")
     private volatile boolean enabledNonBlockingCalls;
     @LockedBy("nonBlockingCallsLock")
-    private volatile BGSegmentDataUpdater bgDataUpdater;
+    private volatile NonBlockingHTDataAdder bgDataUpdater;
 
     private volatile boolean enabledVersionedData;
 
@@ -126,7 +125,7 @@ public class HashTreeImpl extends Observable implements HashTree {
         this(noOfSegments,
              new HashTreeIdProviderImpl(),
              new DefaultSegIdProviderImpl(noOfSegments),
-             new HTPersistentStorage(dbDir, noOfSegments),
+             new HashTreePersistentStorage(dbDir, noOfSegments),
              new StorageImpl());
     }
 
@@ -161,7 +160,7 @@ public class HashTreeImpl extends Observable implements HashTree {
         hTStorage.setDirtySegment(treeId, segId);
 
         if(enabledVersionedData) {
-            VersionedData vData = hTStorage.putVersionedDataToAdditionList(treeId, key, value);
+            VersionedData vData = hTStorage.versionedPut(treeId, key, value);
             setChanged();
             notifyObservers(vData);
         }
@@ -185,7 +184,7 @@ public class HashTreeImpl extends Observable implements HashTree {
         hTStorage.setDirtySegment(treeId, segId);
 
         if(enabledVersionedData) {
-            VersionedData vData = hTStorage.putVersionedDataToRemovalList(treeId, key);
+            VersionedData vData = hTStorage.versionedRemove(treeId, key);
             setChanged();
             notifyObservers(vData);
         }
@@ -620,7 +619,7 @@ public class HashTreeImpl extends Observable implements HashTree {
                 return;
             }
             if(bgDataUpdater == null)
-                bgDataUpdater = new BGSegmentDataUpdater(this);
+                bgDataUpdater = new NonBlockingHTDataAdder(this);
             new Thread(bgDataUpdater).start();
             enabledNonBlockingCalls = true;
         }

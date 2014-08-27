@@ -15,7 +15,7 @@
  */
 package voldemort.hashtrees.synch;
 
-public interface HTSyncManager {
+public interface HashTreeSyncManager {
 
     /**
      * Sets the remote hostname and port no.

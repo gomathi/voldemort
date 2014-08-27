@@ -1,3 +1,18 @@
+/*
+ * Copyright 2008-2014 LinkedIn, Inc
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License"); you may not
+ * use this file except in compliance with the License. You may obtain a copy of
+ * the License at
+ * 
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * 
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+ * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+ * License for the specific language governing permissions and limitations under
+ * the License.
+ */
 package voldemort.hashtrees.synch;
 
 import java.nio.ByteBuffer;
@@ -16,14 +31,14 @@ import voldemort.hashtrees.thrift.generated.SegmentHash;
  * {@link HashTreeSyncInterface.Iface}. This is used by Thrift server.
  * 
  */
-public class HTServer implements HashTreeSyncInterface.Iface {
+public class HashTreeServerImpl implements HashTreeSyncInterface.Iface {
 
     private final HashTree hashTree;
-    private final HTSyncManagerImpl hashTreeManager;
+    private final HashTreeSyncManagerImpl htSyncManager;
 
-    public HTServer(final HashTree hashTree, final HTSyncManagerImpl hashTreeManager) {
+    public HashTreeServerImpl(final HashTree hashTree, final HashTreeSyncManagerImpl htSyncManager) {
         this.hashTree = hashTree;
-        this.hashTreeManager = hashTreeManager;
+        this.htSyncManager = htSyncManager;
     }
 
     @Override
@@ -98,7 +113,7 @@ public class HTServer implements HashTreeSyncInterface.Iface {
     public void rebuildHashTree(long tokenNo, int treeId, long expFullRebuildTimeInt)
             throws TException {
         try {
-            hashTreeManager.onRebuildHashTreeRequest(tokenNo, treeId, expFullRebuildTimeInt);
+            htSyncManager.onRebuildHashTreeRequest(tokenNo, treeId, expFullRebuildTimeInt);
         } catch(Exception e) {
             throw new TException(e);
         }
@@ -108,7 +123,7 @@ public class HTServer implements HashTreeSyncInterface.Iface {
     public void postRebuildHashTreeResponse(String hostName, long tokenNo, int treeId)
             throws TException {
         try {
-            hashTreeManager.onRebuildHashTreeResponse(hostName, tokenNo, treeId);
+            htSyncManager.onRebuildHashTreeResponse(hostName, tokenNo, treeId);
         } catch(Exception e) {
             throw new TException(e);
         }

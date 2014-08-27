@@ -33,18 +33,18 @@ import voldemort.hashtrees.thrift.generated.VersionedData;
  * 
  */
 @Threadsafe
-public class HTMemStorage implements HashTreeStorage {
+public class HashTreeMemStorage implements HashTreeStorage {
 
     private final int noOfSegDataBlocks;
-    private final ConcurrentMap<Integer, IHTMemStorage> treeIdAndIndHashTree = new ConcurrentHashMap<Integer, IHTMemStorage>();
+    private final ConcurrentMap<Integer, IndHashTreeMemStorage> treeIdAndIndHashTree = new ConcurrentHashMap<Integer, IndHashTreeMemStorage>();
 
-    public HTMemStorage(int noOfSegDataBlocks) {
+    public HashTreeMemStorage(int noOfSegDataBlocks) {
         this.noOfSegDataBlocks = noOfSegDataBlocks;
     }
 
-    private IHTMemStorage getIndHTree(int treeId) {
+    private IndHashTreeMemStorage getIndHTree(int treeId) {
         if(!treeIdAndIndHashTree.containsKey(treeId))
-            treeIdAndIndHashTree.putIfAbsent(treeId, new IHTMemStorage(treeId, noOfSegDataBlocks));
+            treeIdAndIndHashTree.putIfAbsent(treeId, new IndHashTreeMemStorage(treeId, noOfSegDataBlocks));
         return treeIdAndIndHashTree.get(treeId);
     }
 
@@ -134,12 +134,12 @@ public class HTMemStorage implements HashTreeStorage {
     }
 
     @Override
-    public VersionedData putVersionedDataToAdditionList(int treeId, ByteBuffer key, ByteBuffer value) {
+    public VersionedData versionedPut(int treeId, ByteBuffer key, ByteBuffer value) {
         return getIndHTree(treeId).putVersionedDataAddition(key, value);
     }
 
     @Override
-    public VersionedData putVersionedDataToRemovalList(int treeId, ByteBuffer key) {
+    public VersionedData versionedRemove(int treeId, ByteBuffer key) {
         return getIndHTree(treeId).putVersionedDataRemoval(key);
     }
 

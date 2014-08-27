@@ -33,9 +33,16 @@ import voldemort.hashtrees.synch.BGStoppableTask;
 public abstract class NonBlockingDataQueueService<T> extends BGStoppableTask {
 
     private static final Logger LOG = Logger.getLogger(NonBlockingDataQueueService.class);
+    // A special marker to note down a stop operation has been requested on this
+    // thread.
     private final T stopMarker;
     private final BlockingQueue<T> que;
 
+    /**
+     * @param stopMarker specifies a special data which is used for indicating
+     *        stop operation.
+     * @param queueSize how much data can the queue can hold.
+     */
     public NonBlockingDataQueueService(T stopMarker, int queueSize) {
         this.stopMarker = stopMarker;
         que = new ArrayBlockingQueue<T>(queueSize);
@@ -48,6 +55,12 @@ public abstract class NonBlockingDataQueueService<T> extends BGStoppableTask {
         boolean status = que.offer(data);
         if(!status)
             LOG.warn("Segement data queue is full. Unable to add data to the queue.");
+    }
+
+    @Override
+    public synchronized void stop() {
+        super.stop();
+        enque(stopMarker);
     }
 
     @Override

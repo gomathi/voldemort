@@ -31,7 +31,7 @@ import voldemort.hashtrees.thrift.generated.HashTreeSyncInterface;
  * 
  */
 
-public class HTClientProvider {
+public class HashTreeClientProvider {
 
     public static HashTreeSyncInterface.Iface getRemoteHashTreeClient(String serverName, int portNo)
             throws TTransportException {
@@ -52,7 +52,7 @@ public class HTClientProvider {
         TTransport transport = new TSocket(serverName, portNo);
         transport.open();
         TProtocol protocol = new TBinaryProtocol(transport);
-        return new HTClient(new HashTreeSyncInterface.Client(protocol));
+        return new HashTreeClientImpl(new HashTreeSyncInterface.Client(protocol));
     }
 
     public static HashTree getHashTreeClient(String serverName) throws TTransportException {

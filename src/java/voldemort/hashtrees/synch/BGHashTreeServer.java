@@ -15,6 +15,8 @@
  */
 package voldemort.hashtrees.synch;
 
+import java.util.concurrent.CountDownLatch;
+
 import org.apache.log4j.Logger;
 import org.apache.thrift.server.TServer;
 import org.apache.thrift.server.TThreadPoolServer;
@@ -37,15 +39,24 @@ public class BGHashTreeServer extends BGStoppableTask {
     private final static Logger LOG = Logger.getLogger(BGHashTreeServer.class);
     private volatile TServer server;
     private final HashTree localHashTree;
-    private final HTSyncManagerImpl hTreeMgr;
+    private final HashTreeSyncManagerImpl htSynchMgr;
     private final int serverPortNo;
+    private CountDownLatch initializedLatch;
 
     public BGHashTreeServer(final HashTree localHashTree,
-                            final HTSyncManagerImpl hashTreeMgr,
+                            final HashTreeSyncManagerImpl hashTreeMgr,
                             final int serverPortNo) {
-        this.localHashTree = localHashTree;
-        this.hTreeMgr = hashTreeMgr;
+        this(localHashTree, hashTreeMgr, serverPortNo, null);
+    }
+
+    public BGHashTreeServer(final HashTree hTree,
+                            final HashTreeSyncManagerImpl htSynchMgr,
+                            final int serverPortNo,
+                            final CountDownLatch initializedLatch) {
+        this.localHashTree = hTree;
+        this.htSynchMgr = htSynchMgr;
         this.serverPortNo = serverPortNo;
+        this.initializedLatch = initializedLatch;
     }
 
     @Override
@@ -66,7 +77,7 @@ public class BGHashTreeServer extends BGStoppableTask {
         super.stop();
     }
 
-    private static TServer createServer(int serverPortNo, HTServer hashTreeServer)
+    private static TServer createServer(int serverPortNo, HashTreeServerImpl hashTreeServer)
             throws TTransportException {
         TServerSocket serverTransport = new TServerSocket(serverPortNo);
         HashTreeSyncInterface.Processor<Iface> processor = new HashTreeSyncInterface.Processor<HashTreeSyncInterface.Iface>(hashTreeServer);
@@ -76,7 +87,9 @@ public class BGHashTreeServer extends BGStoppableTask {
 
     private void startServer() throws TTransportException {
         if(server == null)
-            this.server = createServer(serverPortNo, new HTServer(localHashTree, hTreeMgr));
+            this.server = createServer(serverPortNo, new HashTreeServerImpl(localHashTree, htSynchMgr));
+        if(initializedLatch != null)
+            initializedLatch.countDown();
         server.serve();
         LOG.info("Hash tree server has started.");
     }
@@ -85,4 +98,5 @@ public class BGHashTreeServer extends BGStoppableTask {
         server.stop();
         LOG.info("Hash tree server has stopped.");
     }
+
 }

@@ -29,11 +29,13 @@ public class HashTreeImplTestObj extends HashTreeImpl {
     @Override
     public void sPut(Map<ByteBuffer, ByteBuffer> keyValuePairs) throws Exception {
         super.sPut(keyValuePairs);
+        events.put(HashTreeImplTestEvent.SYNCH_INITIATED);
     }
 
     @Override
     public void sRemove(List<ByteBuffer> keys) throws Exception {
         super.sRemove(keys);
+        events.put(HashTreeImplTestEvent.SYNCH_INITIATED);
     }
 
     @Override

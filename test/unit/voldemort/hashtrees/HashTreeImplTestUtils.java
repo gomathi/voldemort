@@ -12,9 +12,9 @@ import voldemort.hashtrees.core.HashTree;
 import voldemort.hashtrees.core.HashTreeIdProvider;
 import voldemort.hashtrees.core.HashTreeImpl;
 import voldemort.hashtrees.core.SegmentIdProvider;
-import voldemort.hashtrees.storage.HTPersistentStorage;
+import voldemort.hashtrees.storage.HashTreeMemStorage;
+import voldemort.hashtrees.storage.HashTreePersistentStorage;
 import voldemort.hashtrees.storage.HashTreeStorage;
-import voldemort.hashtrees.storage.HTMemStorage;
 import voldemort.hashtrees.storage.Storage;
 import voldemort.utils.ByteUtils;
 import voldemort.utils.Pair;
@@ -59,7 +59,7 @@ public class HashTreeImplTestUtils {
 
         @Override
         public List<Integer> getAllPrimaryTreeIds() {
-            return null;
+            return treeIds;
         }
 
     }
@@ -97,7 +97,10 @@ public class HashTreeImplTestUtils {
 
         @Override
         public Iterator<Pair<ByteBuffer, ByteBuffer>> iterator() {
-            return null;
+            List<Pair<ByteBuffer, ByteBuffer>> result = new ArrayList<Pair<ByteBuffer, ByteBuffer>>();
+            for(Map.Entry<ByteBuffer, ByteBuffer> entry: localStorage.entrySet())
+                result.add(Pair.create(entry.getKey(), entry.getValue()));
+            return result.iterator();
         }
 
     }
@@ -158,11 +161,11 @@ public class HashTreeImplTestUtils {
     }
 
     public static HashTreeStorage generateInMemoryStore(int noOfSegDataBlocks) {
-        return new HTMemStorage(noOfSegDataBlocks);
+        return new HashTreeMemStorage(noOfSegDataBlocks);
     }
 
     private static HashTreeStorage generatePersistentStore(int noOfSegDataBlocks) throws Exception {
-        return new HTPersistentStorage(randomDirName(), noOfSegDataBlocks);
+        return new HashTreePersistentStorage(randomDirName(), noOfSegDataBlocks);
     }
 
     public static HashTreeStorage[] generateInMemoryAndPersistentStores(int noOfSegDataBlocks)

@@ -55,9 +55,9 @@ import voldemort.utils.ByteUtils;
  * 
  */
 
-public class HTPersistentStorage implements HashTreeStorage {
+public class HashTreePersistentStorage implements HashTreeStorage {
 
-    private static final Logger LOG = Logger.getLogger(HTPersistentStorage.class);
+    private static final Logger LOG = Logger.getLogger(HashTreePersistentStorage.class);
 
     private static final byte[] KEY_LAST_FULLY_TREE_BUILT_TS = "ltfbTs".getBytes();
     private static final byte[] KEY_LAST_TREE_BUILT_TS = "ltbTs".getBytes();
@@ -79,7 +79,7 @@ public class HTPersistentStorage implements HashTreeStorage {
     private final ConcurrentMap<Integer, AtomicLong> treeIdsAndVersionNos = new ConcurrentHashMap<Integer, AtomicLong>();
     private final ConcurrentMap<Integer, AtomicBitSet> treeIdAndDirtySegmentMap = new ConcurrentHashMap<Integer, AtomicBitSet>();
 
-    public HTPersistentStorage(String dbDir, int noOfSegDataBlocks) throws Exception {
+    public HashTreePersistentStorage(String dbDir, int noOfSegDataBlocks) throws Exception {
         this.dbObj = initDatabase(dbDir);
         this.noOfSegDataBlocks = noOfSegDataBlocks;
         loadTreeIdsAndVersionNos();
@@ -320,7 +320,7 @@ public class HTPersistentStorage implements HashTreeStorage {
     }
 
     @Override
-    public VersionedData putVersionedDataToAdditionList(int treeId, ByteBuffer key, ByteBuffer value) {
+    public VersionedData versionedPut(int treeId, ByteBuffer key, ByteBuffer value) {
         byte[] keyArr = key.array();
         byte[] fullKey = new byte[2 + ByteUtils.SIZE_OF_INT + ByteUtils.SIZE_OF_LONG
                                   + keyArr.length];
@@ -338,7 +338,7 @@ public class HTPersistentStorage implements HashTreeStorage {
     }
 
     @Override
-    public VersionedData putVersionedDataToRemovalList(int treeId, ByteBuffer key) {
+    public VersionedData versionedRemove(int treeId, ByteBuffer key) {
         byte[] keyArr = key.array();
         byte[] fullKey = new byte[2 + ByteUtils.SIZE_OF_INT + ByteUtils.SIZE_OF_LONG
                                   + keyArr.length];

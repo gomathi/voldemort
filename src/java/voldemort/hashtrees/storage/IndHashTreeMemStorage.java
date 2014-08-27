@@ -39,7 +39,7 @@ import voldemort.utils.AtomicBitSet;
  * 
  */
 @Threadsafe
-class IHTMemStorage {
+class IndHashTreeMemStorage {
 
     private final ConcurrentMap<Integer, ByteBuffer> segmentHashes = new ConcurrentSkipListMap<Integer, ByteBuffer>();
     private final ConcurrentMap<Integer, ConcurrentSkipListMap<ByteBuffer, ByteBuffer>> segDataBlocks = new ConcurrentHashMap<Integer, ConcurrentSkipListMap<ByteBuffer, ByteBuffer>>();
@@ -50,7 +50,7 @@ class IHTMemStorage {
     private final AtomicLong versionNo = new AtomicLong();
     private final int treeId;
 
-    public IHTMemStorage(int treeId, int noOfSegDataBlocks) {
+    public IndHashTreeMemStorage(int treeId, int noOfSegDataBlocks) {
         this.dirtySegments = new AtomicBitSet(noOfSegDataBlocks);
         this.treeId = treeId;
     }

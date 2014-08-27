@@ -29,7 +29,7 @@ import voldemort.utils.Pair;
  * 
  */
 @Threadsafe
-public class BGSegmentDataUpdater extends
+public class NonBlockingHTDataAdder extends
         NonBlockingDataQueueService<Pair<HTOperation, List<ByteBuffer>>> {
 
     private static final int DEFAULT_QUE_SIZE = 10000;
@@ -37,7 +37,7 @@ public class BGSegmentDataUpdater extends
                                                                                                                    null);
     private final HashTreeImpl hTree;
 
-    public BGSegmentDataUpdater(final HashTreeImpl hTree) {
+    public NonBlockingHTDataAdder(final HashTreeImpl hTree) {
         super(STOP_MARKER, DEFAULT_QUE_SIZE);
         this.hTree = hTree;
     }
