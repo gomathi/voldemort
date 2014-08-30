@@ -16,7 +16,7 @@
 package voldemort.hashtrees.core;
 
 import java.nio.ByteBuffer;
-import java.util.List;
+import java.util.Collection;
 
 /**
  * Each node maintains primary partition, and set of secondary
@@ -44,13 +44,21 @@ public interface HashTreeIdProvider {
      * 
      * @return
      */
-    List<Integer> getAllTreeIds();
+    Collection<Integer> getAllTreeIds();
 
     /**
      * Returns treeIds for which the current node is responsible for.
      * 
      * @return
      */
-    List<Integer> getAllPrimaryTreeIds();
+    Collection<Integer> getAllPrimaryTreeIds();
 
+    /**
+     * Returns true if the given treeId is one of the primary partitions of this
+     * node.
+     * 
+     * @param treeId
+     * @return
+     */
+    boolean isPrimaryTreeId(int treeId);
 }

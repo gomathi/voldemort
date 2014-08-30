@@ -15,7 +15,7 @@
  */
 package voldemort.hashtrees.tasks;
 
-import java.util.List;
+import java.util.Collection;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -87,7 +87,7 @@ public class BGRebuildTreeTask extends BGStoppableTask {
     }
 
     private void rebuildHashTrees() {
-        List<Integer> treeIds = treeIdProvider.getAllTreeIds();
+        Collection<Integer> treeIds = treeIdProvider.getAllTreeIds();
         for(int treeId: treeIds)
             rebuildHashTree(treeId);
     }

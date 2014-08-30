@@ -194,7 +194,7 @@ public class HashTreeSyncManagerImpl extends BGStoppableTask implements HashTree
     }
 
     private void rebuildAllLocallyManagedTrees() {
-        List<Integer> treeIds = treeIdProvider.getAllPrimaryTreeIds();
+        Collection<Integer> treeIds = treeIdProvider.getAllPrimaryTreeIds();
         if(treeIds.size() == 0) {
             LOG.info("There are no locally managed trees. So skipping rebuild operation.");
             return;
@@ -264,7 +264,7 @@ public class HashTreeSyncManagerImpl extends BGStoppableTask implements HashTree
     }
 
     private void synch() {
-        List<Integer> treeIds = treeIdProvider.getAllPrimaryTreeIds();
+        Collection<Integer> treeIds = treeIdProvider.getAllPrimaryTreeIds();
         List<Pair<String, Integer>> hostNameAndTreeIdList = new ArrayList<Pair<String, Integer>>();
 
         for(int treeId: treeIds) {

@@ -21,6 +21,8 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.ConcurrentSkipListMap;
+import java.util.concurrent.atomic.AtomicLong;
 
 import voldemort.annotations.concurrency.Threadsafe;
 import voldemort.hashtrees.thrift.generated.SegmentData;
@@ -37,6 +39,8 @@ public class HashTreeMemStorage implements HashTreeStorage {
 
     private final int noOfSegDataBlocks;
     private final ConcurrentMap<Integer, IndHashTreeMemStorage> treeIdAndIndHashTree = new ConcurrentHashMap<Integer, IndHashTreeMemStorage>();
+    private final ConcurrentSkipListMap<Long, VersionedData> versionedData = new ConcurrentSkipListMap<Long, VersionedData>();
+    private final AtomicLong versionNo = new AtomicLong();
 
     public HashTreeMemStorage(int noOfSegDataBlocks) {
         this.noOfSegDataBlocks = noOfSegDataBlocks;
@@ -44,7 +48,7 @@ public class HashTreeMemStorage implements HashTreeStorage {
 
     private IndHashTreeMemStorage getIndHTree(int treeId) {
         if(!treeIdAndIndHashTree.containsKey(treeId))
-            treeIdAndIndHashTree.putIfAbsent(treeId, new IndHashTreeMemStorage(treeId, noOfSegDataBlocks));
+            treeIdAndIndHashTree.putIfAbsent(treeId, new IndHashTreeMemStorage(noOfSegDataBlocks));
         return treeIdAndIndHashTree.get(treeId);
     }
 
@@ -124,23 +128,38 @@ public class HashTreeMemStorage implements HashTreeStorage {
     }
 
     @Override
-    public Iterator<VersionedData> getVersionedData(int treeId) {
-        return getIndHTree(treeId).getVersionedData();
+    public Iterator<VersionedData> getVersionedData() {
+        return versionedData.values().iterator();
     }
 
     @Override
-    public Iterator<VersionedData> getVersionedData(int treeId, long versionNo) {
-        return getIndHTree(treeId).getVersionedData(versionNo);
+    public Iterator<VersionedData> getVersionedData(long versionNo) {
+        return versionedData.tailMap(versionNo).values().iterator();
     }
 
     @Override
-    public VersionedData versionedPut(int treeId, ByteBuffer key, ByteBuffer value) {
-        return getIndHTree(treeId).putVersionedDataAddition(key, value);
+    public VersionedData versionedPut(ByteBuffer key, ByteBuffer value) {
+        VersionedData vData = new VersionedData(versionNo.incrementAndGet(), true, key);
+        vData.setValue(value);
+        versionedData.put(vData.getVersionNo(), vData);
+        return vData;
     }
 
     @Override
-    public VersionedData versionedRemove(int treeId, ByteBuffer key) {
-        return getIndHTree(treeId).putVersionedDataRemoval(key);
+    public VersionedData versionedRemove(ByteBuffer key) {
+        VersionedData vData = new VersionedData(versionNo.incrementAndGet(), false, key);
+        versionedData.put(vData.getVersionNo(), vData);
+        return vData;
+    }
+
+    @Override
+    public VersionedData fetchVersionedData(long versionNo) {
+        return versionedData.get(versionNo);
+    }
+
+    @Override
+    public void deleteAllVersionedData() {
+        versionedData.clear();
     }
 
 }

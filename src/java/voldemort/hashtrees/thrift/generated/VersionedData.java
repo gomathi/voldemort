@@ -40,10 +40,9 @@ public class VersionedData implements org.apache.thrift.TBase<VersionedData, Ver
   private static final org.apache.thrift.protocol.TStruct STRUCT_DESC = new org.apache.thrift.protocol.TStruct("VersionedData");
 
   private static final org.apache.thrift.protocol.TField VERSION_NO_FIELD_DESC = new org.apache.thrift.protocol.TField("versionNo", org.apache.thrift.protocol.TType.I64, (short)1);
-  private static final org.apache.thrift.protocol.TField TREE_ID_FIELD_DESC = new org.apache.thrift.protocol.TField("treeId", org.apache.thrift.protocol.TType.I32, (short)2);
-  private static final org.apache.thrift.protocol.TField ADDED_OR_REMOVED_FIELD_DESC = new org.apache.thrift.protocol.TField("addedOrRemoved", org.apache.thrift.protocol.TType.BOOL, (short)3);
-  private static final org.apache.thrift.protocol.TField KEY_FIELD_DESC = new org.apache.thrift.protocol.TField("key", org.apache.thrift.protocol.TType.STRING, (short)4);
-  private static final org.apache.thrift.protocol.TField VALUE_FIELD_DESC = new org.apache.thrift.protocol.TField("value", org.apache.thrift.protocol.TType.STRING, (short)5);
+  private static final org.apache.thrift.protocol.TField ADDED_OR_REMOVED_FIELD_DESC = new org.apache.thrift.protocol.TField("addedOrRemoved", org.apache.thrift.protocol.TType.BOOL, (short)2);
+  private static final org.apache.thrift.protocol.TField KEY_FIELD_DESC = new org.apache.thrift.protocol.TField("key", org.apache.thrift.protocol.TType.STRING, (short)3);
+  private static final org.apache.thrift.protocol.TField VALUE_FIELD_DESC = new org.apache.thrift.protocol.TField("value", org.apache.thrift.protocol.TType.STRING, (short)4);
 
   private static final Map<Class<? extends IScheme>, SchemeFactory> schemes = new HashMap<Class<? extends IScheme>, SchemeFactory>();
   static {
@@ -52,7 +51,6 @@ public class VersionedData implements org.apache.thrift.TBase<VersionedData, Ver
   }
 
   public long versionNo; // required
-  public int treeId; // required
   public boolean addedOrRemoved; // required
   public ByteBuffer key; // required
   public ByteBuffer value; // optional
@@ -60,10 +58,9 @@ public class VersionedData implements org.apache.thrift.TBase<VersionedData, Ver
   /** The set of fields this struct contains, along with convenience methods for finding and manipulating them. */
   public enum _Fields implements org.apache.thrift.TFieldIdEnum {
     VERSION_NO((short)1, "versionNo"),
-    TREE_ID((short)2, "treeId"),
-    ADDED_OR_REMOVED((short)3, "addedOrRemoved"),
-    KEY((short)4, "key"),
-    VALUE((short)5, "value");
+    ADDED_OR_REMOVED((short)2, "addedOrRemoved"),
+    KEY((short)3, "key"),
+    VALUE((short)4, "value");
 
     private static final Map<String, _Fields> byName = new HashMap<String, _Fields>();
 
@@ -80,13 +77,11 @@ public class VersionedData implements org.apache.thrift.TBase<VersionedData, Ver
       switch(fieldId) {
         case 1: // VERSION_NO
           return VERSION_NO;
-        case 2: // TREE_ID
-          return TREE_ID;
-        case 3: // ADDED_OR_REMOVED
+        case 2: // ADDED_OR_REMOVED
           return ADDED_OR_REMOVED;
-        case 4: // KEY
+        case 3: // KEY
           return KEY;
-        case 5: // VALUE
+        case 4: // VALUE
           return VALUE;
         default:
           return null;
@@ -129,8 +124,7 @@ public class VersionedData implements org.apache.thrift.TBase<VersionedData, Ver
 
   // isset id assignments
   private static final int __VERSIONNO_ISSET_ID = 0;
-  private static final int __TREEID_ISSET_ID = 1;
-  private static final int __ADDEDORREMOVED_ISSET_ID = 2;
+  private static final int __ADDEDORREMOVED_ISSET_ID = 1;
   private byte __isset_bitfield = 0;
   private _Fields optionals[] = {_Fields.VALUE};
   public static final Map<_Fields, org.apache.thrift.meta_data.FieldMetaData> metaDataMap;
@@ -138,8 +132,6 @@ public class VersionedData implements org.apache.thrift.TBase<VersionedData, Ver
     Map<_Fields, org.apache.thrift.meta_data.FieldMetaData> tmpMap = new EnumMap<_Fields, org.apache.thrift.meta_data.FieldMetaData>(_Fields.class);
     tmpMap.put(_Fields.VERSION_NO, new org.apache.thrift.meta_data.FieldMetaData("versionNo", org.apache.thrift.TFieldRequirementType.REQUIRED, 
         new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.I64)));
-    tmpMap.put(_Fields.TREE_ID, new org.apache.thrift.meta_data.FieldMetaData("treeId", org.apache.thrift.TFieldRequirementType.REQUIRED, 
-        new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.I32)));
     tmpMap.put(_Fields.ADDED_OR_REMOVED, new org.apache.thrift.meta_data.FieldMetaData("addedOrRemoved", org.apache.thrift.TFieldRequirementType.REQUIRED, 
         new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.BOOL)));
     tmpMap.put(_Fields.KEY, new org.apache.thrift.meta_data.FieldMetaData("key", org.apache.thrift.TFieldRequirementType.REQUIRED, 
@@ -155,15 +147,12 @@ public class VersionedData implements org.apache.thrift.TBase<VersionedData, Ver
 
   public VersionedData(
     long versionNo,
-    int treeId,
     boolean addedOrRemoved,
     ByteBuffer key)
   {
     this();
     this.versionNo = versionNo;
     setVersionNoIsSet(true);
-    this.treeId = treeId;
-    setTreeIdIsSet(true);
     this.addedOrRemoved = addedOrRemoved;
     setAddedOrRemovedIsSet(true);
     this.key = key;
@@ -175,7 +164,6 @@ public class VersionedData implements org.apache.thrift.TBase<VersionedData, Ver
   public VersionedData(VersionedData other) {
     __isset_bitfield = other.__isset_bitfield;
     this.versionNo = other.versionNo;
-    this.treeId = other.treeId;
     this.addedOrRemoved = other.addedOrRemoved;
     if (other.isSetKey()) {
       this.key = org.apache.thrift.TBaseHelper.copyBinary(other.key);
@@ -195,8 +183,6 @@ public class VersionedData implements org.apache.thrift.TBase<VersionedData, Ver
   public void clear() {
     setVersionNoIsSet(false);
     this.versionNo = 0;
-    setTreeIdIsSet(false);
-    this.treeId = 0;
     setAddedOrRemovedIsSet(false);
     this.addedOrRemoved = false;
     this.key = null;
@@ -224,29 +210,6 @@ public class VersionedData implements org.apache.thrift.TBase<VersionedData, Ver
 
   public void setVersionNoIsSet(boolean value) {
     __isset_bitfield = EncodingUtils.setBit(__isset_bitfield, __VERSIONNO_ISSET_ID, value);
-  }
-
-  public int getTreeId() {
-    return this.treeId;
-  }
-
-  public VersionedData setTreeId(int treeId) {
-    this.treeId = treeId;
-    setTreeIdIsSet(true);
-    return this;
-  }
-
-  public void unsetTreeId() {
-    __isset_bitfield = EncodingUtils.clearBit(__isset_bitfield, __TREEID_ISSET_ID);
-  }
-
-  /** Returns true if field treeId is set (has been assigned a value) and false otherwise */
-  public boolean isSetTreeId() {
-    return EncodingUtils.testBit(__isset_bitfield, __TREEID_ISSET_ID);
-  }
-
-  public void setTreeIdIsSet(boolean value) {
-    __isset_bitfield = EncodingUtils.setBit(__isset_bitfield, __TREEID_ISSET_ID, value);
   }
 
   public boolean isAddedOrRemoved() {
@@ -350,14 +313,6 @@ public class VersionedData implements org.apache.thrift.TBase<VersionedData, Ver
       }
       break;
 
-    case TREE_ID:
-      if (value == null) {
-        unsetTreeId();
-      } else {
-        setTreeId((Integer)value);
-      }
-      break;
-
     case ADDED_OR_REMOVED:
       if (value == null) {
         unsetAddedOrRemoved();
@@ -390,9 +345,6 @@ public class VersionedData implements org.apache.thrift.TBase<VersionedData, Ver
     case VERSION_NO:
       return Long.valueOf(getVersionNo());
 
-    case TREE_ID:
-      return Integer.valueOf(getTreeId());
-
     case ADDED_OR_REMOVED:
       return Boolean.valueOf(isAddedOrRemoved());
 
@@ -415,8 +367,6 @@ public class VersionedData implements org.apache.thrift.TBase<VersionedData, Ver
     switch (field) {
     case VERSION_NO:
       return isSetVersionNo();
-    case TREE_ID:
-      return isSetTreeId();
     case ADDED_OR_REMOVED:
       return isSetAddedOrRemoved();
     case KEY:
@@ -446,15 +396,6 @@ public class VersionedData implements org.apache.thrift.TBase<VersionedData, Ver
       if (!(this_present_versionNo && that_present_versionNo))
         return false;
       if (this.versionNo != that.versionNo)
-        return false;
-    }
-
-    boolean this_present_treeId = true;
-    boolean that_present_treeId = true;
-    if (this_present_treeId || that_present_treeId) {
-      if (!(this_present_treeId && that_present_treeId))
-        return false;
-      if (this.treeId != that.treeId)
         return false;
     }
 
@@ -507,16 +448,6 @@ public class VersionedData implements org.apache.thrift.TBase<VersionedData, Ver
     }
     if (isSetVersionNo()) {
       lastComparison = org.apache.thrift.TBaseHelper.compareTo(this.versionNo, other.versionNo);
-      if (lastComparison != 0) {
-        return lastComparison;
-      }
-    }
-    lastComparison = Boolean.valueOf(isSetTreeId()).compareTo(other.isSetTreeId());
-    if (lastComparison != 0) {
-      return lastComparison;
-    }
-    if (isSetTreeId()) {
-      lastComparison = org.apache.thrift.TBaseHelper.compareTo(this.treeId, other.treeId);
       if (lastComparison != 0) {
         return lastComparison;
       }
@@ -575,10 +506,6 @@ public class VersionedData implements org.apache.thrift.TBase<VersionedData, Ver
     sb.append(this.versionNo);
     first = false;
     if (!first) sb.append(", ");
-    sb.append("treeId:");
-    sb.append(this.treeId);
-    first = false;
-    if (!first) sb.append(", ");
     sb.append("addedOrRemoved:");
     sb.append(this.addedOrRemoved);
     first = false;
@@ -607,7 +534,6 @@ public class VersionedData implements org.apache.thrift.TBase<VersionedData, Ver
   public void validate() throws org.apache.thrift.TException {
     // check for required fields
     // alas, we cannot check 'versionNo' because it's a primitive and you chose the non-beans generator.
-    // alas, we cannot check 'treeId' because it's a primitive and you chose the non-beans generator.
     // alas, we cannot check 'addedOrRemoved' because it's a primitive and you chose the non-beans generator.
     if (key == null) {
       throw new org.apache.thrift.protocol.TProtocolException("Required field 'key' was not present! Struct: " + toString());
@@ -659,15 +585,7 @@ public class VersionedData implements org.apache.thrift.TBase<VersionedData, Ver
               org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
             }
             break;
-          case 2: // TREE_ID
-            if (schemeField.type == org.apache.thrift.protocol.TType.I32) {
-              struct.treeId = iprot.readI32();
-              struct.setTreeIdIsSet(true);
-            } else { 
-              org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
-            }
-            break;
-          case 3: // ADDED_OR_REMOVED
+          case 2: // ADDED_OR_REMOVED
             if (schemeField.type == org.apache.thrift.protocol.TType.BOOL) {
               struct.addedOrRemoved = iprot.readBool();
               struct.setAddedOrRemovedIsSet(true);
@@ -675,7 +593,7 @@ public class VersionedData implements org.apache.thrift.TBase<VersionedData, Ver
               org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
             }
             break;
-          case 4: // KEY
+          case 3: // KEY
             if (schemeField.type == org.apache.thrift.protocol.TType.STRING) {
               struct.key = iprot.readBinary();
               struct.setKeyIsSet(true);
@@ -683,7 +601,7 @@ public class VersionedData implements org.apache.thrift.TBase<VersionedData, Ver
               org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
             }
             break;
-          case 5: // VALUE
+          case 4: // VALUE
             if (schemeField.type == org.apache.thrift.protocol.TType.STRING) {
               struct.value = iprot.readBinary();
               struct.setValueIsSet(true);
@@ -702,9 +620,6 @@ public class VersionedData implements org.apache.thrift.TBase<VersionedData, Ver
       if (!struct.isSetVersionNo()) {
         throw new org.apache.thrift.protocol.TProtocolException("Required field 'versionNo' was not found in serialized data! Struct: " + toString());
       }
-      if (!struct.isSetTreeId()) {
-        throw new org.apache.thrift.protocol.TProtocolException("Required field 'treeId' was not found in serialized data! Struct: " + toString());
-      }
       if (!struct.isSetAddedOrRemoved()) {
         throw new org.apache.thrift.protocol.TProtocolException("Required field 'addedOrRemoved' was not found in serialized data! Struct: " + toString());
       }
@@ -717,9 +632,6 @@ public class VersionedData implements org.apache.thrift.TBase<VersionedData, Ver
       oprot.writeStructBegin(STRUCT_DESC);
       oprot.writeFieldBegin(VERSION_NO_FIELD_DESC);
       oprot.writeI64(struct.versionNo);
-      oprot.writeFieldEnd();
-      oprot.writeFieldBegin(TREE_ID_FIELD_DESC);
-      oprot.writeI32(struct.treeId);
       oprot.writeFieldEnd();
       oprot.writeFieldBegin(ADDED_OR_REMOVED_FIELD_DESC);
       oprot.writeBool(struct.addedOrRemoved);
@@ -754,7 +666,6 @@ public class VersionedData implements org.apache.thrift.TBase<VersionedData, Ver
     public void write(org.apache.thrift.protocol.TProtocol prot, VersionedData struct) throws org.apache.thrift.TException {
       TTupleProtocol oprot = (TTupleProtocol) prot;
       oprot.writeI64(struct.versionNo);
-      oprot.writeI32(struct.treeId);
       oprot.writeBool(struct.addedOrRemoved);
       oprot.writeBinary(struct.key);
       BitSet optionals = new BitSet();
@@ -772,8 +683,6 @@ public class VersionedData implements org.apache.thrift.TBase<VersionedData, Ver
       TTupleProtocol iprot = (TTupleProtocol) prot;
       struct.versionNo = iprot.readI64();
       struct.setVersionNoIsSet(true);
-      struct.treeId = iprot.readI32();
-      struct.setTreeIdIsSet(true);
       struct.addedOrRemoved = iprot.readBool();
       struct.setAddedOrRemovedIsSet(true);
       struct.key = iprot.readBinary();

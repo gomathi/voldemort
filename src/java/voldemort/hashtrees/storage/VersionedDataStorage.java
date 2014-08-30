@@ -27,11 +27,15 @@ import voldemort.hashtrees.thrift.generated.VersionedData;
  */
 public interface VersionedDataStorage {
 
-    VersionedData versionedPut(int treeId, ByteBuffer key, ByteBuffer value);
+    VersionedData versionedPut(ByteBuffer key, ByteBuffer value);
 
-    VersionedData versionedRemove(int treeId, ByteBuffer key);
+    VersionedData versionedRemove(ByteBuffer key);
 
-    Iterator<VersionedData> getVersionedData(int treeId);
+    Iterator<VersionedData> getVersionedData();
 
-    Iterator<VersionedData> getVersionedData(int treeId, long fromVersionNo);
+    Iterator<VersionedData> getVersionedData(long fromVersionNo);
+
+    VersionedData fetchVersionedData(long versionNo);
+
+    void deleteAllVersionedData();
 }

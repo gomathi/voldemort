@@ -19,7 +19,6 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -30,7 +29,6 @@ import java.util.concurrent.atomic.AtomicLong;
 import voldemort.annotations.concurrency.Threadsafe;
 import voldemort.hashtrees.thrift.generated.SegmentData;
 import voldemort.hashtrees.thrift.generated.SegmentHash;
-import voldemort.hashtrees.thrift.generated.VersionedData;
 import voldemort.utils.AtomicBitSet;
 
 /**
@@ -43,16 +41,12 @@ class IndHashTreeMemStorage {
 
     private final ConcurrentMap<Integer, ByteBuffer> segmentHashes = new ConcurrentSkipListMap<Integer, ByteBuffer>();
     private final ConcurrentMap<Integer, ConcurrentSkipListMap<ByteBuffer, ByteBuffer>> segDataBlocks = new ConcurrentHashMap<Integer, ConcurrentSkipListMap<ByteBuffer, ByteBuffer>>();
-    private final ConcurrentSkipListMap<Long, VersionedData> versionedData = new ConcurrentSkipListMap<Long, VersionedData>();
     private final AtomicBitSet dirtySegments;
     private final AtomicLong fullyRebuiltTreeTs = new AtomicLong(0);
     private final AtomicLong rebuiltTreeTs = new AtomicLong(0);
-    private final AtomicLong versionNo = new AtomicLong();
-    private final int treeId;
 
-    public IndHashTreeMemStorage(int treeId, int noOfSegDataBlocks) {
+    public IndHashTreeMemStorage(int noOfSegDataBlocks) {
         this.dirtySegments = new AtomicBitSet(noOfSegDataBlocks);
-        this.treeId = treeId;
     }
 
     public void putSegmentHash(int nodeId, ByteBuffer digest) {
@@ -145,26 +139,5 @@ class IndHashTreeMemStorage {
 
     public long getLastHashTreeUpdatedTimestamp() {
         return rebuiltTreeTs.get();
-    }
-
-    public VersionedData putVersionedDataAddition(ByteBuffer key, ByteBuffer value) {
-        VersionedData vData = new VersionedData(versionNo.incrementAndGet(), treeId, true, key);
-        vData.setValue(value);
-        versionedData.put(vData.getVersionNo(), vData);
-        return vData;
-    }
-
-    public VersionedData putVersionedDataRemoval(ByteBuffer key) {
-        VersionedData vData = new VersionedData(versionNo.incrementAndGet(), treeId, false, key);
-        versionedData.put(vData.getVersionNo(), vData);
-        return vData;
-    }
-
-    public Iterator<VersionedData> getVersionedData() {
-        return versionedData.values().iterator();
-    }
-
-    public Iterator<VersionedData> getVersionedData(long versionNo) {
-        return versionedData.tailMap(versionNo).values().iterator();
     }
 }

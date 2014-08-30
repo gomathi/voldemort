@@ -7,10 +7,18 @@ namespace java voldemort.hashtrees.thrift.generated
 struct VersionedData
 {
 	1: required i64 versionNo;
-	2: required i32 treeId;
-	3: required bool addedOrRemoved;
-	4: required binary key;
-	5: optional binary value;
+	2: required bool addedOrRemoved;
+	3: required binary key;
+	4: optional binary value;
 }
 	
+/**
+ * A client is supposed to run locally a VersionedDataListenerService to which each node in the voldemort notifies the changes. 
+ *
+ */
+ 	
+service VersionedDataListenerService
+{
+	void post(1:list<VersionedData> vDataList);
+}
 	

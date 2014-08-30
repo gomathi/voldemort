@@ -62,6 +62,11 @@ public class HashTreeImplTestUtils {
             return treeIds;
         }
 
+        @Override
+        public boolean isPrimaryTreeId(int treeId) {
+            return false;
+        }
+
     }
 
     public static class StorageImplTest implements Storage {

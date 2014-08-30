@@ -39,7 +39,8 @@ public interface HashTree {
     public void sPut(Map<ByteBuffer, ByteBuffer> keyValuePairs) throws Exception;
 
     /**
-     * Deletes the keys from the storage. While synching this function is used.
+     * Deletes the keys from the storage. Intended to be used while synch
+     * operation.
      * 
      * @param keys
      * 

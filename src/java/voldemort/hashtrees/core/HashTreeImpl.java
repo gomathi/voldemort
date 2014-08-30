@@ -160,7 +160,7 @@ public class HashTreeImpl extends Observable implements HashTree {
         hTStorage.setDirtySegment(treeId, segId);
 
         if(enabledVersionedData) {
-            VersionedData vData = hTStorage.versionedPut(treeId, key, value);
+            VersionedData vData = hTStorage.versionedPut(key, value);
             setChanged();
             notifyObservers(vData);
         }
@@ -184,7 +184,7 @@ public class HashTreeImpl extends Observable implements HashTree {
         hTStorage.setDirtySegment(treeId, segId);
 
         if(enabledVersionedData) {
-            VersionedData vData = hTStorage.versionedRemove(treeId, key);
+            VersionedData vData = hTStorage.versionedRemove(key);
             setChanged();
             notifyObservers(vData);
         }
@@ -367,7 +367,7 @@ public class HashTreeImpl extends Observable implements HashTree {
 
     @Override
     public void rebuildHashTrees(boolean fullRebuild) {
-        List<Integer> treeIds = treeIdProvider.getAllTreeIds();
+        Collection<Integer> treeIds = treeIdProvider.getAllTreeIds();
         for(int treeId: treeIds)
             rebuildHashTree(treeId, fullRebuild);
     }

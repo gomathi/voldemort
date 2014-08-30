@@ -35,4 +35,9 @@ public class HashTreeIdProviderImpl implements HashTreeIdProvider {
         return null;
     }
 
+    @Override
+    public boolean isPrimaryTreeId(int treeId) {
+        return false;
+    }
+
 }
