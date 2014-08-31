@@ -162,4 +162,9 @@ public class HashTreeMemStorage implements HashTreeStorage {
         versionedData.clear();
     }
 
+    @Override
+    public long getLatestVersionNo() {
+        return versionNo.get();
+    }
+
 }

@@ -82,8 +82,8 @@ public class HashTreePersistentStorage implements HashTreeStorage {
     public HashTreePersistentStorage(String dbDir, int noOfSegDataBlocks) throws Exception {
         this.dbObj = initDatabase(dbDir);
         this.noOfSegDataBlocks = noOfSegDataBlocks;
-        this.versionNo = new AtomicLong(loadTreeIdsAndVersionNos());
-        loadTreeIdsAndVersionNos();
+        this.versionNo = new AtomicLong(loadVersionNo());
+        loadVersionNo();
     }
 
     private static boolean createDir(String dirName) {
@@ -100,7 +100,7 @@ public class HashTreePersistentStorage implements HashTreeStorage {
         return new JniDBFactory().open(new File(dbDir), options);
     }
 
-    private long loadTreeIdsAndVersionNos() {
+    private long loadVersionNo() {
         byte[] keyPrefix = new byte[1];
         ByteBuffer keyPrefixBuf = ByteBuffer.wrap(keyPrefix);
         byte nextKeyVersionedDataPrefix = 'V' + 1;
@@ -450,5 +450,11 @@ public class HashTreePersistentStorage implements HashTreeStorage {
         if(itr.hasNext())
             return itr.next();
         return null;
+    }
+
+    @Override
+    public long getLatestVersionNo() {
+        long latestVersionNo = loadVersionNo();
+        return latestVersionNo;
     }
 }

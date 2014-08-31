@@ -13,31 +13,19 @@
  * License for the specific language governing permissions and limitations under
  * the License.
  */
-package voldemort.hashtrees.storage;
+package voldemort.client.subscriber;
 
-import java.nio.ByteBuffer;
-import java.util.Iterator;
+import java.util.List;
 
 import voldemort.hashtrees.thrift.generated.VersionedData;
 
-/**
- * Stores (key,value) with a monotonically increasing number. Using this number
- * clients can request for all the changes happened since this number.
- * 
- */
-public interface VersionedDataStorage {
+public interface SubscriberCallbackImpl {
 
-    VersionedData versionedPut(ByteBuffer key, ByteBuffer value);
-
-    VersionedData versionedRemove(ByteBuffer key);
-
-    Iterator<VersionedData> getVersionedData();
-
-    Iterator<VersionedData> getVersionedData(long fromVersionNo);
-
-    VersionedData fetchVersionedData(long versionNo);
-
-    void deleteAllVersionedData();
-
-    long getLatestVersionNo();
+    /**
+     * When the local subscriber server receives changes from Voldemort node,
+     * the server makes a call to this server.
+     * 
+     * @param vDataList
+     */
+    public void onPost(List<VersionedData> vDataList);
 }

@@ -32,7 +32,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 
-import org.apache.http.annotation.ThreadSafe;
 import org.apache.log4j.Logger;
 import org.apache.thrift.TException;
 import org.apache.thrift.protocol.TBinaryProtocol;
@@ -57,7 +56,8 @@ import com.google.common.collect.Collections2;
 
 /**
  * An observer that listens to all the changes that are happening in the
- * {@link VersionedDataStorage} and updates all the clients with that changes.
+ * {@link VersionedDataStorage} and updates all the subscribers with that
+ * changes.
  * 
  */
 public class VersionedDataObserver implements Observer {
@@ -76,13 +76,11 @@ public class VersionedDataObserver implements Observer {
     private final HashTreeImpl hashTree;
     private final HashTreeStorage hashTreeStorage;
     private final ConcurrentMap<Pair<String, Integer>, VersionedDataListenerService.Client> listeners = new ConcurrentHashMap<Pair<String, Integer>, VersionedDataListenerService.Client>();
-    private final BlockingQueue<List<VersionedData>> batchedDataQueue = new ArrayBlockingQueue<List<VersionedData>>(DEFAULT_QUE_SIZE);
-    private final VersionedDataAdder versionedDataAdder = new VersionedDataAdder();
-    private final BatchedDataDispatcher<VersionedData> dispatcher = new BatchedDataDispatcher<VersionedData>(CLIENT_BATCH_SIZE,
-                                                                                                             batchedDataQueue,
-                                                                                                             versionedDataAdder,
-                                                                                                             new VersionedDataHeapSizeCalculator());
-    private final ClientDataUpdater clientDataUpdater = new ClientDataUpdater();
+    private final VersionedDataAdder versionedDataAdder;
+    // This queue is shared between dispatcher and subscriber updater.
+    private final BlockingQueue<List<VersionedData>> batchedDataQueue;
+    private final BatchedDataDispatcher<VersionedData> batchedDataDispatcher;
+    private final SubscriberUpdater clientDataUpdater = new SubscriberUpdater();
 
     private volatile boolean started;
     private volatile boolean stopRequested = false;
@@ -94,12 +92,18 @@ public class VersionedDataObserver implements Observer {
         this.hashTree = hashTree;
         this.hashTreeStorage = hashTreeStorage;
         this.executors = Executors.newFixedThreadPool(noOfBGThreads);
+        this.versionedDataAdder = new VersionedDataAdder(hashTreeStorage.getLatestVersionNo() + 1);
+        this.batchedDataQueue = new ArrayBlockingQueue<List<VersionedData>>(DEFAULT_QUE_SIZE);
+        this.batchedDataDispatcher = new BatchedDataDispatcher<VersionedData>(CLIENT_BATCH_SIZE,
+                                                                              batchedDataQueue,
+                                                                              versionedDataAdder,
+                                                                              new VersionedDataHeapSizeCalculator());
     }
 
     public synchronized void start() {
         if(!started) {
             hashTree.addObserver(this);
-            new Thread(dispatcher).start();
+            new Thread(batchedDataDispatcher).start();
             new Thread(clientDataUpdater).start();
             started = true;
         }
@@ -123,9 +127,10 @@ public class VersionedDataObserver implements Observer {
         }
     }
 
-    public void enque(VersionedData data) {
-        if(stopRequested && data != STOP_MARKER)
+    public void enque(VersionedData vData) {
+        if(stopRequested && vData != STOP_MARKER)
             return;
+        versionedDataAdder.readData();
     }
 
     public void addListenerHostNameAndPortNo(String hostName, int portNo)
@@ -142,6 +147,8 @@ public class VersionedDataObserver implements Observer {
     }
 
     private void postDataToClients(final List<VersionedData> vDataList) {
+        if(vDataList == null || vDataList.isEmpty())
+            return;
         Collection<Callable<Boolean>> tasks = Collections2.transform(listeners.keySet(),
                                                                      new Function<Pair<String, Integer>, Callable<Boolean>>() {
 
@@ -192,23 +199,19 @@ public class VersionedDataObserver implements Observer {
         LOG.info("Total no of successful synchs : " + totFailures);
     }
 
-    @ThreadSafe
+    // This class is not threadsafe, should not be shared across multiple
+    // threads.
     private class VersionedDataAdder implements Iterator<VersionedData> {
 
         private final BlockingQueue<VersionedData> queue = new ArrayBlockingQueue<VersionedData>(1);
-        private long maxVersionsToRead;
-        private long currReadVersion;
-        private volatile boolean initialized = false;
+        private final Iterator<VersionedData> itr;
 
-        public void addData(VersionedData vData) {
-            if(!initialized) {
-                maxVersionsToRead = vData.versionNo;
-                currReadVersion = vData.versionNo;
-            }
-            boolean added = queue.offer(vData);
-            if(!added) {
-                maxVersionsToRead = vData.versionNo;
-            }
+        public VersionedDataAdder(long versionNo) {
+            itr = hashTreeStorage.getVersionedData(versionNo);
+        }
+
+        public void readData() {
+            loadData();
         }
 
         @Override
@@ -218,22 +221,20 @@ public class VersionedDataObserver implements Observer {
 
         @Override
         public VersionedData next() {
-            VersionedData ele = queue.peek();
-            if(ele == null) {
-                while(currReadVersion < maxVersionsToRead) {
-                    currReadVersion = currReadVersion + 1;
-                    VersionedData vData = hashTreeStorage.fetchVersionedData(currReadVersion);
-                    if(vData != null) {
-                        queue.add(vData);
-                        break;
-                    }
-                }
-            }
+            loadData();
             try {
                 return queue.take();
             } catch(InterruptedException e) {
-                throw new RuntimeException("Interrupted while waiting to remove an element.", e);
+                LOG.warn("Interrupted while waiting for data to be available.");
+                throw new RuntimeException(e);
             }
+        }
+
+        private void loadData() {
+            if(queue.size() == 1)
+                return;
+            else if(itr.hasNext())
+                queue.add(itr.next());
         }
 
         @Override
@@ -313,7 +314,7 @@ public class VersionedDataObserver implements Observer {
         }
     }
 
-    private class ClientDataUpdater implements Runnable {
+    private class SubscriberUpdater implements Runnable {
 
         @Override
         public void run() {
