@@ -16,9 +16,12 @@
 package voldemort.hashtrees.storage;
 
 import java.nio.ByteBuffer;
+import java.util.ArrayDeque;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
+import java.util.NoSuchElementException;
+import java.util.Queue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ConcurrentSkipListMap;
@@ -28,6 +31,8 @@ import voldemort.annotations.concurrency.Threadsafe;
 import voldemort.hashtrees.thrift.generated.SegmentData;
 import voldemort.hashtrees.thrift.generated.SegmentHash;
 import voldemort.hashtrees.thrift.generated.VersionedData;
+
+import com.google.common.collect.PeekingIterator;
 
 /**
  * In memory implementation of {@link HashTreeStorage} used only for unit
@@ -128,13 +133,17 @@ public class HashTreeMemStorage implements HashTreeStorage {
     }
 
     @Override
-    public Iterator<VersionedData> getVersionedData() {
-        return versionedData.values().iterator();
+    public PeekingIterator<VersionedData> getVersionedData() {
+        final Iterator<VersionedData> localItr = versionedData.values().iterator();
+        return new VersionedDataPeekingIterator(localItr);
     }
 
     @Override
-    public Iterator<VersionedData> getVersionedData(long versionNo) {
-        return versionedData.tailMap(versionNo).values().iterator();
+    public PeekingIterator<VersionedData> getVersionedData(long versionNo) {
+        final Iterator<VersionedData> localItr = versionedData.tailMap(versionNo)
+                                                              .values()
+                                                              .iterator();
+        return new VersionedDataPeekingIterator(localItr);
     }
 
     @Override
@@ -165,6 +174,47 @@ public class HashTreeMemStorage implements HashTreeStorage {
     @Override
     public long getLatestVersionNo() {
         return versionNo.get();
+    }
+
+    private static class VersionedDataPeekingIterator implements PeekingIterator<VersionedData> {
+
+        private final Queue<VersionedData> queue = new ArrayDeque<VersionedData>(1);
+        private final Iterator<VersionedData> itr;
+
+        public VersionedDataPeekingIterator(Iterator<VersionedData> itr) {
+            this.itr = itr;
+        }
+
+        private void loadData() {
+            if(itr.hasNext())
+                queue.add(itr.next());
+        }
+
+        @Override
+        public boolean hasNext() {
+            if(queue.size() == 0)
+                loadData();
+            return queue.size() > 0;
+        }
+
+        @Override
+        public VersionedData peek() {
+            if(!hasNext())
+                throw new NoSuchElementException();
+            return queue.peek();
+        }
+
+        @Override
+        public VersionedData next() {
+            if(!hasNext())
+                throw new NoSuchElementException();
+            return queue.peek();
+        }
+
+        @Override
+        public void remove() {
+            throw new UnsupportedOperationException();
+        }
     }
 
 }

@@ -41,6 +41,8 @@ import voldemort.hashtrees.thrift.generated.VersionedData;
 import voldemort.utils.AtomicBitSet;
 import voldemort.utils.ByteUtils;
 
+import com.google.common.collect.PeekingIterator;
+
 /**
  * Uses LevelDB for storing segment hashes and segment data. Dirty segment
  * markers are stored in memory.
@@ -357,7 +359,7 @@ public class HashTreePersistentStorage implements HashTreeStorage {
     }
 
     @Override
-    public Iterator<VersionedData> getVersionedData() {
+    public PeekingIterator<VersionedData> getVersionedData() {
         final byte[] seekKey = new byte[1];
         ByteBuffer bb = ByteBuffer.wrap(seekKey);
         bb.put(KEY_VERSIONED_DATA_PREFIX);
@@ -365,7 +367,7 @@ public class HashTreePersistentStorage implements HashTreeStorage {
     }
 
     @Override
-    public Iterator<VersionedData> getVersionedData(long versionNo) {
+    public PeekingIterator<VersionedData> getVersionedData(long versionNo) {
         final byte[] seekKey = new byte[1 + ByteUtils.SIZE_OF_LONG];
         final byte[] keyPrefix = new byte[1];
 
@@ -397,13 +399,23 @@ public class HashTreePersistentStorage implements HashTreeStorage {
         return new VersionedData(versionNo, addedOrRemoved, ByteBuffer.wrap(dataKey));
     }
 
-    private Iterator<VersionedData> getVersionedData(final byte[] startKey, final byte[] keyPrefix) {
+    /**
+     * Iterator returned by this method is not thread safe. It should not be
+     * shared.
+     * 
+     * @param startKey
+     * @param keyPrefix
+     * @return
+     */
+    private PeekingIterator<VersionedData> getVersionedData(final byte[] startKey,
+                                                            final byte[] keyPrefix) {
         final DBIterator iterator = dbObj.iterator();
         iterator.seek(startKey);
 
-        return new Iterator<VersionedData>() {
+        return new PeekingIterator<VersionedData>() {
 
             private Queue<VersionedData> queue = new ArrayDeque<VersionedData>(1);
+            private boolean itrClosed = false;
 
             @Override
             public boolean hasNext() {
@@ -425,7 +437,7 @@ public class HashTreePersistentStorage implements HashTreeStorage {
             }
 
             private void load() {
-                if(iterator.hasNext()) {
+                if(!itrClosed && iterator.hasNext()) {
                     if(ByteUtils.compare(keyPrefix,
                                          iterator.peekNext().getKey(),
                                          0,
@@ -438,7 +450,22 @@ public class HashTreePersistentStorage implements HashTreeStorage {
                         vData.setValue(rowValue);
                     queue.add(vData);
                     iterator.next();
-                }
+                } else
+                    try {
+                        iterator.close();
+                    } catch(IOException e) {
+                        LOG.warn("Exception occurred while closing the iterator", e);
+                        return;
+                    } finally {
+                        itrClosed = true;
+                    }
+            }
+
+            @Override
+            public VersionedData peek() {
+                if(queue.size() == 0)
+                    throw new NoSuchElementException();
+                return queue.peek();
             }
 
         };

@@ -22,8 +22,9 @@ import voldemort.hashtrees.thrift.generated.VersionedData;
 public interface SubscriberCallbackImpl {
 
     /**
-     * When the local subscriber server receives changes from Voldemort node,
-     * the server makes a call to this server.
+     * When the local subscriber receives changes from Voldemort node, the
+     * server makes a call to this server. The client has to implement what to
+     * do on receiving the data.
      * 
      * @param vDataList
      */

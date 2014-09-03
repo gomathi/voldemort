@@ -16,13 +16,14 @@
 package voldemort.hashtrees.storage;
 
 import java.nio.ByteBuffer;
-import java.util.Iterator;
 
 import voldemort.hashtrees.thrift.generated.VersionedData;
 
+import com.google.common.collect.PeekingIterator;
+
 /**
  * Stores (key,value) with a monotonically increasing number. Using this number
- * clients can request for all the changes happened since this number.
+ * clients can request for all the changes happened since a version number.
  * 
  */
 public interface VersionedDataStorage {
@@ -31,9 +32,9 @@ public interface VersionedDataStorage {
 
     VersionedData versionedRemove(ByteBuffer key);
 
-    Iterator<VersionedData> getVersionedData();
+    PeekingIterator<VersionedData> getVersionedData();
 
-    Iterator<VersionedData> getVersionedData(long fromVersionNo);
+    PeekingIterator<VersionedData> getVersionedData(long fromVersionNo);
 
     VersionedData fetchVersionedData(long versionNo);
 
